@@ -36,7 +36,7 @@ Write-Host "Building version: $Version"
 Write-Host ""
 
 # Build NeoForge
-Write-ColorOutput Yellow "[1/3] Building NeoForge version..."
+Write-ColorOutput Yellow "[1/4] Building NeoForge version..."
 $NeoForgeDir = Join-Path $PSScriptRoot "VonixCore-NeoForge-Universal"
 if (Test-Path $NeoForgeDir) {
     Push-Location $NeoForgeDir
@@ -61,15 +61,41 @@ if (Test-Path $NeoForgeDir) {
 
 Write-Host ""
 
+# Build Forge 1.20.1
+Write-ColorOutput Yellow "[2/4] Building Forge 1.20.1 version..."
+$Forge1201Dir = Join-Path $PSScriptRoot "VonixCore-Forge-1.20.1"
+if (Test-Path $Forge1201Dir) {
+    Push-Location $Forge1201Dir
+    try {
+        & ./gradlew build --no-daemon
+        if ($LASTEXITCODE -eq 0) {
+            $JarFiles = Get-ChildItem -Path "build\libs" -Filter "*.jar" | Where-Object { $_.Name -notmatch "sources|javadoc" }
+            foreach ($jar in $JarFiles) {
+                $DestName = "VonixCore-Forge-1.20.1-$Version.jar"
+                Copy-Item $jar.FullName (Join-Path $OutputDir $DestName)
+                Write-ColorOutput Green "  OK Built: $DestName"
+            }
+        } else {
+            Write-ColorOutput Red "  FAIL Forge 1.20.1 build failed!"
+        }
+    } finally {
+        Pop-Location
+    }
+} else {
+    Write-ColorOutput Red "  FAIL Forge 1.20.1 directory not found"
+}
+
+Write-Host ""
+
 # Build Paper
-Write-ColorOutput Yellow "[2/3] Building Paper version..."
+Write-ColorOutput Yellow "[3/4] Building Paper version..."
 $PaperDir = Join-Path $PSScriptRoot "VonixCore-Paper-Universal"
 if (Test-Path $PaperDir) {
     Push-Location $PaperDir
     try {
-        & ./gradlew fatJar --no-daemon
+        & ./gradlew build --no-daemon
         if ($LASTEXITCODE -eq 0) {
-            $JarFiles = Get-ChildItem -Path "build\libs" -Filter "*-all.jar"
+            $JarFiles = Get-ChildItem -Path "build\libs" -Filter "*.jar" | Where-Object { $_.Name -notmatch "sources|javadoc" }
             foreach ($jar in $JarFiles) {
                 $DestName = "VonixCore-Paper-$Version.jar"
                 Copy-Item $jar.FullName (Join-Path $OutputDir $DestName)
@@ -88,7 +114,7 @@ if (Test-Path $PaperDir) {
 Write-Host ""
 
 # Build Bukkit
-Write-ColorOutput Yellow "[3/3] Building Bukkit version..."
+Write-ColorOutput Yellow "[4/4] Building Bukkit version..."
 $BukkitDir = Join-Path $PSScriptRoot "VonixCore-Bukkit-Universal"
 if (Test-Path $BukkitDir) {
     Push-Location $BukkitDir

@@ -33,7 +33,7 @@ echo "Building version: $VERSION"
 echo ""
 
 # Build NeoForge
-echo -e "${YELLOW}[1/3] Building NeoForge version...${NC}"
+echo -e "${YELLOW}[1/4] Building NeoForge version...${NC}"
 NEOFORGE_DIR="$SCRIPT_DIR/VonixCore-NeoForge-Universal"
 if [ -d "$NEOFORGE_DIR" ]; then
     cd "$NEOFORGE_DIR"
@@ -50,13 +50,31 @@ fi
 
 echo ""
 
+# Build Forge 1.20.1
+echo -e "${YELLOW}[2/4] Building Forge 1.20.1 version...${NC}"
+FORGE_1201_DIR="$SCRIPT_DIR/VonixCore-Forge-1.20.1"
+if [ -d "$FORGE_1201_DIR" ]; then
+    cd "$FORGE_1201_DIR"
+    if ./gradlew build --no-daemon; then
+        find build/libs -name "*.jar" ! -name "*sources*" ! -name "*javadoc*" -exec cp {} "$OUTPUT_DIR/VonixCore-Forge-1.20.1-$VERSION.jar" \;
+        echo -e "${GREEN}  OK Built: VonixCore-Forge-1.20.1-$VERSION.jar${NC}"
+    else
+        echo -e "${RED}  FAIL Forge 1.20.1 build failed!${NC}"
+    fi
+    cd "$SCRIPT_DIR"
+else
+    echo -e "${RED}  FAIL Forge 1.20.1 directory not found${NC}"
+fi
+
+echo ""
+
 # Build Paper
-echo -e "${YELLOW}[2/3] Building Paper version...${NC}"
+echo -e "${YELLOW}[3/4] Building Paper version...${NC}"
 PAPER_DIR="$SCRIPT_DIR/VonixCore-Paper-Universal"
 if [ -d "$PAPER_DIR" ]; then
     cd "$PAPER_DIR"
-    if ./gradlew fatJar --no-daemon; then
-        find build/libs -name "*-all.jar" -exec cp {} "$OUTPUT_DIR/VonixCore-Paper-$VERSION.jar" \;
+    if ./gradlew build --no-daemon; then
+        find build/libs -name "*.jar" ! -name "*sources*" ! -name "*javadoc*" -exec cp {} "$OUTPUT_DIR/VonixCore-Paper-$VERSION.jar" \;
         echo -e "${GREEN}  OK Built: VonixCore-Paper-$VERSION.jar${NC}"
     else
         echo -e "${RED}  FAIL Paper build failed!${NC}"
@@ -69,7 +87,7 @@ fi
 echo ""
 
 # Build Bukkit
-echo -e "${YELLOW}[3/3] Building Bukkit version...${NC}"
+echo -e "${YELLOW}[4/4] Building Bukkit version...${NC}"
 BUKKIT_DIR="$SCRIPT_DIR/VonixCore-Bukkit-Universal"
 if [ -d "$BUKKIT_DIR" ]; then
     cd "$BUKKIT_DIR"
