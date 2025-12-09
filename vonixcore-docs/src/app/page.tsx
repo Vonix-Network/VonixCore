@@ -239,7 +239,7 @@ export default function HomePage() {
                 <ol className="space-y-2 text-muted-foreground">
                   <li className="flex items-start gap-3">
                     <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/20 text-primary text-sm flex items-center justify-center">1</span>
-                    <span>Download <code className="text-primary">VonixCore-NeoForge-x.x.x.jar</code> from Releases</span>
+                    <span>Download <code className="text-primary">VonixCore-NeoForge-1.0.0.jar</code> from Releases</span>
                   </li>
                   <li className="flex items-start gap-3">
                     <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/20 text-primary text-sm flex items-center justify-center">2</span>
@@ -261,7 +261,7 @@ export default function HomePage() {
                 <ol className="space-y-2 text-muted-foreground">
                   <li className="flex items-start gap-3">
                     <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/20 text-primary text-sm flex items-center justify-center">1</span>
-                    <span>Download <code className="text-primary">VonixCore-Paper-x.x.x.jar</code> or <code className="text-primary">VonixCore-Bukkit-x.x.x.jar</code></span>
+                    <span>Download <code className="text-primary">VonixCore-Paper-1.0.0.jar</code> or <code className="text-primary">VonixCore-Bukkit-1.0.0.jar</code></span>
                   </li>
                   <li className="flex items-start gap-3">
                     <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/20 text-primary text-sm flex items-center justify-center">2</span>
