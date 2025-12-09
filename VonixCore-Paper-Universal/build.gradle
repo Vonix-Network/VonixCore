@@ -58,7 +58,7 @@ processResources {
 }
 
 shadowJar {
-    archiveClassifier.set('all')
+    archiveClassifier.set('')
     
     // Relocate dependencies to avoid conflicts
     relocate 'com.zaxxer.hikari', 'network.vonix.vonixcore.libs.hikari'
@@ -87,3 +87,8 @@ tasks.register('fatJar', Jar) {
     }
 }
 
+
+tasks.build.dependsOn tasks.shadowJar
+// jar {
+//    enabled = false
+// }

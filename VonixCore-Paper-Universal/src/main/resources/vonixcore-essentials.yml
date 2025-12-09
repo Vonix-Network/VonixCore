@@ -1,0 +1,21 @@
+essentials:
+  enabled: true
+  features:
+    homes_enabled: true
+    warps_enabled: true
+    tpa_enabled: true
+    economy_enabled: true
+    kits_enabled: true
+    shops_enabled: false
+  homes:
+    max_homes: 5
+    cooldown: 5
+  tpa:
+    cooldown: 30
+    timeout: 120
+  economy:
+    starting_balance: 100.0
+    currency_symbol: "$"
+    currency_name: "Coins"
+  kits:
+    default_cooldown: 86400
