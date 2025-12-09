@@ -1,6 +1,6 @@
 plugins {
     id 'java'
-    id 'com.github.johnrengelman.shadow' version '8.1.1'
+    id 'com.gradleup.shadow' version '8.3.0'
 }
 
 group = 'network.vonix'
@@ -62,7 +62,7 @@ shadowJar {
     
     // Relocate dependencies to avoid conflicts
     relocate 'com.zaxxer.hikari', 'network.vonix.vonixcore.libs.hikari'
-    relocate 'org.sqlite', 'network.vonix.vonixcore.libs.sqlite'
+    // Do NOT relocate org.sqlite; relocating breaks sqlite-jdbc native bindings
     relocate 'org.javacord', 'network.vonix.vonixcore.libs.javacord'
     relocate 'okhttp3', 'network.vonix.vonixcore.libs.okhttp3'
     relocate 'okio', 'network.vonix.vonixcore.libs.okio'

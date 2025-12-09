@@ -1,0 +1,3 @@
+enabled: true
+format: "<gray>[<prefix><gray>] <white><displayname><gray>: <white><message>"
+format-chat: true

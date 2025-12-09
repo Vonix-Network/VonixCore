@@ -1,0 +1,39 @@
+discord:
+  enabled: false
+  connection:
+    bot_token: "YOUR_BOT_TOKEN_HERE"
+    channel_id: "YOUR_CHANNEL_ID_HERE"
+    webhook_url: "YOUR_WEBHOOK_URL_HERE"
+    webhook_id: ""
+    invite_url: ""
+  server_identity:
+    prefix: "[MC]"
+    name: "Minecraft Server"
+    avatar_url: ""
+  message_formats:
+    discord_to_minecraft: "§b[Discord] §f<{username}> {message}"
+    minecraft_to_discord: "{message}"
+    webhook_username: "{prefix}{username}"
+    avatar_url: "https://minotar.net/armor/bust/{uuid}/100.png"
+  events:
+    send_join: true
+    send_leave: true
+    send_death: true
+    send_advancement: true
+    event_channel_id: ""
+    event_webhook_url: ""
+  loop_prevention:
+    ignore_bots: false
+    ignore_webhooks: false
+    filter_by_prefix: true
+    show_other_server_events: true
+  bot_status:
+    enabled: true
+    format: "{online}/{max} players online"
+  account_linking:
+    enabled: true
+    code_expiry_seconds: 300
+  advanced:
+    debug_logging: false
+    message_queue_size: 100
+    rate_limit_delay: 1000

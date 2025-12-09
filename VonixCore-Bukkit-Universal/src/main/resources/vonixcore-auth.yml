@@ -1,0 +1,8 @@
+enabled: true
+sessions:
+  enabled: true
+  timeout: 86400
+security:
+  min-password-length: 8
+  max-login-attempts: 5
+  lockout-duration: 300
