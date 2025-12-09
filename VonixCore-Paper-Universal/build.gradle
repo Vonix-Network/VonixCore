@@ -62,7 +62,7 @@ shadowJar {
     
     // Relocate dependencies to avoid conflicts
     relocate 'com.zaxxer.hikari', 'network.vonix.vonixcore.libs.hikari'
-    relocate 'org.sqlite', 'network.vonix.vonixcore.libs.sqlite'
+    // Do NOT relocate org.sqlite; relocating breaks sqlite-jdbc native bindings
     relocate 'org.javacord', 'network.vonix.vonixcore.libs.javacord'
     relocate 'okhttp3', 'network.vonix.vonixcore.libs.okhttp3'
     relocate 'okio', 'network.vonix.vonixcore.libs.okio'
