@@ -93,9 +93,9 @@ $PaperDir = Join-Path $PSScriptRoot "VonixCore-Paper-Universal"
 if (Test-Path $PaperDir) {
     Push-Location $PaperDir
     try {
-        & ./gradlew build --no-daemon
+        & ./gradlew shadowJar --no-daemon
         if ($LASTEXITCODE -eq 0) {
-            $JarFiles = Get-ChildItem -Path "build\libs" -Filter "*.jar" | Where-Object { $_.Name -notmatch "sources|javadoc" }
+            $JarFiles = Get-ChildItem -Path "build\libs" -Filter "*-all.jar"
             foreach ($jar in $JarFiles) {
                 $DestName = "VonixCore-Paper-$Version.jar"
                 Copy-Item $jar.FullName (Join-Path $OutputDir $DestName)

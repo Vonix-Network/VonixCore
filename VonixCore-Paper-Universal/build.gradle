@@ -58,7 +58,7 @@ processResources {
 }
 
 shadowJar {
-    archiveClassifier.set('')
+    archiveClassifier.set('all')
     
     // Relocate dependencies to avoid conflicts
     relocate 'com.zaxxer.hikari', 'network.vonix.vonixcore.libs.hikari'

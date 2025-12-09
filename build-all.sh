@@ -73,8 +73,8 @@ echo -e "${YELLOW}[3/4] Building Paper version...${NC}"
 PAPER_DIR="$SCRIPT_DIR/VonixCore-Paper-Universal"
 if [ -d "$PAPER_DIR" ]; then
     cd "$PAPER_DIR"
-    if ./gradlew build --no-daemon; then
-        find build/libs -name "*.jar" ! -name "*sources*" ! -name "*javadoc*" -exec cp {} "$OUTPUT_DIR/VonixCore-Paper-$VERSION.jar" \;
+    if ./gradlew shadowJar --no-daemon; then
+        find build/libs -name "*-all.jar" -exec cp {} "$OUTPUT_DIR/VonixCore-Paper-$VERSION.jar" \;
         echo -e "${GREEN}  OK Built: VonixCore-Paper-$VERSION.jar${NC}"
     else
         echo -e "${RED}  FAIL Paper build failed!${NC}"
