@@ -1,0 +1,42 @@
+# VonixCore Build Artifacts
+BuildOutput/
+
+# Gradle
+.gradle/
+build/
+*/build/
+*/.gradle/
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+*.code-workspace
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Java
+*.class
+*.jar
+!gradle/wrapper/*.jar
+
+# Logs
+*.log
+logs/
+
+# Runtime
+run/
+*/run/
+
+# Generated
+src/generated/
+*/src/generated/
+
+# Caches
+.cache/
+*/caches/

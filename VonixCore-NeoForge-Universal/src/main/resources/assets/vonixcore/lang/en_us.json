@@ -1,0 +1,13 @@
+{
+  "itemGroup.vonixcore": "Example Mod Tab",
+  "block.vonixcore.example_block": "Example Block",
+  "item.vonixcore.example_item": "Example Item",
+
+  "vonixcore.configuration.title": "VonixCore Configs",
+  "vonixcore.configuration.section.vonixcore.common.toml": "VonixCore Configs",
+  "vonixcore.configuration.section.vonixcore.common.toml.title": "VonixCore Configs",
+  "vonixcore.configuration.items": "Item List",
+  "vonixcore.configuration.logDirtBlock": "Log Dirt Block",
+  "vonixcore.configuration.magicNumberIntroduction": "Magic Number Text",
+  "vonixcore.configuration.magicNumber": "Magic Number"
+}
