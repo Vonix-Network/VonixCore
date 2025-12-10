@@ -184,15 +184,38 @@ linked_role_id = ""`}
                 <h3>Commands</h3>
                 <p><strong>Minecraft:</strong></p>
                 <ul>
-                    <li><code>/discord link</code> - Generate a link code</li>
-                    <li><code>/discord unlink</code> - Unlink your account</li>
+                    <li><code>/vonix discord link</code> - Generate a link code</li>
+                    <li><code>/vonix discord unlink</code> - Unlink your account</li>
+                    <li><code>/vonix discord messages &lt;enable|disable&gt;</code> - Toggle Discord messages from other servers</li>
+                    <li><code>/vonix discord events &lt;enable|disable&gt;</code> - Toggle Discord event notifications</li>
+                    <li><code>/vonix discord help</code> - Show all Discord commands</li>
                 </ul>
                 <p><strong>Discord:</strong></p>
                 <ul>
                     <li><code>/link &lt;code&gt;</code> - Link with a code</li>
                     <li><code>/unlink</code> - Unlink your account</li>
-                    <li><code>/whois &lt;minecraft_name&gt;</code> - View linked account</li>
+                    <li><code>/list</code> - Show online players</li>
                 </ul>
+            </section>
+
+            {/* Message Filtering */}
+            <section>
+                <h2 id="filtering">🔇 Message Filtering</h2>
+
+                <h3>Server Messages</h3>
+                <p>In multi-server setups, you can filter messages from other Minecraft servers using VonixCore:</p>
+                <CodeBlock code={`/vonix discord messages disable`} language="text" />
+                <p>This will hide chat messages from other servers while still showing messages from your current server.</p>
+
+                <h3>Event Notifications</h3>
+                <p>You can also toggle event notifications (joins, leaves, deaths, advancements) from appearing in your chat:</p>
+                <CodeBlock code={`/vonix discord events disable`} language="text" />
+                <p>These events will still be sent to Discord, but won&apos;t appear in your Minecraft chat.</p>
+
+                <h3>Check Current Status</h3>
+                <p>To see your current filter settings, run the commands without arguments:</p>
+                <CodeBlock code={`/vonix discord messages
+/vonix discord events`} language="text" />
             </section>
 
             {/* Event Notifications */}
