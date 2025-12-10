@@ -29,9 +29,22 @@ public class Database {
     private final MinecraftServer server;
     private HikariDataSource dataSource;
     private DatabaseType databaseType = DatabaseType.SQLITE;
+    private final java.util.concurrent.ExecutorService executor;
 
     public Database(MinecraftServer server) {
         this.server = server;
+        this.executor = java.util.concurrent.Executors.newFixedThreadPool(2, r -> {
+            Thread thread = new Thread(r, "vonixcore-DB-Worker");
+            thread.setDaemon(true);
+            return thread;
+        });
+    }
+
+    /**
+     * Get the executor for async database operations.
+     */
+    public java.util.concurrent.ExecutorService getExecutor() {
+        return executor;
     }
 
     /**
@@ -253,9 +266,13 @@ public class Database {
                         id INTEGER PRIMARY KEY %s,
                         time BIGINT NOT NULL,
                         user %s NOT NULL,
+                        world %s NOT NULL,
+                        x INTEGER NOT NULL,
+                        y INTEGER NOT NULL,
+                        z INTEGER NOT NULL,
                         message %s NOT NULL
                     )
-                    """, autoIncrement, textType, textType));
+                    """, autoIncrement, textType, textType, textType));
 
             // Command log table
             stmt.execute(String.format("""
@@ -263,9 +280,13 @@ public class Database {
                         id INTEGER PRIMARY KEY %s,
                         time BIGINT NOT NULL,
                         user %s NOT NULL,
+                        world %s NOT NULL,
+                        x INTEGER NOT NULL,
+                        y INTEGER NOT NULL,
+                        z INTEGER NOT NULL,
                         command %s NOT NULL
                     )
-                    """, autoIncrement, textType, textType));
+                    """, autoIncrement, textType, textType, textType));
 
             // Sign log table
             stmt.execute(String.format("""
@@ -277,12 +298,23 @@ public class Database {
                         x INTEGER NOT NULL,
                         y INTEGER NOT NULL,
                         z INTEGER NOT NULL,
-                        line1 %s,
-                        line2 %s,
-                        line3 %s,
-                        line4 %s
+                        text %s
                     )
-                    """, autoIncrement, textType, textType, textType, textType, textType, textType));
+                    """, autoIncrement, textType, textType, textType));
+
+            // Interaction log table
+            stmt.execute(String.format("""
+                    CREATE TABLE IF NOT EXISTS vp_interaction (
+                        id INTEGER PRIMARY KEY %s,
+                        time BIGINT NOT NULL,
+                        user %s NOT NULL,
+                        world %s NOT NULL,
+                        x INTEGER NOT NULL,
+                        y INTEGER NOT NULL,
+                        z INTEGER NOT NULL,
+                        type %s NOT NULL
+                    )
+                    """, autoIncrement, textType, textType, textType));
 
             // User cache table
             stmt.execute(String.format("""
@@ -488,6 +520,17 @@ public class Database {
      * Close the database connection pool.
      */
     public void close() {
+        // Shutdown executor
+        executor.shutdown();
+        try {
+            if (!executor.awaitTermination(5, java.util.concurrent.TimeUnit.SECONDS)) {
+                executor.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            executor.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
+
         if (dataSource != null && !dataSource.isClosed()) {
             dataSource.close();
             VonixCore.LOGGER.info("[VonixCore] Database connection pool closed");
