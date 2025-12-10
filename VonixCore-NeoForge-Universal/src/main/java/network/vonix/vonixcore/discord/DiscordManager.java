@@ -82,6 +82,18 @@ public class DiscordManager {
             return;
         }
 
+        // Validate webhook URL format
+        String webhookUrl = DiscordConfig.CONFIG.webhookUrl.get();
+        if (webhookUrl != null && !webhookUrl.isEmpty() && !webhookUrl.contains("YOUR_WEBHOOK_URL")) {
+            if (!webhookUrl.startsWith("http://") && !webhookUrl.startsWith("https://")) {
+                VonixCore.LOGGER.error(
+                        "[Discord] Invalid webhook URL format: '{}'. Must start with http:// or https://", webhookUrl);
+                VonixCore.LOGGER.error(
+                        "[Discord] Example: https://discord.com/api/webhooks/YOUR_WEBHOOK_ID/YOUR_WEBHOOK_TOKEN");
+                return;
+            }
+        }
+
         VonixCore.LOGGER.info("[Discord] Starting Discord integration (Javacord + Webhooks)...");
 
         extractWebhookId();
@@ -98,7 +110,13 @@ public class DiscordManager {
         startMessageQueueThread();
 
         // Initialize Javacord
-        initializeJavacord(token);
+        try {
+            initializeJavacord(token);
+        } catch (Exception e) {
+            VonixCore.LOGGER.error("[Discord] Failed to initialize Discord", e);
+            running = false;
+            return;
+        }
 
         // Send startup embed
         String serverName = DiscordConfig.CONFIG.serverName.get();
@@ -688,6 +706,17 @@ public class DiscordManager {
             return;
         }
 
+        // Validate webhook URL format
+        if (!webhookUrl.startsWith("http://") && !webhookUrl.startsWith("https://")) {
+            VonixCore.LOGGER.error("[Discord] Invalid webhook URL format: '{}'. Skipping webhook send.", webhookUrl);
+            VonixCore.LOGGER.error("[Discord] Webhook URLs must start with http:// or https://");
+            VonixCore.LOGGER
+                    .error("[Discord] Example: https://discord.com/api/webhooks/YOUR_WEBHOOK_ID/YOUR_WEBHOOK_TOKEN");
+            VonixCore.LOGGER
+                    .error("[Discord] If you see a number like '144202...', that's a channel ID, not a webhook URL!");
+            return;
+        }
+
         JsonObject payload = new JsonObject();
 
         String prefix = DiscordConfig.CONFIG.serverPrefix.get();
@@ -845,4 +874,3 @@ public class DiscordManager {
         }
     }
 }
-

@@ -39,9 +39,10 @@ public class ChatFormatter {
         // Build the full message: [prefix] name [suffix]: message
         MutableComponent result = Component.empty();
 
-        // Add prefix
+        // Add prefix with space
         if (prefix != null && !prefix.isEmpty()) {
             result.append(parseColors(prefix));
+            result.append(Component.literal(" ")); // Add space after prefix
         }
 
         // Add player name with hover
@@ -53,8 +54,9 @@ public class ChatFormatter {
                                 "/msg " + playerName + " ")));
         result.append(nameComponent);
 
-        // Add suffix
+        // Add suffix with space
         if (suffix != null && !suffix.isEmpty()) {
+            result.append(Component.literal(" ")); // Add space before suffix
             result.append(parseColors(suffix));
         }
 
@@ -79,11 +81,13 @@ public class ChatFormatter {
 
         if (prefix != null && !prefix.isEmpty()) {
             result.append(parseColors(prefix));
+            result.append(Component.literal(" ")); // Add space after prefix
         }
 
         result.append(Component.literal(playerName));
 
         if (suffix != null && !suffix.isEmpty()) {
+            result.append(Component.literal(" ")); // Add space before suffix
             result.append(parseColors(suffix));
         }
 

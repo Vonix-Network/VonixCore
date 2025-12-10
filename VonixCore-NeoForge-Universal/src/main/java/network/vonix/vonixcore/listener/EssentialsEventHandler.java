@@ -80,8 +80,13 @@ public class EssentialsEventHandler {
         // Format the message with prefix/suffix
         Component formatted = ChatFormatter.formatChatMessage(player, rawMessage);
 
-        // Replace the message
-        event.setMessage(formatted);
+        // Cancel the event to prevent default formatting
+        event.setCanceled(true);
+
+        // Manually broadcast to all players
+        player.getServer().getPlayerList().getPlayers().forEach(p -> {
+            p.sendSystemMessage(formatted);
+        });
     }
 
     /**
