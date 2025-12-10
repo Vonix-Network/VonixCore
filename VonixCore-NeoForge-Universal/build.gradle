@@ -4,6 +4,9 @@ plugins {
     id 'net.neoforged.gradle.userdev' version '7.1.9'
 }
 
+// Enable JarJar for embedding dependencies
+jarJar.enable()
+
 tasks.named('wrapper', Wrapper).configure {
     // Define wrapper values here so as to not have to always do so when updating gradlew.properties.
     // Switching this to Wrapper.DistributionType.ALL will download the full gradle sources that comes with
@@ -28,7 +31,12 @@ base {
     archivesName = 'VonixCore-NeoForge'
 }
 
+// Use jarJar as the primary artifact (contains embedded dependencies)
 jar {
+    archiveClassifier = 'slim'
+}
+
+tasks.named('jarJar') {
     archiveClassifier = ''
 }
 
@@ -104,37 +112,85 @@ dependencies {
     // For all intends and purposes: You can treat this dependency as if it is a normal library you would use.
     implementation "net.neoforged:neoforge:${neo_version}"
 
-    // Database dependencies for VonixCore
+    // ========================================
+    // Database Dependencies (JarJar embedded)
+    // ========================================
+    
     // HikariCP for efficient connection pooling
     implementation 'com.zaxxer:HikariCP:5.1.0'
+    jarJar(group: 'com.zaxxer', name: 'HikariCP', version: '[5.0.0,6.0.0)')
+    
     // SQLite JDBC driver for embedded database support
     implementation 'org.xerial:sqlite-jdbc:3.45.1.0'
+    jarJar(group: 'org.xerial', name: 'sqlite-jdbc', version: '[3.40.0.0,4.0.0.0)')
+    
+    // SLF4J API (required by HikariCP) - PROVIDED by game/loader (don't bundle!)
+    compileOnly 'org.slf4j:slf4j-api:2.0.9'
+
 
     // ========================================
-    // Discord Integration Dependencies
+    // Discord Integration Dependencies (JarJar embedded)
     // ========================================
     
     // Javacord for Discord Bot API (gateway, slash commands, bot status)
     implementation 'org.javacord:javacord:3.8.0'
+    jarJar(group: 'org.javacord', name: 'javacord', version: '[3.8.0,4.0.0)')
+    
+    // Javacord core and API modules
+    implementation 'org.javacord:javacord-api:3.8.0'
+    jarJar(group: 'org.javacord', name: 'javacord-api', version: '[3.8.0,4.0.0)')
+    implementation 'org.javacord:javacord-core:3.8.0'
+    jarJar(group: 'org.javacord', name: 'javacord-core', version: '[3.8.0,4.0.0)')
     
     // OkHttp for webhook requests (faster than Javacord webhooks)
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
-    implementation 'com.squareup.okio:okio-jvm:3.9.0'
+    jarJar(group: 'com.squareup.okhttp3', name: 'okhttp', version: '[4.10.0,5.0.0)')
     
-    // Kotlin stdlib required by OkHttp 4.x
+    implementation 'com.squareup.okio:okio-jvm:3.9.0'
+    jarJar(group: 'com.squareup.okio', name: 'okio-jvm', version: '[3.5.0,4.0.0)')
+    
+    implementation 'com.squareup.okio:okio:3.9.0'
+    jarJar(group: 'com.squareup.okio', name: 'okio', version: '[3.5.0,4.0.0)')
+    
+    // Kotlin stdlib required by OkHttp 4.x - PROVIDED by KotlinForForge (don't bundle!)
+    // KotlinForForge is required in the modpack for other mods, so we rely on it
     compileOnly 'org.jetbrains.kotlin:kotlin-stdlib:1.9.22'
+    compileOnly 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.22'
+    compileOnly 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.9.22'
     
     // Jackson for JSON processing (Javacord transitive dependency)
     implementation 'com.fasterxml.jackson.core:jackson-databind:2.17.0'
+    jarJar(group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: '[2.15.0,3.0.0)')
+    
     implementation 'com.fasterxml.jackson.core:jackson-core:2.17.0'
+    jarJar(group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: '[2.15.0,3.0.0)')
+    
     implementation 'com.fasterxml.jackson.core:jackson-annotations:2.17.0'
+    jarJar(group: 'com.fasterxml.jackson.core', name: 'jackson-annotations', version: '[2.15.0,3.0.0)')
     
     // Javacord transitive dependencies
     implementation 'io.vavr:vavr:0.10.4'
-    implementation 'com.neovisionaries:nv-websocket-client:2.14'
-    implementation 'com.squareup.okhttp3:logging-interceptor:4.12.0'
+    jarJar(group: 'io.vavr', name: 'vavr', version: '[0.10.0,1.0.0)')
     
-    // LuckPerms API (optional runtime dependency)
+    implementation 'io.vavr:vavr-match:0.10.4'
+    jarJar(group: 'io.vavr', name: 'vavr-match', version: '[0.10.0,1.0.0)')
+    
+    implementation 'com.neovisionaries:nv-websocket-client:2.14'
+    jarJar(group: 'com.neovisionaries', name: 'nv-websocket-client', version: '[2.10,3.0)')
+    
+    implementation 'com.squareup.okhttp3:logging-interceptor:4.12.0'
+    jarJar(group: 'com.squareup.okhttp3', name: 'logging-interceptor', version: '[4.10.0,5.0.0)')
+    
+    // XSalsa20Poly1305 encryption library (required by Javacord for voice)
+    implementation 'com.codahale:xsalsa20poly1305:0.11.0'
+    jarJar(group: 'com.codahale', name: 'xsalsa20poly1305', version: '[0.11.0,1.0.0)')
+    
+    // Bouncy Castle crypto provider (required by xsalsa20poly1305)
+    implementation 'org.bouncycastle:bcprov-jdk18on:1.78.1'
+    jarJar(group: 'org.bouncycastle', name: 'bcprov-jdk18on', version: '[1.70,2.0.0)')
+
+    
+    // LuckPerms API (optional runtime dependency - NOT embedded)
     compileOnly 'net.luckperms:api:5.4'
 
     // For more info:
