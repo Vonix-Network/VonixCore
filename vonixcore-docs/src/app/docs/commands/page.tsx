@@ -1,9 +1,10 @@
 import { Metadata } from 'next';
 import { DocPageLayout } from '@/components/doc-page-layout';
+import { CodeBlock } from '@/components/code-block';
 
 export const metadata: Metadata = {
     title: 'Commands Reference - VonixCore Docs',
-    description: 'Complete reference of all commands available in VonixCore organized by category.',
+    description: 'Complete reference of all commands available in VonixCore, organized by category.',
 };
 
 export default function CommandsPage() {
@@ -66,7 +67,7 @@ export default function CommandsPage() {
                     </table>
                 </div>
 
-                <h3 id="tpa">TPA (Teleport Request) Commands</h3>
+                <h3>TPA (Teleport Request) Commands</h3>
                 <div className="overflow-x-auto">
                     <table>
                         <thead>
@@ -238,6 +239,153 @@ export default function CommandsPage() {
                 </div>
             </section>
 
+            {/* Shop Commands */}
+            <section>
+                <h2 id="shops">🛒 Shop Commands</h2>
+
+                <h3>GUI Shop Commands</h3>
+                <div className="overflow-x-auto">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Command</th>
+                                <th>Permission</th>
+                                <th>Description</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>/shop</code></td>
+                                <td><code>vonixcore.shop</code></td>
+                                <td>Open admin/server shop GUI</td>
+                            </tr>
+                            <tr>
+                                <td><code>/shop server</code></td>
+                                <td><code>vonixcore.shop</code></td>
+                                <td>Open server shop GUI</td>
+                            </tr>
+                            <tr>
+                                <td><code>/shop player</code></td>
+                                <td><code>vonixcore.shop</code></td>
+                                <td>Open player market GUI</td>
+                            </tr>
+                            <tr>
+                                <td><code>/shop player sell</code></td>
+                                <td><code>vonixcore.shop.sell</code></td>
+                                <td>List held item for sale</td>
+                            </tr>
+                            <tr>
+                                <td><code>/market</code></td>
+                                <td><code>vonixcore.shop</code></td>
+                                <td>Open player market GUI</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3>Quick Sell Commands</h3>
+                <div className="overflow-x-auto">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Command</th>
+                                <th>Permission</th>
+                                <th>Description</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>/sell hand</code></td>
+                                <td><code>vonixcore.sell</code></td>
+                                <td>Sell held item to server shop</td>
+                            </tr>
+                            <tr>
+                                <td><code>/sell all</code></td>
+                                <td><code>vonixcore.sell</code></td>
+                                <td>Sell all sellable items in inventory</td>
+                            </tr>
+                            <tr>
+                                <td><code>/daily</code></td>
+                                <td><code>vonixcore.daily</code></td>
+                                <td>Claim daily reward</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3>Chest Shop Commands</h3>
+                <div className="overflow-x-auto">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Command</th>
+                                <th>Permission</th>
+                                <th>Description</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>/chestshop create</code></td>
+                                <td><code>vonixcore.chestshop</code></td>
+                                <td>Start chest shop creation</td>
+                            </tr>
+                            <tr>
+                                <td><code>/chestshop remove</code></td>
+                                <td><code>vonixcore.chestshop</code></td>
+                                <td>Remove your chest shop</td>
+                            </tr>
+                            <tr>
+                                <td><code>/chestshop cancel</code></td>
+                                <td><code>vonixcore.chestshop</code></td>
+                                <td>Cancel shop creation</td>
+                            </tr>
+                            <tr>
+                                <td><code>/chestshop info</code></td>
+                                <td><code>vonixcore.chestshop</code></td>
+                                <td>View chest shop information</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3>Admin Shop Commands</h3>
+                <div className="overflow-x-auto">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Command</th>
+                                <th>Permission</th>
+                                <th>Description</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>/adminshop setprice &lt;item&gt; &lt;buy&gt; &lt;sell&gt;</code></td>
+                                <td><code>vonixcore.adminshop</code></td>
+                                <td>Set server shop prices</td>
+                            </tr>
+                            <tr>
+                                <td><code>/adminshop list</code></td>
+                                <td><code>vonixcore.adminshop</code></td>
+                                <td>List all server shop items</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3>Sign Shops</h3>
+                <p>Create sign shops by placing a sign with this format:</p>
+                <CodeBlock code={`[Buy] or [Sell]
+<quantity>
+<item name>
+$<price>`} language="text" />
+                <p>Example buy sign:</p>
+                <CodeBlock code={`[Buy]
+16
+diamond
+$500`} language="text" />
+            </section>
+
             {/* Player Utility Commands */}
             <section>
                 <h2 id="utility">👤 Player Utility Commands</h2>
@@ -296,6 +444,11 @@ export default function CommandsPage() {
                                 <td><code>vonixcore.list</code></td>
                                 <td>Enhanced player list</td>
                             </tr>
+                            <tr>
+                                <td><code>/suicide</code></td>
+                                <td><code>vonixcore.suicide</code></td>
+                                <td>Kill yourself</td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>
@@ -335,6 +488,11 @@ export default function CommandsPage() {
                                 <td><code>/r &lt;message&gt;</code></td>
                                 <td><code>vonixcore.msg</code></td>
                                 <td>Reply to last message</td>
+                            </tr>
+                            <tr>
+                                <td><code>/reply &lt;message&gt;</code></td>
+                                <td><code>vonixcore.msg</code></td>
+                                <td>Alias for /r</td>
                             </tr>
                             <tr>
                                 <td><code>/ignore &lt;player&gt;</code></td>
@@ -453,6 +611,16 @@ export default function CommandsPage() {
                                 <td>Strike lightning at player or look position</td>
                             </tr>
                             <tr>
+                                <td><code>/smite [player]</code></td>
+                                <td><code>vonixcore.lightning</code></td>
+                                <td>Alias for /lightning</td>
+                            </tr>
+                            <tr>
+                                <td><code>/ext [player]</code></td>
+                                <td><code>vonixcore.ext</code></td>
+                                <td>Extinguish fire on player</td>
+                            </tr>
+                            <tr>
                                 <td><code>/afk [message]</code></td>
                                 <td><code>vonixcore.afk</code></td>
                                 <td>Toggle AFK status with optional message</td>
@@ -520,6 +688,175 @@ export default function CommandsPage() {
                 </div>
             </section>
 
+            {/* Permission Commands */}
+            <section>
+                <h2 id="permissions">🔑 Permission Commands</h2>
+                <div className="overflow-x-auto">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Command</th>
+                                <th>Permission</th>
+                                <th>Description</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>/perm user &lt;player&gt; info</code></td>
+                                <td><code>vonixcore.perm</code></td>
+                                <td>View player permission info</td>
+                            </tr>
+                            <tr>
+                                <td><code>/perm user &lt;player&gt; group set &lt;group&gt;</code></td>
+                                <td><code>vonixcore.perm</code></td>
+                                <td>Set player&apos;s primary group</td>
+                            </tr>
+                            <tr>
+                                <td><code>/perm user &lt;player&gt; group add &lt;group&gt;</code></td>
+                                <td><code>vonixcore.perm</code></td>
+                                <td>Add player to a group</td>
+                            </tr>
+                            <tr>
+                                <td><code>/perm user &lt;player&gt; group remove &lt;group&gt;</code></td>
+                                <td><code>vonixcore.perm</code></td>
+                                <td>Remove player from a group</td>
+                            </tr>
+                            <tr>
+                                <td><code>/perm user &lt;player&gt; permission set &lt;perm&gt; &lt;true/false&gt;</code></td>
+                                <td><code>vonixcore.perm</code></td>
+                                <td>Set a permission</td>
+                            </tr>
+                            <tr>
+                                <td><code>/perm user &lt;player&gt; permission unset &lt;perm&gt;</code></td>
+                                <td><code>vonixcore.perm</code></td>
+                                <td>Remove a permission</td>
+                            </tr>
+                            <tr>
+                                <td><code>/perm user &lt;player&gt; permission check &lt;perm&gt;</code></td>
+                                <td><code>vonixcore.perm</code></td>
+                                <td>Check if player has permission</td>
+                            </tr>
+                            <tr>
+                                <td><code>/perm user &lt;player&gt; meta setprefix &lt;prefix&gt;</code></td>
+                                <td><code>vonixcore.perm</code></td>
+                                <td>Set player&apos;s prefix</td>
+                            </tr>
+                            <tr>
+                                <td><code>/perm user &lt;player&gt; meta setsuffix &lt;suffix&gt;</code></td>
+                                <td><code>vonixcore.perm</code></td>
+                                <td>Set player&apos;s suffix</td>
+                            </tr>
+                            <tr>
+                                <td><code>/perm group &lt;group&gt; info</code></td>
+                                <td><code>vonixcore.perm</code></td>
+                                <td>View group info</td>
+                            </tr>
+                            <tr>
+                                <td><code>/perm group &lt;group&gt; create</code></td>
+                                <td><code>vonixcore.perm</code></td>
+                                <td>Create a new group</td>
+                            </tr>
+                            <tr>
+                                <td><code>/perm group &lt;group&gt; delete</code></td>
+                                <td><code>vonixcore.perm</code></td>
+                                <td>Delete a group</td>
+                            </tr>
+                            <tr>
+                                <td><code>/perm group &lt;group&gt; permission set &lt;perm&gt; &lt;true/false&gt;</code></td>
+                                <td><code>vonixcore.perm</code></td>
+                                <td>Set group permission</td>
+                            </tr>
+                            <tr>
+                                <td><code>/perm group &lt;group&gt; meta setprefix &lt;prefix&gt;</code></td>
+                                <td><code>vonixcore.perm</code></td>
+                                <td>Set group prefix</td>
+                            </tr>
+                            <tr>
+                                <td><code>/perm group &lt;group&gt; meta setsuffix &lt;suffix&gt;</code></td>
+                                <td><code>vonixcore.perm</code></td>
+                                <td>Set group suffix</td>
+                            </tr>
+                            <tr>
+                                <td><code>/perm group &lt;group&gt; meta setweight &lt;weight&gt;</code></td>
+                                <td><code>vonixcore.perm</code></td>
+                                <td>Set group weight (priority)</td>
+                            </tr>
+                            <tr>
+                                <td><code>/perm group &lt;group&gt; parent set &lt;parent&gt;</code></td>
+                                <td><code>vonixcore.perm</code></td>
+                                <td>Set group&apos;s parent</td>
+                            </tr>
+                            <tr>
+                                <td><code>/perm listgroups</code></td>
+                                <td><code>vonixcore.perm</code></td>
+                                <td>List all groups</td>
+                            </tr>
+                            <tr>
+                                <td><code>/lp ...</code></td>
+                                <td><code>vonixcore.perm</code></td>
+                                <td>Alias for /perm</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>See <a href="/docs/permissions">Permissions</a> for detailed permission system documentation.</p>
+            </section>
+
+            {/* VonixCore Admin Commands */}
+            <section>
+                <h2 id="admin">⚙️ VonixCore Admin Commands</h2>
+                <div className="overflow-x-auto">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Command</th>
+                                <th>Permission</th>
+                                <th>Description</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>/vonixcore</code></td>
+                                <td><code>vonixcore.admin</code></td>
+                                <td>Show VonixCore help</td>
+                            </tr>
+                            <tr>
+                                <td><code>/vonixcore reload</code></td>
+                                <td><code>vonixcore.admin</code></td>
+                                <td>Reload all configurations</td>
+                            </tr>
+                            <tr>
+                                <td><code>/vonixcore reload &lt;module&gt;</code></td>
+                                <td><code>vonixcore.admin</code></td>
+                                <td>Reload specific module config</td>
+                            </tr>
+                            <tr>
+                                <td><code>/vonixcore version</code></td>
+                                <td><code>vonixcore.admin</code></td>
+                                <td>Show VonixCore version</td>
+                            </tr>
+                            <tr>
+                                <td><code>/vonixcore status</code></td>
+                                <td><code>vonixcore.admin</code></td>
+                                <td>Show enabled/disabled modules</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3>Reload Modules</h3>
+                <p>Available modules for <code>/vonixcore reload &lt;module&gt;</code>:</p>
+                <ul>
+                    <li><code>all</code> - Reload all configurations</li>
+                    <li><code>database</code> - Database connection settings</li>
+                    <li><code>protection</code> - Block logging settings</li>
+                    <li><code>essentials</code> - Homes, warps, economy, kits settings</li>
+                    <li><code>discord</code> - Discord integration settings</li>
+                    <li><code>xpsync</code> - XP sync settings</li>
+                    <li><code>auth</code> - Authentication settings</li>
+                </ul>
+            </section>
+
             {/* Discord Commands */}
             <section>
                 <h2 id="discord">📱 Discord Commands</h2>
@@ -534,14 +871,24 @@ export default function CommandsPage() {
                         </thead>
                         <tbody>
                             <tr>
-                                <td><code>/discord link</code></td>
+                                <td><code>/vonix discord link</code></td>
                                 <td><code>vonixcore.discord.link</code></td>
                                 <td>Generate a link code</td>
                             </tr>
                             <tr>
-                                <td><code>/discord unlink</code></td>
+                                <td><code>/vonix discord unlink</code></td>
                                 <td><code>vonixcore.discord.link</code></td>
                                 <td>Unlink your Discord account</td>
+                            </tr>
+                            <tr>
+                                <td><code>/vonix discord messages &lt;enable|disable&gt;</code></td>
+                                <td><code>vonixcore.discord</code></td>
+                                <td>Toggle Discord messages from other servers</td>
+                            </tr>
+                            <tr>
+                                <td><code>/vonix discord events &lt;enable|disable&gt;</code></td>
+                                <td><code>vonixcore.discord</code></td>
+                                <td>Toggle Discord event notifications</td>
                             </tr>
                         </tbody>
                     </table>
