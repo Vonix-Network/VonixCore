@@ -15,6 +15,7 @@
 | Platform | Minecraft Versions | Java | Status |
 |----------|-------------------|------|--------|
 | **NeoForge** | 1.20.2 - 1.21.x | Java 21 | ✅ Release |
+| **Forge** | 1.20.1 | Java 17+ | ✅ Release |
 | **Paper** | 1.18.2 - 1.21.x | Java 17+ | ✅ Release |
 | **Bukkit/Spigot** | 1.18.2 - 1.21.x | Java 17+ | ✅ Release |
 
@@ -47,10 +48,14 @@ Personal homes and server-wide warps.
 - Multiple homes per player (configurable)
 - Server warps accessible to all
 
-### 💰 Economy System
-Full-featured economy with baltop, pay, and more.
+### 💰 Economy & Shop System
+Full-featured economy with shops and trading.
 - Persistent player balances
 - Player-to-player transactions
+- **GUI Shops** - Visual server shop and player market
+- **Chest Shops** - Player-owned physical shops
+- **Sign Shops** - Admin sign-based shops
+- **Daily Rewards** - Login streak bonuses
 - Leaderboards
 
 ### 📍 Teleportation Suite

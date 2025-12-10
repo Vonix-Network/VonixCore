@@ -177,6 +177,78 @@ See [Permissions](permissions.md) for detailed permission system documentation.
 
 ---
 
+## ⚙️ VonixCore Admin Commands
+
+| Command | Permission | Description |
+|---------|------------|-------------|
+| `/vonixcore` | `vonixcore.admin` | Show VonixCore help |
+| `/vonixcore reload` | `vonixcore.admin` | Reload all configurations |
+| `/vonixcore reload <module>` | `vonixcore.admin` | Reload specific module config |
+| `/vonixcore version` | `vonixcore.admin` | Show VonixCore version |
+| `/vonixcore status` | `vonixcore.admin` | Show enabled/disabled modules |
+
+### Reload Modules
+Available modules for `/vonixcore reload <module>`:
+- `all` - Reload all configurations
+- `database` - Database connection settings
+- `protection` - Block logging settings
+- `essentials` - Homes, warps, economy, kits settings
+- `discord` - Discord integration settings
+- `xpsync` - XP sync settings
+- `auth` - Authentication settings
+
+---
+
+## 🛒 Shop Commands
+
+### GUI Shop Commands
+| Command | Permission | Description |
+|---------|------------|-------------|
+| `/shop` | `vonixcore.shop` | Open admin/server shop GUI |
+| `/shop server` | `vonixcore.shop` | Open server shop GUI |
+| `/shop player` | `vonixcore.shop` | Open player market GUI |
+| `/shop player sell` | `vonixcore.shop.sell` | List held item for sale |
+| `/market` | `vonixcore.shop` | Open player market GUI |
+
+### Quick Sell Commands
+| Command | Permission | Description |
+|---------|------------|-------------|
+| `/sell hand` | `vonixcore.sell` | Sell held item to server shop |
+| `/sell all` | `vonixcore.sell` | Sell all sellable items in inventory |
+| `/daily` | `vonixcore.daily` | Claim daily reward |
+
+### Chest Shop Commands
+| Command | Permission | Description |
+|---------|------------|-------------|
+| `/chestshop create` | `vonixcore.chestshop` | Start chest shop creation |
+| `/chestshop remove` | `vonixcore.chestshop` | Remove your chest shop |
+| `/chestshop cancel` | `vonixcore.chestshop` | Cancel shop creation |
+| `/chestshop info` | `vonixcore.chestshop` | View chest shop information |
+
+### Admin Shop Commands
+| Command | Permission | Description |
+|---------|------------|-------------|
+| `/adminshop setprice <item> <buy> <sell>` | `vonixcore.adminshop` | Set server shop prices |
+| `/adminshop list` | `vonixcore.adminshop` | List all server shop items |
+
+### Sign Shops
+Create sign shops by placing a sign with this format:
+```
+[Buy] or [Sell]
+<quantity>
+<item name>
+$<price>
+```
+Example buy sign:
+```
+[Buy]
+16
+diamond
+$500
+```
+
+---
+
 ## 📱 Discord Commands
 
 | Command | Permission | Description |

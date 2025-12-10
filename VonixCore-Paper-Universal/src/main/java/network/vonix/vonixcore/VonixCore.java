@@ -2,8 +2,14 @@ package network.vonix.vonixcore;
 
 import network.vonix.vonixcore.config.*;
 import network.vonix.vonixcore.database.Database;
+import network.vonix.vonixcore.economy.TransactionLog;
+import network.vonix.vonixcore.jobs.JobsCommands;
+import network.vonix.vonixcore.jobs.JobsManager;
+import network.vonix.vonixcore.shops.ShopsCommands;
+import network.vonix.vonixcore.shops.ShopsManager;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.logging.Level;
 
@@ -12,6 +18,8 @@ public class VonixCore extends JavaPlugin {
     private static VonixCore instance;
     private Database database;
     private ConfigManager configManager;
+    private ShopsManager shopsManager;
+    private JobsManager jobsManager;
 
     @Override
     public void onEnable() {
@@ -53,6 +61,57 @@ public class VonixCore extends JavaPlugin {
 
         getCommand("balance").setExecutor(new network.vonix.vonixcore.economy.EconomyCommands());
         getCommand("pay").setExecutor(new network.vonix.vonixcore.economy.EconomyCommands());
+
+        // Initialize Shops system
+        try (Connection conn = database.getConnection()) {
+            // Initialize transaction log table
+            TransactionLog.getInstance().initializeTable(conn);
+
+            // Initialize shops
+            shopsManager = ShopsManager.getInstance();
+            shopsManager.initialize(conn);
+
+            // Register shop commands
+            ShopsCommands shopsCmds = new ShopsCommands(this, shopsManager);
+            if (getCommand("shop") != null) {
+                getCommand("shop").setExecutor(shopsCmds);
+                getCommand("shop").setTabCompleter(shopsCmds);
+            }
+            if (getCommand("cshop") != null) {
+                getCommand("cshop").setExecutor(shopsCmds);
+                getCommand("cshop").setTabCompleter(shopsCmds);
+            }
+            if (getCommand("market") != null) {
+                getCommand("market").setExecutor(shopsCmds);
+                getCommand("market").setTabCompleter(shopsCmds);
+            }
+            if (getCommand("pshop") != null) {
+                getCommand("pshop").setExecutor(shopsCmds);
+                getCommand("pshop").setTabCompleter(shopsCmds);
+            }
+            if (getCommand("shopadmin") != null) {
+                getCommand("shopadmin").setExecutor(shopsCmds);
+                getCommand("shopadmin").setTabCompleter(shopsCmds);
+            }
+            getLogger().info("Shops system initialized.");
+        } catch (SQLException e) {
+            getLogger().log(Level.WARNING, "Failed to initialize shops system", e);
+        }
+
+        // Initialize Jobs system
+        try (Connection conn = database.getConnection()) {
+            jobsManager = new JobsManager(this);
+            jobsManager.initialize(conn);
+
+            JobsCommands jobsCmds = new JobsCommands(this, jobsManager);
+            if (getCommand("jobs") != null) {
+                getCommand("jobs").setExecutor(jobsCmds);
+                getCommand("jobs").setTabCompleter(jobsCmds);
+            }
+            getLogger().info("Jobs system initialized.");
+        } catch (SQLException e) {
+            getLogger().log(Level.WARNING, "Failed to initialize jobs system", e);
+        }
 
         // Register listeners
         getServer().getPluginManager().registerEvents(new network.vonix.vonixcore.essentials.EssentialsListener(),
@@ -112,6 +171,16 @@ public class VonixCore extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        // Shutdown Jobs
+        if (jobsManager != null) {
+            jobsManager.shutdown();
+        }
+
+        // Shutdown Shops
+        if (shopsManager != null) {
+            shopsManager.shutdown();
+        }
+
         if (database != null) {
             database.close();
         }
@@ -137,6 +206,7 @@ public class VonixCore extends JavaPlugin {
         // Load new configs (self-loading)
         network.vonix.vonixcore.config.AuthConfig.load();
         network.vonix.vonixcore.config.ChatConfig.load();
+        ShopsConfig.load(getDataFolder());
     }
 
     public static VonixCore getInstance() {
@@ -145,5 +215,9 @@ public class VonixCore extends JavaPlugin {
 
     public Database getDatabase() {
         return database;
+    }
+
+    public ShopsManager getShopsManager() {
+        return shopsManager;
     }
 }

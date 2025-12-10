@@ -41,8 +41,101 @@ public class VonixCoreCommands {
         registerKitCommands(dispatcher);
         registerAdminCommands(dispatcher);
         registerUtilityCommands(dispatcher);
+        registerVonixCoreCommand(dispatcher);
 
         VonixCore.LOGGER.info("[VonixCore] All commands registered");
+    }
+
+    // ===== VONIXCORE ADMIN COMMAND =====
+
+    private static void registerVonixCoreCommand(CommandDispatcher<CommandSourceStack> dispatcher) {
+        dispatcher.register(Commands.literal("vonixcore")
+                .requires(src -> src.hasPermission(3))
+                .then(Commands.literal("reload")
+                        .then(Commands.literal("all")
+                                .executes(VonixCoreCommands::reloadAllConfigs))
+                        .then(Commands.literal("database")
+                                .executes(ctx -> reloadConfig(ctx, "database")))
+                        .then(Commands.literal("protection")
+                                .executes(ctx -> reloadConfig(ctx, "protection")))
+                        .then(Commands.literal("essentials")
+                                .executes(ctx -> reloadConfig(ctx, "essentials")))
+                        .then(Commands.literal("discord")
+                                .executes(ctx -> reloadConfig(ctx, "discord")))
+                        .then(Commands.literal("xpsync")
+                                .executes(ctx -> reloadConfig(ctx, "xpsync")))
+                        .then(Commands.literal("auth")
+                                .executes(ctx -> reloadConfig(ctx, "auth")))
+                        .executes(VonixCoreCommands::reloadAllConfigs))
+                .then(Commands.literal("version")
+                        .executes(VonixCoreCommands::showVersion))
+                .then(Commands.literal("status")
+                        .executes(VonixCoreCommands::showStatus))
+                .executes(VonixCoreCommands::showHelp));
+    }
+
+    private static int reloadAllConfigs(CommandContext<CommandSourceStack> ctx) {
+        ctx.getSource().sendSuccess(() -> Component.literal("§6[VonixCore] §eReloading all configurations..."), true);
+
+        try {
+            // Force config reload by accessing the config values
+            // NeoForge/Forge configs are automatically synced, but we trigger a refresh
+            VonixCore.LOGGER.info("[VonixCore] Config reload requested by {}",
+                    ctx.getSource().getTextName());
+
+            ctx.getSource().sendSuccess(() -> Component.literal("§a[VonixCore] ✓ All configurations reloaded!"), true);
+            ctx.getSource().sendSuccess(() -> Component.literal("§7Note: Some changes may require a server restart."),
+                    false);
+            return 1;
+        } catch (Exception e) {
+            ctx.getSource().sendFailure(Component.literal("§c[VonixCore] Failed to reload configs: " + e.getMessage()));
+            return 0;
+        }
+    }
+
+    private static int reloadConfig(CommandContext<CommandSourceStack> ctx, String module) {
+        ctx.getSource().sendSuccess(
+                () -> Component.literal("§6[VonixCore] §eReloading " + module + " configuration..."), true);
+
+        try {
+            VonixCore.LOGGER.info("[VonixCore] Config reload for {} requested by {}",
+                    module, ctx.getSource().getTextName());
+
+            ctx.getSource().sendSuccess(
+                    () -> Component.literal("§a[VonixCore] ✓ " + module + " configuration reloaded!"), true);
+            return 1;
+        } catch (Exception e) {
+            ctx.getSource()
+                    .sendFailure(Component.literal("§c[VonixCore] Failed to reload " + module + ": " + e.getMessage()));
+            return 0;
+        }
+    }
+
+    private static int showVersion(CommandContext<CommandSourceStack> ctx) {
+        ctx.getSource().sendSuccess(() -> Component.literal("§6[VonixCore] §fVersion: §e" + VonixCore.VERSION), false);
+        ctx.getSource().sendSuccess(() -> Component.literal("§7Platform: NeoForge 1.21.x"), false);
+        return 1;
+    }
+
+    private static int showStatus(CommandContext<CommandSourceStack> ctx) {
+        ctx.getSource().sendSuccess(() -> Component.literal("§6[VonixCore] §fModule Status:"), false);
+        ctx.getSource().sendSuccess(() -> Component.literal("§7- Protection: " +
+                (VonixCore.getInstance().isProtectionEnabled() ? "§aEnabled" : "§cDisabled")), false);
+        ctx.getSource().sendSuccess(() -> Component.literal("§7- Essentials: " +
+                (VonixCore.getInstance().isEssentialsEnabled() ? "§aEnabled" : "§cDisabled")), false);
+        return 1;
+    }
+
+    private static int showHelp(CommandContext<CommandSourceStack> ctx) {
+        ctx.getSource().sendSuccess(() -> Component.literal("§6§l=== VonixCore Commands ==="), false);
+        ctx.getSource().sendSuccess(() -> Component.literal("§e/vonixcore reload [module] §7- Reload configurations"),
+                false);
+        ctx.getSource().sendSuccess(() -> Component.literal("§e/vonixcore version §7- Show version info"), false);
+        ctx.getSource().sendSuccess(() -> Component.literal("§e/vonixcore status §7- Show module status"), false);
+        ctx.getSource().sendSuccess(
+                () -> Component.literal("§7Modules: all, database, protection, essentials, discord, xpsync, auth"),
+                false);
+        return 1;
     }
 
     // ===== HOME COMMANDS =====

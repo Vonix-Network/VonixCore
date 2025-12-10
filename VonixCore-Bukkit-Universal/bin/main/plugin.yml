@@ -60,3 +60,15 @@ commands:
     description: Create a kit from inventory
     usage: /createkit <name> <delay>
     permission: vonix.admin
+  graves:
+    description: View and manage your graves
+    usage: /graves [list|tp|info]
+    aliases: [grave]
+
+permissions:
+  vonixcore.graves.teleport:
+    description: Allows teleporting to your graves
+    default: true
+  vonixcore.graves.bypass:
+    description: Bypass grave protection
+    default: op

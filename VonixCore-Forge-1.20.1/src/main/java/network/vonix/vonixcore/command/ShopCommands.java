@@ -18,6 +18,7 @@ import net.minecraftforge.event.RegisterCommandsEvent;
 import network.vonix.vonixcore.VonixCore;
 import network.vonix.vonixcore.economy.EconomyManager;
 import network.vonix.vonixcore.economy.ShopManager;
+import network.vonix.vonixcore.economy.shop.ShopGUIManager;
 
 /**
  * Shop commands for the economy system.
@@ -112,34 +113,8 @@ public class ShopCommands {
         if (player == null)
             return 0;
 
-        // Open player shop GUI
-        var listings = ShopManager.getInstance().getAllListings();
-
-        player.sendSystemMessage(Component.literal("§6§l----- Player Market -----"));
-        if (listings.isEmpty()) {
-            player.sendSystemMessage(
-                    Component.literal("§7No items for sale. Use §e/shop player sell §7to list items."));
-        } else {
-            int count = 0;
-            for (var listing : listings) {
-                if (count++ >= 10) {
-                    player.sendSystemMessage(Component.literal("§7... and " + (listings.size() - 10) + " more items"));
-                    break;
-                }
-                String itemName = listing.itemId().replace("minecraft:", "");
-
-                // Clickable buy link
-                Component buyButton = Component.literal("§a[BUY]")
-                        .withStyle(Style.EMPTY
-                                .withClickEvent(
-                                        new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/shop buy " + listing.id()))
-                                .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
-                                        Component.literal("Click to buy"))));
-
-                player.sendSystemMessage(Component.literal("§e" + itemName + " x" + listing.quantity() + " §7- §a" +
-                        EconomyManager.getInstance().format(listing.price()) + " ").append(buyButton));
-            }
-        }
+        // Open player market GUI
+        ShopGUIManager.getInstance().openPlayerMarket(player);
         return 1;
     }
 
@@ -171,24 +146,8 @@ public class ShopCommands {
         if (player == null)
             return 0;
 
-        var items = ShopManager.getInstance().getAllAdminItems();
-
-        player.sendSystemMessage(Component.literal("§6§l----- Server Shop -----"));
-        if (items.isEmpty()) {
-            player.sendSystemMessage(Component.literal("§7Server shop is empty."));
-        } else {
-            for (var item : items) {
-                String itemName = item.itemId().replace("minecraft:", "");
-                StringBuilder sb = new StringBuilder("§e" + itemName + " §7- ");
-                if (item.buyPrice() != null) {
-                    sb.append("§aBuy: ").append(EconomyManager.getInstance().format(item.buyPrice())).append(" ");
-                }
-                if (item.sellPrice() != null) {
-                    sb.append("§cSell: ").append(EconomyManager.getInstance().format(item.sellPrice()));
-                }
-                player.sendSystemMessage(Component.literal(sb.toString()));
-            }
-        }
+        // Open admin shop GUI
+        ShopGUIManager.getInstance().openAdminShop(player);
         return 1;
     }
 

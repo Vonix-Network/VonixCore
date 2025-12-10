@@ -60,3 +60,68 @@ commands:
     description: Create a kit from inventory
     usage: /createkit <name> <delay>
     permission: vonix.admin
+  graves:
+    description: View and manage your graves
+    usage: /graves [list|tp|info]
+    aliases: [grave]
+  shop:
+    description: Open the server shop
+    usage: /shop
+  cshop:
+    description: Chest shop commands
+    usage: /cshop <create|remove|info|setprice|buy|sell|find|list>
+    aliases: [chestshop, qs, quickshop]
+  market:
+    description: Player market
+    usage: /market [browse|my|create|search|collect]
+    aliases: [auction, ah]
+  pshop:
+    description: Player shop (market)
+    usage: /pshop [browse|my|create|search|collect]
+    aliases: [playershop]
+  shopadmin:
+    description: Shop administration
+    usage: /shopadmin <reload|stats>
+    permission: vonixcore.shops.admin
+  jobs:
+    description: Jobs system commands
+    usage: /jobs <list|join|leave|stats|info|browse>
+    aliases: [job]
+
+permissions:
+  vonixcore.graves.teleport:
+    description: Allows teleporting to your graves
+    default: true
+  vonixcore.graves.bypass:
+    description: Bypass grave protection
+    default: op
+  vonixcore.shop:
+    description: Access to server shop
+    default: true
+  vonixcore.shops.create:
+    description: Create chest shops
+    default: true
+  vonixcore.shops.unlimited:
+    description: Bypass shop limits
+    default: op
+  vonixcore.shops.admin:
+    description: Shop administration
+    default: op
+  vonixcore.shops.admin.remove:
+    description: Remove any shop
+    default: op
+  vonixcore.market:
+    description: Access to player market
+    default: true
+  vonixcore.market.unlimited:
+    description: Bypass market limits
+    default: op
+  vonixcore.jobs:
+    description: Access to jobs system
+    default: true
+  vonixcore.jobs.unlimited:
+    description: Bypass job limits
+    default: op
+  vonixcore.jobs.admin:
+    description: Jobs administration
+    default: op

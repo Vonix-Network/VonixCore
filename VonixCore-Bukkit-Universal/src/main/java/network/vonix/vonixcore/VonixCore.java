@@ -2,8 +2,17 @@ package network.vonix.vonixcore;
 
 import network.vonix.vonixcore.config.*;
 import network.vonix.vonixcore.database.Database;
+import network.vonix.vonixcore.economy.TransactionLog;
+import network.vonix.vonixcore.graves.GravesCommands;
+import network.vonix.vonixcore.graves.GravesListener;
+import network.vonix.vonixcore.graves.GravesManager;
+import network.vonix.vonixcore.jobs.JobsCommands;
+import network.vonix.vonixcore.jobs.JobsManager;
+import network.vonix.vonixcore.shops.ShopsCommands;
+import network.vonix.vonixcore.shops.ShopsManager;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.logging.Level;
 
@@ -12,6 +21,9 @@ public class VonixCore extends JavaPlugin {
     private static VonixCore instance;
     private Database database;
     private ConfigManager configManager;
+    private GravesManager gravesManager;
+    private ShopsManager shopsManager;
+    private JobsManager jobsManager;
 
     @Override
     public void onEnable() {
@@ -32,6 +44,65 @@ public class VonixCore extends JavaPlugin {
             getLogger().log(Level.SEVERE, "Failed to initialize database!", e);
             getServer().getPluginManager().disablePlugin(this);
             return;
+        }
+
+        // Initialize Graves system
+        gravesManager = new GravesManager(this);
+        GravesCommands gravesCommands = new GravesCommands(this, gravesManager);
+        getCommand("graves").setExecutor(gravesCommands);
+        getCommand("graves").setTabCompleter(gravesCommands);
+        getServer().getPluginManager().registerEvents(new GravesListener(this, gravesManager), this);
+        getLogger().info("Graves system initialized.");
+
+        // Initialize Shops system
+        try (Connection conn = database.getConnection()) {
+            // Initialize transaction log table
+            TransactionLog.getInstance().initializeTable(conn);
+
+            // Initialize shops
+            shopsManager = ShopsManager.getInstance();
+            shopsManager.initialize(conn);
+
+            // Register shop commands
+            ShopsCommands shopsCmds = new ShopsCommands(this, shopsManager);
+            if (getCommand("shop") != null) {
+                getCommand("shop").setExecutor(shopsCmds);
+                getCommand("shop").setTabCompleter(shopsCmds);
+            }
+            if (getCommand("cshop") != null) {
+                getCommand("cshop").setExecutor(shopsCmds);
+                getCommand("cshop").setTabCompleter(shopsCmds);
+            }
+            if (getCommand("market") != null) {
+                getCommand("market").setExecutor(shopsCmds);
+                getCommand("market").setTabCompleter(shopsCmds);
+            }
+            if (getCommand("pshop") != null) {
+                getCommand("pshop").setExecutor(shopsCmds);
+                getCommand("pshop").setTabCompleter(shopsCmds);
+            }
+            if (getCommand("shopadmin") != null) {
+                getCommand("shopadmin").setExecutor(shopsCmds);
+                getCommand("shopadmin").setTabCompleter(shopsCmds);
+            }
+            getLogger().info("Shops system initialized.");
+        } catch (SQLException e) {
+            getLogger().log(Level.WARNING, "Failed to initialize shops system", e);
+        }
+
+        // Initialize Jobs system
+        try (Connection conn = database.getConnection()) {
+            jobsManager = new JobsManager(this);
+            jobsManager.initialize(conn);
+
+            JobsCommands jobsCmds = new JobsCommands(this, jobsManager);
+            if (getCommand("jobs") != null) {
+                getCommand("jobs").setExecutor(jobsCmds);
+                getCommand("jobs").setTabCompleter(jobsCmds);
+            }
+            getLogger().info("Jobs system initialized.");
+        } catch (SQLException e) {
+            getLogger().log(Level.WARNING, "Failed to initialize jobs system", e);
         }
 
         // Register commands
@@ -73,6 +144,21 @@ public class VonixCore extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        // Shutdown Jobs
+        if (jobsManager != null) {
+            jobsManager.shutdown();
+        }
+
+        // Shutdown Shops
+        if (shopsManager != null) {
+            shopsManager.shutdown();
+        }
+
+        // Shutdown Graves
+        if (gravesManager != null) {
+            gravesManager.shutdown();
+        }
+
         if (database != null) {
             database.close();
         }
@@ -94,6 +180,7 @@ public class VonixCore extends JavaPlugin {
         DiscordConfig.load(configManager.loadConfig("vonixcore-discord.yml"));
         XPSyncConfig.load(configManager.loadConfig("vonixcore-xpsync.yml"));
         ProtectionConfig.load(configManager.loadConfig("vonixcore-protection.yml"));
+        ShopsConfig.load(getDataFolder());
     }
 
     public static VonixCore getInstance() {
@@ -102,5 +189,13 @@ public class VonixCore extends JavaPlugin {
 
     public Database getDatabase() {
         return database;
+    }
+
+    public GravesManager getGravesManager() {
+        return gravesManager;
+    }
+
+    public ShopsManager getShopsManager() {
+        return shopsManager;
     }
 }

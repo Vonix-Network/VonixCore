@@ -1,0 +1,319 @@
+
+> Task :compileJava
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:1: error: illegal character: '\ufeff'
+?package network.vonix.vonixcore.graves.command;
+^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:1: error: class, interface, enum, or record expected
+?package network.vonix.vonixcore.graves.command;
+         ^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:3: error: class, interface, enum, or record expected
+import network.vonix.vonixcore.graves.GravesModule;
+^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:5: error: class, interface, enum, or record expected
+import network.vonix.vonixcore.graves.Graves;
+^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:6: error: class, interface, enum, or record expected
+import network.vonix.vonixcore.graves.type.Grave;
+^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:7: error: class, interface, enum, or record expected
+import dev.cwhead.GravesX.compatibility.CompatibilityTeleport;
+^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:8: error: class, interface, enum, or record expected
+import dev.cwhead.GravesX.util.PluginDownloadUtil;
+^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:9: error: class, interface, enum, or record expected
+import org.bukkit.*;
+^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:10: error: class, interface, enum, or record expected
+import org.bukkit.command.Command;
+^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:11: error: class, interface, enum, or record expected
+import org.bukkit.command.CommandExecutor;
+^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:12: error: class, interface, enum, or record expected
+import org.bukkit.command.CommandSender;
+^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:13: error: class, interface, enum, or record expected
+import org.bukkit.command.TabCompleter;
+^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:14: error: class, interface, enum, or record expected
+import org.bukkit.entity.Entity;
+^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:15: error: class, interface, enum, or record expected
+import org.bukkit.entity.ExperienceOrb;
+^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:16: error: class, interface, enum, or record expected
+import org.bukkit.entity.Player;
+^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:17: error: class, interface, enum, or record expected
+import org.bukkit.event.player.PlayerTeleportEvent;
+^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:18: error: class, interface, enum, or record expected
+import org.bukkit.inventory.EquipmentSlot;
+^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:19: error: class, interface, enum, or record expected
+import org.bukkit.inventory.ItemStack;
+^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:20: error: class, interface, enum, or record expected
+import org.bukkit.plugin.Plugin;
+^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:21: error: class, interface, enum, or record expected
+import org.jetbrains.annotations.NotNull;
+^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:23: error: class, interface, enum, or record expected
+import java.io.IOException;
+^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:24: error: class, interface, enum, or record expected
+import java.lang.reflect.Method;
+^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:25: error: class, interface, enum, or record expected
+import java.util.ArrayList;
+^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:26: error: class, interface, enum, or record expected
+import java.util.HashSet;
+^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:27: error: class, interface, enum, or record expected
+import java.util.List;
+^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:28: error: class, interface, enum, or record expected
+import java.util.Locale;
+^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:29: error: class, interface, enum, or record expected
+import java.util.Map;
+^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:30: error: class, interface, enum, or record expected
+import java.util.Set;
+^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:31: error: class, interface, enum, or record expected
+import java.util.UUID;
+^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:32: error: class, interface, enum, or record expected
+import java.util.concurrent.CompletableFuture;
+^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:33: error: class, interface, enum, or record expected
+import java.util.concurrent.CountDownLatch;
+^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:34: error: class, interface, enum, or record expected
+import java.util.concurrent.atomic.AtomicBoolean;
+^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:49: error: illegal start of type
+     package network.vonix.vonixcore.graves.command;
+     ^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:49: error: <identifier> expected
+     package network.vonix.vonixcore.graves.command;
+                                                   ^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:51: error: illegal start of type
+import network.vonix.vonixcore.graves.GravesModule;
+^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:51: error: <identifier> expected
+import network.vonix.vonixcore.graves.GravesModule;
+                                                  ^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:53: error: illegal start of type
+import network.vonix.vonixcore.graves.Graves;
+^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:53: error: <identifier> expected
+import network.vonix.vonixcore.graves.Graves;
+                                            ^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:54: error: illegal start of type
+import network.vonix.vonixcore.graves.type.Grave;
+^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:54: error: <identifier> expected
+import network.vonix.vonixcore.graves.type.Grave;
+                                                ^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:55: error: illegal start of type
+import dev.cwhead.GravesX.compatibility.CompatibilityTeleport;
+^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:55: error: <identifier> expected
+import dev.cwhead.GravesX.compatibility.CompatibilityTeleport;
+                                                             ^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:56: error: illegal start of type
+import dev.cwhead.GravesX.util.PluginDownloadUtil;
+^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:56: error: <identifier> expected
+import dev.cwhead.GravesX.util.PluginDownloadUtil;
+                                                 ^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:57: error: illegal start of type
+import org.bukkit.*;
+^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:57: error: <identifier> expected
+import org.bukkit.*;
+                  ^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:58: error: illegal start of type
+import org.bukkit.command.Command;
+^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:58: error: <identifier> expected
+import org.bukkit.command.Command;
+                                 ^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:59: error: illegal start of type
+import org.bukkit.command.CommandExecutor;
+^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:59: error: <identifier> expected
+import org.bukkit.command.CommandExecutor;
+                                         ^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:60: error: illegal start of type
+import org.bukkit.command.CommandSender;
+^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:60: error: <identifier> expected
+import org.bukkit.command.CommandSender;
+                                       ^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:61: error: illegal start of type
+import org.bukkit.command.TabCompleter;
+^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:61: error: <identifier> expected
+import org.bukkit.command.TabCompleter;
+                                      ^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:62: error: illegal start of type
+import org.bukkit.entity.Entity;
+^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:62: error: <identifier> expected
+import org.bukkit.entity.Entity;
+                               ^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:63: error: illegal start of type
+import org.bukkit.entity.ExperienceOrb;
+^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:63: error: <identifier> expected
+import org.bukkit.entity.ExperienceOrb;
+                                      ^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:64: error: illegal start of type
+import org.bukkit.entity.Player;
+^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:64: error: <identifier> expected
+import org.bukkit.entity.Player;
+                               ^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:65: error: illegal start of type
+import org.bukkit.event.player.PlayerTeleportEvent;
+^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:65: error: <identifier> expected
+import org.bukkit.event.player.PlayerTeleportEvent;
+                                                  ^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:66: error: illegal start of type
+import org.bukkit.inventory.EquipmentSlot;
+^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:66: error: <identifier> expected
+import org.bukkit.inventory.EquipmentSlot;
+                                         ^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:67: error: illegal start of type
+import org.bukkit.inventory.ItemStack;
+^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:67: error: <identifier> expected
+import org.bukkit.inventory.ItemStack;
+                                     ^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:68: error: illegal start of type
+import org.bukkit.plugin.Plugin;
+^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:68: error: <identifier> expected
+import org.bukkit.plugin.Plugin;
+                               ^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:69: error: illegal start of type
+import org.jetbrains.annotations.NotNull;
+^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:69: error: <identifier> expected
+import org.jetbrains.annotations.NotNull;
+                                        ^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:71: error: illegal start of type
+import java.io.IOException;
+^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:71: error: <identifier> expected
+import java.io.IOException;
+                          ^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:72: error: illegal start of type
+import java.lang.reflect.Method;
+^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:72: error: <identifier> expected
+import java.lang.reflect.Method;
+                               ^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:73: error: illegal start of type
+import java.util.ArrayList;
+^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:73: error: <identifier> expected
+import java.util.ArrayList;
+                          ^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:74: error: illegal start of type
+import java.util.HashSet;
+^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:74: error: <identifier> expected
+import java.util.HashSet;
+                        ^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:75: error: illegal start of type
+import java.util.List;
+^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:75: error: <identifier> expected
+import java.util.List;
+                     ^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:76: error: illegal start of type
+import java.util.Locale;
+^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:76: error: <identifier> expected
+import java.util.Locale;
+                       ^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:77: error: illegal start of type
+import java.util.Map;
+^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:77: error: <identifier> expected
+import java.util.Map;
+                    ^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:78: error: illegal start of type
+import java.util.Set;
+^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:78: error: <identifier> expected
+import java.util.Set;
+                    ^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:79: error: illegal start of type
+import java.util.UUID;
+^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:79: error: <identifier> expected
+import java.util.UUID;
+                     ^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:80: error: illegal start of type
+import java.util.concurrent.CompletableFuture;
+^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:80: error: <identifier> expected
+import java.util.concurrent.CompletableFuture;
+                                             ^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:81: error: illegal start of type
+import java.util.concurrent.CountDownLatch;
+^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:81: error: <identifier> expected
+import java.util.concurrent.CountDownLatch;
+                                          ^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:82: error: illegal start of type
+import java.util.concurrent.atomic.AtomicBoolean;
+^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:82: error: <identifier> expected
+import java.util.concurrent.atomic.AtomicBoolean;
+                                                ^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:888: error: illegal start of type
+}.Value -replace 'Graves', 'GravesModule'  {
+ ^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:888: error: <identifier> expected
+}.Value -replace 'Graves', 'GravesModule'  {
+       ^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:888: error: unclosed character literal
+}.Value -replace 'Graves', 'GravesModule'  {
+                 ^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:888: error: unclosed character literal
+}.Value -replace 'Graves', 'GravesModule'  {
+                        ^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:888: error: unclosed character literal
+}.Value -replace 'Graves', 'GravesModule'  {
+                           ^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Bukkit-Universal\src\main\java\network\vonix\vonixcore\graves\command\GravesCommand.java:888: error: unclosed character literal
+}.Value -replace 'Graves', 'GravesModule'  {
+                                        ^
+100 errors
+only showing the first 100 errors, of 3580 total; use -Xmaxerrs if you would like to see more
+
+> Task :compileJava FAILED
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':compileJava'.
+> Compilation failed; see the compiler error output for details.
+
+* Try:
+> Run with --info option to get more log output.
+> Run with --scan to get full insights.
+
+BUILD FAILED in 7s
+1 actionable task: 1 executed

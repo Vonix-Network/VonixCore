@@ -272,4 +272,22 @@ public class VonixCore {
 
         LOGGER.info("[{}] Shutdown complete", MOD_NAME);
     }
+
+    // Executor service for async operations
+    private static final java.util.concurrent.ExecutorService ASYNC_EXECUTOR = java.util.concurrent.Executors
+            .newCachedThreadPool();
+
+    /**
+     * Execute a task asynchronously
+     */
+    public static void executeAsync(Runnable task) {
+        ASYNC_EXECUTOR.submit(task);
+    }
+
+    /**
+     * Get the config path
+     */
+    public java.nio.file.Path getConfigPath() {
+        return net.minecraftforge.fml.loading.FMLPaths.CONFIGDIR.get();
+    }
 }

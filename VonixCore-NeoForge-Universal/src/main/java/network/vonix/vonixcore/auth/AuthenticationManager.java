@@ -119,7 +119,11 @@ public class AuthenticationManager {
         ScheduledFuture<?> task = timeoutTasks.remove(uuid);
         if (task != null)
             task.cancel(false);
-        VonixCore.LOGGER.info("[Auth] Player {} authenticated", uuid);
+
+        // Unfreeze the player now that they're authenticated
+        network.vonix.vonixcore.auth.events.AuthEventHandler.updateFreezeState(uuid);
+
+        VonixCore.LOGGER.info("[Auth] Player {} authenticated and unfrozen", uuid);
     }
 
     public static void setPendingRegistration(UUID uuid) {

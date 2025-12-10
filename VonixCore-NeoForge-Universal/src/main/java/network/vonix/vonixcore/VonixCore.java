@@ -15,6 +15,8 @@ import net.neoforged.neoforge.event.server.ServerStartedEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import network.vonix.vonixcore.admin.AdminManager;
+import network.vonix.vonixcore.auth.AuthenticationManager;
+import network.vonix.vonixcore.auth.AuthConfig;
 import network.vonix.vonixcore.config.DatabaseConfig;
 import network.vonix.vonixcore.config.DiscordConfig;
 import network.vonix.vonixcore.config.EssentialsConfig;
@@ -27,6 +29,7 @@ import network.vonix.vonixcore.economy.EconomyManager;
 import network.vonix.vonixcore.economy.ShopManager;
 import network.vonix.vonixcore.homes.HomeManager;
 import network.vonix.vonixcore.kits.KitManager;
+import network.vonix.vonixcore.jobs.JobsManager;
 import network.vonix.vonixcore.warps.WarpManager;
 import network.vonix.vonixcore.xpsync.XPSyncManager;
 
@@ -96,6 +99,7 @@ public class VonixCore {
         modContainer.registerConfig(ModConfig.Type.COMMON, EssentialsConfig.SPEC, "vonixcore-essentials.toml");
         modContainer.registerConfig(ModConfig.Type.COMMON, DiscordConfig.SPEC, "vonixcore-discord.toml");
         modContainer.registerConfig(ModConfig.Type.COMMON, XPSyncConfig.SPEC, "vonixcore-xpsync.toml");
+        modContainer.registerConfig(ModConfig.Type.COMMON, AuthConfig.SPEC, "vonixcore-auth.toml");
 
         LOGGER.info("[{}] Loading v{}...", MOD_NAME, VERSION);
     }
@@ -109,6 +113,14 @@ public class VonixCore {
         LOGGER.info("[{}] Initializing modules...", MOD_NAME);
 
         List<String> enabledModules = new ArrayList<>();
+
+        // Initialize Auth (ensure config is loaded)
+        try {
+            AuthenticationManager.updateFreezeCache();
+            LOGGER.info("[{}] Auth module initialized", MOD_NAME);
+        } catch (Exception e) {
+            LOGGER.error("[{}] Failed to initialize Auth: {}", MOD_NAME, e.getMessage());
+        }
 
         // Initialize database (always needed)
         try {
@@ -154,6 +166,7 @@ public class VonixCore {
                     KitManager.getInstance().loadDefaultKits();
                 }
                 AdminManager.getInstance().initializeTable(conn);
+                JobsManager.getInstance().initialize(conn);
 
                 essentialsEnabled = true;
                 enabledModules.add("Essentials");
@@ -264,5 +277,23 @@ public class VonixCore {
         }
 
         LOGGER.info("[{}] Shutdown complete", MOD_NAME);
+    }
+
+    // Executor service for async operations
+    private static final java.util.concurrent.ExecutorService ASYNC_EXECUTOR = java.util.concurrent.Executors
+            .newCachedThreadPool();
+
+    /**
+     * Execute a task asynchronously
+     */
+    public static void executeAsync(Runnable task) {
+        ASYNC_EXECUTOR.submit(task);
+    }
+
+    /**
+     * Get the config path
+     */
+    public java.nio.file.Path getConfigPath() {
+        return net.neoforged.fml.loading.FMLPaths.CONFIGDIR.get();
     }
 }
