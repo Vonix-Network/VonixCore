@@ -1,211 +1,192 @@
 # VonixCore
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Minecraft-1.18.2%20|%201.20.x%20|%201.21.x-brightgreen" alt="Minecraft Versions">
-  <img src="https://img.shields.io/badge/Platforms-NeoForge%20|%20Paper%20|%20Bukkit-orange" alt="Platforms">
-  <img src="https://img.shields.io/badge/License-MIT-blue" alt="License">
-</p>
+A comprehensive, cross-platform Minecraft server core plugin/mod providing essential features for servers.
 
-**VonixCore** is a comprehensive, all-in-one essentials mod/plugin that brings the beloved features of EssentialsX, LuckPerms, CoreProtect, and more into a single, highly optimized package. Available for **NeoForge**, **Paper**, and **Bukkit** servers, VonixCore provides powerful functionality without the complexity of managing multiple mods/plugins.
+## 🎮 Supported Platforms
 
----
-
-## 📦 Available Versions
-
-| Platform | Minecraft Versions | Java | Status |
-|----------|-------------------|------|--------|
-| **NeoForge** | 1.20.2 - 1.21.x | Java 21 | ✅ Release |
-| **Forge** | 1.20.1 | Java 17+ | ✅ Release |
-| **Paper** | 1.18.2 - 1.21.x | Java 17+ | ✅ Release |
-| **Bukkit/Spigot** | 1.18.2 - 1.21.x | Java 17+ | ✅ Release |
-
----
+| Platform | Minecraft Version | Status |
+|----------|------------------|--------|
+| **NeoForge** | 1.21.x | ⚠️ Pending Testing |
+| **Forge** | 1.20.1 | ⚠️ Pending Testing |
+| **Bukkit/Spigot/Paper** | 1.18+ | ⚠️ Pending Testing |
 
 ## ✨ Features
 
-### 🗄️ Flexible Database Storage
-All data stored in a **single database** with support for multiple backends:
-- **SQLite** - Single-file storage (default, perfect for single servers)
-- **MySQL/MariaDB** - Traditional database server
-- **PostgreSQL** - Advanced PostgreSQL features
-- **Turso** - LibSQL edge database (global low-latency)
-- **Supabase** - Serverless PostgreSQL with web dashboard
+### Core Systems
+- **Homes System** - Set, teleport to, and manage personal homes
+- **Warps System** - Server-wide warp points with GUI
+- **TPA System** - Teleport requests between players
+- **Kits System** - Configurable item kits with cooldowns
 
-### 🔐 Authentication System
-Complete authentication for offline/cracked servers with API integration.
-- Secure Login/Register with session tokens
-- API Integration for centralized account management
-- Auto-authentication with configurable timeout
+### Economy
+- **Virtual Currency** - Balance, pay commands
+- **GUI Shop** - Server-side item shop with GUI
+- **Chest Shops** - Player-to-player trading via chests
+- **Sign Shops** - Quick buy/sell via signs
+- **Player Market** - Auction house for player listings
+- **Jobs System** - Earn money by mining, farming, fishing, etc.
 
-### 🛡️ Protection System (CoreProtect-style)
-Full block logging and rollback capabilities.
-- Block break/place tracking
-- Rollback/Restore commands
-- Lookup tools for investigation
+### Protection (CoreProtect-style)
+- **Block Logging** - Track all block changes
+- **Entity Logging** - Track entity kills and interactions
+- **Container Logging** - Track chest/inventory transactions
+- **Rollback/Restore** - Undo/redo block changes by player/time/radius
+- **Inspector Mode** - Click blocks to see their history
+- **Extended Logging** - Chat, commands, signs
 
-### 🏠 Homes & Warps
-Personal homes and server-wide warps.
-- Multiple homes per player (configurable)
-- Server warps accessible to all
+### Graves System
+- **Death Protection** - Items stored in graves on death
+- **XP Retention** - Configurable XP percentage saved
+- **Protection Timer** - Prevent others from looting immediately
+- **Auto-Cleanup** - Expired graves removed automatically
 
-### 💰 Economy & Shop System
-Full-featured economy with shops and trading.
-- Persistent player balances
-- Player-to-player transactions
-- **GUI Shops** - Visual server shop and player market
-- **Chest Shops** - Player-owned physical shops
-- **Sign Shops** - Admin sign-based shops
-- **Daily Rewards** - Login streak bonuses
-- Leaderboards
+### Authentication
+- **Login/Register** - Account-based authentication
+- **Freeze System** - Unauthenticated players can't move/interact
+- **Vonix Network API** - Integration with external auth service
 
-### 📍 Teleportation Suite
-Comprehensive teleportation commands:
-- `/tp`, `/tphere`, `/tpall`, `/tppos`
-- `/tpa`, `/tpahere`, `/tpaccept`, `/tpdeny`
-- `/rtp` - Random teleport with safe location finding
-- `/back` - Return to previous location
+### Utility Commands
+- **Teleportation** - `/tp`, `/tphere`, `/tppos`, `/tpall`, `/rtp`
+- **Player Info** - `/nick`, `/seen`, `/whois`, `/ping`, `/near`, `/playtime`
+- **Messaging** - `/msg`, `/r`, `/ignore`
+- **Admin Tools** - `/heal`, `/feed`, `/fly`, `/god`, `/speed`, `/clear`, `/repair`, `/invsee`
 
-### 👤 Player Utilities
-- `/nick`, `/seen`, `/whois`, `/ping`
-- `/near`, `/getpos`, `/playtime`, `/list`
-- `/hat`, `/more`, `/repair`, `/clear`
+### Integrations
+- **Discord Webhooks** - Send events to Discord
+- **XP Sync** - Synchronize player XP with database
 
-### 🌍 World Commands
-- Weather: `/weather`, `/sun`, `/rain`, `/storm`
-- Time: `/time`, `/day`, `/night`
-- Player: `/fly`, `/god`, `/heal`, `/feed`
+## 📦 Installation
 
-### 💬 Messaging & Chat
-- Private messages: `/msg`, `/r`, `/ignore`
-- MiniMessage formatting support
-- Color codes and gradients
-
-### 📱 Discord Integration
-- Chat relay between Discord and Minecraft
-- Account linking
-- Event notifications (join/leave, deaths, achievements)
-
-### 📊 XP Sync
-- Automatic batch sync of player XP and playtime
-- Multi-server support with retry logic
-- Configurable intervals
-
----
-
-## 📚 Documentation
-
-Detailed documentation is available in the [`documentation/`](documentation/) folder:
-
-| Module | Description |
-|--------|-------------|
-| [Configuration Guide](documentation/configuration.md) | Overview of all config files |
-| [Commands Reference](documentation/commands.md) | Complete command list |
-| [Permissions](documentation/permissions.md) | Permission nodes |
-| [Protection System](documentation/protection.md) | Block logging and rollback |
-| [Economy](documentation/economy.md) | Economy setup |
-| [Discord Integration](documentation/discord.md) | Discord bot configuration |
-| [Authentication](documentation/authentication.md) | Auth system for offline servers |
-| [XP Sync](documentation/xpsync.md) | External API synchronization |
-
----
-
-## 🚀 Installation
-
-### NeoForge
-1. Download `VonixCore-NeoForge-x.x.x.jar` from Releases
-2. Place in your server's `mods/` folder
-3. Start server to generate configs
-4. Configure in `config/vonixcore-*.toml`
-
-### Paper / Bukkit
-1. Download `VonixCore-Paper-x.x.x.jar` or `VonixCore-Bukkit-x.x.x.jar`
+### Bukkit/Spigot/Paper
+1. Download `VonixCore-Bukkit-Universal.jar`
 2. Place in your server's `plugins/` folder
-3. Start server to generate configs
-4. Configure in `plugins/VonixCore/config.yml`
+3. Start the server to generate config files
+4. Configure in `plugins/VonixCore/` directory
 
----
+### NeoForge/Forge
+1. Download the appropriate mod JAR
+2. Place in your server's `mods/` folder
+3. Start the server to generate config files
+4. Configure in `config/vonixcore/` directory
 
-## 🔧 Building from Source
+## ⚙️ Configuration
 
-### Quick Build (All Platforms)
+VonixCore uses modular configuration files:
 
-**Windows (PowerShell):**
-```powershell
-.\build-all.ps1
+| File | Purpose |
+|------|---------|
+| `vonixcore-database.yml` | Database connection (SQLite/MySQL/PostgreSQL) |
+| `vonixcore-essentials.yml` | Homes, warps, TPA, kits settings |
+| `vonixcore-protection.yml` | Block logging and rollback settings |
+| `vonixcore-discord.yml` | Discord webhook integration |
+| `vonixcore-xpsync.yml` | XP synchronization settings |
+| `vonixcore-graves.yml` | Graves system settings |
+| `vonixcore-shops.yml` | Shop system configuration |
+
+## 📋 Commands
+
+### Homes
+| Command | Description | Permission |
+|---------|-------------|------------|
+| `/sethome [name]` | Set a home | `vonixcore.homes` |
+| `/home [name]` | Teleport to home | `vonixcore.homes` |
+| `/delhome [name]` | Delete a home | `vonixcore.homes` |
+| `/homes` | List your homes | `vonixcore.homes` |
+
+### Warps
+| Command | Description | Permission |
+|---------|-------------|------------|
+| `/warp <name>` | Teleport to warp | `vonixcore.warps` |
+| `/setwarp <name>` | Create a warp | `vonixcore.admin` |
+| `/delwarp <name>` | Delete a warp | `vonixcore.admin` |
+| `/warps` | List all warps | `vonixcore.warps` |
+
+### Teleportation
+| Command | Description | Permission |
+|---------|-------------|------------|
+| `/tpa <player>` | Request teleport | - |
+| `/tpaccept` | Accept request | - |
+| `/tpdeny` | Deny request | - |
+| `/tp <player>` | Teleport to player | `vonixcore.tp` |
+| `/tphere <player>` | Teleport player to you | `vonixcore.tphere` |
+| `/rtp` | Random teleport | `vonixcore.rtp` |
+
+### Economy
+| Command | Description | Permission |
+|---------|-------------|------------|
+| `/balance` | Check balance | - |
+| `/pay <player> <amount>` | Pay player | - |
+| `/shop` | Open server shop | `vonixcore.shop` |
+| `/cshop` | Chest shop commands | `vonixcore.shops.create` |
+| `/market` | Player market | `vonixcore.market` |
+| `/jobs` | Jobs system | `vonixcore.jobs` |
+
+### Protection
+| Command | Description | Permission |
+|---------|-------------|------------|
+| `/co inspect` | Toggle inspector mode | `vonixcore.protection.inspect` |
+| `/co lookup` | Search block history | `vonixcore.protection.lookup` |
+| `/co rollback` | Rollback changes | `vonixcore.protection.rollback` |
+| `/co restore` | Restore changes | `vonixcore.protection.restore` |
+| `/co undo` | Undo last rollback | `vonixcore.protection.rollback` |
+
+### Utility
+| Command | Description | Permission |
+|---------|-------------|------------|
+| `/heal [player]` | Heal player | `vonixcore.heal` |
+| `/feed [player]` | Feed player | `vonixcore.feed` |
+| `/fly [player]` | Toggle fly | `vonixcore.fly` |
+| `/god [player]` | Toggle god mode | `vonixcore.god` |
+| `/nick [name]` | Set nickname | `vonixcore.nick` |
+| `/msg <player> <msg>` | Private message | - |
+| `/r <msg>` | Reply to message | - |
+
+### Graves
+| Command | Description | Permission |
+|---------|-------------|------------|
+| `/graves` | List your graves | - |
+| `/graves list` | List your graves | - |
+| `/graves status` | System status | `vonixcore.admin` |
+
+## 🔧 Database Support
+
+VonixCore supports multiple databases:
+
+- **SQLite** (default) - No setup required
+- **MySQL/MariaDB** - For multi-server setups
+- **PostgreSQL** - Enterprise-grade option
+
+## 🛡️ Permissions
+
+See `plugin.yml` (Bukkit) or in-game for full permission list.
+
+Default permission groups:
+- `vonixcore.*` - All permissions
+- `vonixcore.admin` - Admin commands
+- `vonixcore.mod` - Moderator commands
+
+## 📊 API
+
+VonixCore provides an API for other plugins/mods:
+
+```java
+// Get economy balance
+VonixCore.getInstance().getEconomy().getBalance(uuid);
+
+// Log protection event
+VonixCore.getInstance().getProtection().logBlock(player, block, action);
 ```
 
-**Linux/macOS:**
-```bash
-./build-all.sh
-```
+## 🔗 Links
 
-Built JARs will be in the `BuildOutput/` folder.
+- **GitHub**: [github.com/Vonix-Network/VonixCore](https://github.com/Vonix-Network/VonixCore)
+- **Discord**: [discord.gg/vonix](https://discord.gg/vonix)
+- **Documentation**: [docs.vonix.network](https://docs.vonix.network)
 
-### Manual Build
+## 📄 License
 
-```bash
-# NeoForge
-cd VonixCore-NeoForge-Universal
-./gradlew build
-
-# Paper
-cd VonixCore-Paper-Universal
-./gradlew shadowJar
-
-# Bukkit
-cd VonixCore-Bukkit-Universal
-./gradlew shadowJar
-```
+MIT License - See LICENSE file for details.
 
 ---
 
-## 📋 Requirements
-
-| Platform | Requirements |
-|----------|--------------|
-| NeoForge | Minecraft 1.21.1, NeoForge 21.1+, Java 21 |
-| Paper | Paper 1.18.2 - 1.21.x, Java 17+ |
-| Bukkit | Spigot/Bukkit 1.18.2 - 1.21.x, Java 17+ |
-
----
-
-## 💡 Inspired By
-
-| Project | Authors | Contribution |
-|---------|---------|--------------|
-| **[EssentialsX](https://github.com/EssentialsX/Essentials)** | EssentialsX Team | Core utilities, homes, warps, economy |
-| **[LuckPerms](https://github.com/LuckPerms/LuckPerms)** | Luck (lucko) | Permission system design |
-| **[CoreProtect](https://github.com/PlayPro/CoreProtect)** | Intelli (Mbtg) | Block logging and rollback |
-| **[DiscordSRV](https://github.com/DiscordSRV/DiscordSRV)** | Scarsz | Discord integration concepts |
-
----
-
-## 📜 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
----
-
-## 📞 Support
-
-- **Discord**: [Vonix Network Discord](https://discord.gg/vonix)
-- **Issues**: [GitHub Issues](https://github.com/Vonix-Network/VonixCore/issues)
-- **Wiki**: [Documentation](documentation/)
-
----
-
-<p align="center">
-  Made with ❤️ by the Vonix Network Team
-</p>
+Made with ❤️ by [Vonix Network](https://vonix.network)

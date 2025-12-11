@@ -15,6 +15,7 @@ import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 import net.neoforged.neoforge.event.level.BlockEvent;
 import net.neoforged.neoforge.event.entity.item.ItemTossEvent;
 import net.neoforged.neoforge.event.ServerChatEvent;
+import net.neoforged.neoforge.event.CommandEvent;
 import network.vonix.vonixcore.VonixCore;
 import network.vonix.vonixcore.auth.AuthenticationManager;
 import network.vonix.vonixcore.auth.AuthCommands;
@@ -135,6 +136,33 @@ public class AuthEventHandler {
                         Component.literal("§cYou must authenticate! Use §e/login <password>§c or §e/register"));
                 lastChatReminder.put(uuid, now);
             }
+        }
+    }
+
+    /**
+     * Block all commands except /login and /register for unauthenticated players
+     */
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void onCommand(CommandEvent event) {
+        var source = event.getParseResults().getContext().getSource();
+        if (source.getPlayer() == null) {
+            return;
+        }
+
+        ServerPlayer player = (ServerPlayer) source.getPlayer();
+        UUID uuid = player.getUUID();
+
+        if (!isFrozen(uuid)) {
+            return; // Player is authenticated, allow all commands
+        }
+
+        String command = event.getParseResults().getReader().getString().toLowerCase();
+
+        // Only allow /login and /register commands
+        if (!command.startsWith("login") && !command.startsWith("register")) {
+            event.setCanceled(true);
+            player.sendSystemMessage(
+                    Component.literal("§cYou must authenticate first! Use §e/login <password>§c or §e/register"));
         }
     }
 }

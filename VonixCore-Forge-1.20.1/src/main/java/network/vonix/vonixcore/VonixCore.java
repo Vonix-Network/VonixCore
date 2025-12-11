@@ -22,6 +22,10 @@ import network.vonix.vonixcore.config.DiscordConfig;
 import network.vonix.vonixcore.config.EssentialsConfig;
 import network.vonix.vonixcore.config.ProtectionConfig;
 import network.vonix.vonixcore.config.XPSyncConfig;
+import network.vonix.vonixcore.config.GravesConfig;
+import network.vonix.vonixcore.graves.GravesManager;
+import network.vonix.vonixcore.graves.GravesListener;
+import network.vonix.vonixcore.graves.GravesCommands;
 import network.vonix.vonixcore.consumer.Consumer;
 import network.vonix.vonixcore.database.Database;
 import network.vonix.vonixcore.discord.DiscordManager;
@@ -65,6 +69,8 @@ public class VonixCore {
     private boolean essentialsEnabled = false;
     private boolean discordEnabled = false;
     private boolean xpsyncEnabled = false;
+    private boolean gravesEnabled = false;
+    private GravesManager gravesManager;
 
     public static VonixCore getInstance() {
         return instance;
@@ -103,6 +109,7 @@ public class VonixCore {
                 "vonixcore-essentials.toml");
         ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, DiscordConfig.SPEC, "vonixcore-discord.toml");
         ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, XPSyncConfig.SPEC, "vonixcore-xpsync.toml");
+        ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, GravesConfig.SPEC, "vonixcore-graves.toml");
 
         LOGGER.info("[{}] Loading v{}...", MOD_NAME, VERSION);
     }
@@ -188,6 +195,36 @@ public class VonixCore {
             }
         }
 
+        // Initialize Graves module
+        if (GravesConfig.CONFIG.shouldBeEnabled()) {
+            // Check for alternative grave mods
+            String detectedMod = detectAlternativeGraveMod();
+            if (detectedMod != null && GravesConfig.CONFIG.autoDisableIfAlternativeDetected.get()) {
+                LOGGER.info("[{}] Graves auto-disabled: '{}' mod detected", MOD_NAME, detectedMod);
+            } else {
+                try {
+                    gravesManager = new GravesManager(getConfigPath().resolve("vonixcore"));
+                    GravesManager.enabled = true;
+                    GravesManager.expirationTime = GravesConfig.CONFIG.expirationTime.get();
+                    GravesManager.xpRetention = GravesConfig.CONFIG.xpRetention.get();
+                    GravesManager.protectionTime = GravesConfig.CONFIG.protectionTime.get();
+                    GravesManager.maxGravesPerPlayer = GravesConfig.CONFIG.maxGravesPerPlayer.get();
+
+                    // Register event listener
+                    MinecraftForge.EVENT_BUS.register(new GravesListener());
+
+                    // Register commands
+                    GravesCommands.register(event.getServer().getCommands().getDispatcher());
+
+                    gravesEnabled = true;
+                    enabledModules.add("Graves");
+                    LOGGER.info("[{}] Graves module enabled", MOD_NAME);
+                } catch (Exception e) {
+                    LOGGER.error("[{}] Failed to initialize Graves: {}", MOD_NAME, e.getMessage());
+                }
+            }
+        }
+
         // Log status
         if (enabledModules.isEmpty()) {
             LOGGER.warn("[{}] No modules enabled! Check your config files.", MOD_NAME);
@@ -259,6 +296,17 @@ public class VonixCore {
             }
         }
 
+        // Shutdown Graves
+        if (gravesEnabled && gravesManager != null) {
+            try {
+                gravesManager.shutdown();
+                gravesManager = null;
+                LOGGER.debug("[{}] Graves shutdown complete", MOD_NAME);
+            } catch (Exception e) {
+                LOGGER.error("[{}] Error during Graves shutdown", MOD_NAME, e);
+            }
+        }
+
         // Close database last
         if (database != null) {
             try {
@@ -289,5 +337,40 @@ public class VonixCore {
      */
     public java.nio.file.Path getConfigPath() {
         return net.minecraftforge.fml.loading.FMLPaths.CONFIGDIR.get();
+    }
+
+    /**
+     * Detect if an alternative grave mod is loaded.
+     * 
+     * @return The mod ID if detected, null otherwise.
+     */
+    private String detectAlternativeGraveMod() {
+        String[] alternativeMods = {
+                // Popular grave mods
+                "corpse",
+                "gravestone",
+                "gravestone_mod",
+                "gravestones",
+                "universal_graves",
+                "gravesx",
+                "tombstone",
+                // YIGD (You're In Grave Danger)
+                "yigd",
+                // Death chest mods
+                "death_chest",
+                "deathchest",
+                "simple_death_chest",
+                "your_items_are_safe",
+                // Other
+                "vanity",
+                "gravestone-mod"
+        };
+
+        for (String modId : alternativeMods) {
+            if (net.minecraftforge.fml.ModList.get().isLoaded(modId)) {
+                return modId;
+            }
+        }
+        return null;
     }
 }

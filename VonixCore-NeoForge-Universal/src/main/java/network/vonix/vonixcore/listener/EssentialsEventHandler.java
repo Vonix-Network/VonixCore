@@ -6,6 +6,7 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.ServerChatEvent;
+import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import network.vonix.vonixcore.VonixCore;
@@ -15,6 +16,7 @@ import network.vonix.vonixcore.command.WorldCommands;
 import network.vonix.vonixcore.config.EssentialsConfig;
 import network.vonix.vonixcore.permissions.PermissionCommands;
 import network.vonix.vonixcore.permissions.PermissionManager;
+import network.vonix.vonixcore.teleport.TeleportManager;
 
 import java.sql.Connection;
 
@@ -117,6 +119,21 @@ public class EssentialsEventHandler {
 
             // Clear permission cache for this player
             PermissionManager.getInstance().clearUserCache(player.getUUID());
+        }
+    }
+
+    /**
+     * Save death location for /back command.
+     */
+    @SubscribeEvent
+    public static void onPlayerDeath(LivingDeathEvent event) {
+        if (!EssentialsConfig.CONFIG.enabled.get()) {
+            return;
+        }
+
+        if (event.getEntity() instanceof ServerPlayer player) {
+            // Save death location so /back can return to it
+            TeleportManager.getInstance().saveLastLocation(player);
         }
     }
 }

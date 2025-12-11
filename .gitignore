@@ -39,4 +39,6 @@ src/generated/
 
 # Caches
 .cache/
-*/caches/
+
+# Node
+node_modules/

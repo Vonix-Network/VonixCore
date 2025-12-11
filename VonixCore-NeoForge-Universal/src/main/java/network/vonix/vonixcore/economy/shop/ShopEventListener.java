@@ -5,6 +5,8 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.BlockTags;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.ChestBlock;
 import net.minecraft.world.level.block.entity.ChestBlockEntity;
@@ -15,6 +17,7 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.player.PlayerContainerEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.event.level.BlockEvent;
+import net.neoforged.neoforge.event.ServerChatEvent;
 import network.vonix.vonixcore.VonixCore;
 import network.vonix.vonixcore.config.EssentialsConfig;
 import network.vonix.vonixcore.economy.EconomyManager;
@@ -174,7 +177,7 @@ public class ShopEventListener {
     }
 
     /**
-     * Handle shop creation mode
+     * Handle shop creation mode - reads item from chest inventory
      */
     private static void handleShopCreation(ServerPlayer player, BlockPos pos, BlockState state) {
         ShopManager.ShopCreationState creation = ShopManager.getInstance().getCreationState(player.getUUID());
@@ -182,7 +185,7 @@ public class ShopEventListener {
         if (creation == null)
             return;
 
-        // First step - select chest
+        // First step - select chest and read inventory
         if (creation.step == 0) {
             // Verify it's not already a shop
             String world = player.level().dimension().location().toString();
@@ -192,11 +195,39 @@ public class ShopEventListener {
                 return;
             }
 
-            creation.chestPos = pos;
-            creation.step = 1;
-            player.sendSystemMessage(
-                    Component.literal("§aChest selected! Now type the item ID in chat (e.g., minecraft:diamond)"));
-            player.sendSystemMessage(Component.literal("§7Or type 'cancel' to cancel."));
+            // Read chest inventory to detect item type
+            if (player.level().getBlockEntity(pos) instanceof ChestBlockEntity chest) {
+                String itemId = null;
+
+                // Find first non-empty slot
+                for (int i = 0; i < chest.getContainerSize(); i++) {
+                    ItemStack stack = chest.getItem(i);
+                    if (!stack.isEmpty()) {
+                        itemId = BuiltInRegistries.ITEM.getKey(stack.getItem()).toString();
+                        break; // Only need first item
+                    }
+                }
+
+                if (itemId == null) {
+                    player.sendSystemMessage(Component.literal("§cThe chest is empty! Put items in the chest first."));
+                    ShopManager.getInstance().cancelShopCreation(player.getUUID());
+                    return;
+                }
+
+                // Store detected item
+                creation.chestPos = pos;
+                creation.itemId = itemId;
+                creation.step = 1;
+
+                player.sendSystemMessage(Component.literal("§aChest shop creation started!"));
+                player.sendSystemMessage(Component.literal("§7Item detected: §f" + itemId));
+                player.sendSystemMessage(Component.literal("§7Stock will be managed via chest inventory"));
+                player.sendSystemMessage(Component.literal("§eNow type the price in chat:"));
+                player.sendSystemMessage(Component.literal("§7Or type 'cancel' to cancel."));
+            } else {
+                player.sendSystemMessage(Component.literal("§cFailed to read chest inventory!"));
+                ShopManager.getInstance().cancelShopCreation(player.getUUID());
+            }
         }
     }
 
@@ -234,6 +265,59 @@ public class ShopEventListener {
                 }
                 player.sendSystemMessage(Component.literal("§eShop removed."));
             }
+        }
+    }
+
+    /**
+     * Handle chat input during shop creation
+     */
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void onPlayerChat(ServerChatEvent event) {
+        if (!EssentialsConfig.CONFIG.shopsEnabled.get())
+            return;
+
+        ServerPlayer player = event.getPlayer();
+        ShopManager.ShopCreationState creation = ShopManager.getInstance().getCreationState(player.getUUID());
+
+        if (creation == null)
+            return;
+
+        String message = event.getRawText().trim();
+        event.setCanceled(true); // Cancel the chat message
+
+        // Allow cancel at any step
+        if (message.equalsIgnoreCase("cancel")) {
+            ShopManager.getInstance().cancelShopCreation(player.getUUID());
+            player.sendSystemMessage(Component.literal("§cShop creation cancelled."));
+            return;
+        }
+
+        try {
+            // Only step 1: Price input (item already detected from chest)
+            if (creation.step == 1) {
+                double price = Double.parseDouble(message);
+                if (price < 0) {
+                    player.sendSystemMessage(Component.literal("§cPrice cannot be negative!"));
+                    return;
+                }
+                creation.price = price;
+
+                // Create the shop (stock is managed via chest inventory, pass 0 to DB)
+                boolean success = ShopManager.getInstance().createChestShop(
+                        player, creation.chestPos, creation.itemId, creation.price, 0);
+
+                if (success) {
+                    player.sendSystemMessage(Component.literal("§a§l✓ §7Chest shop created successfully!"));
+                    // TODO: Re-enable display entity when method signature is fixed
+                    // DisplayEntityManager display creation
+                } else {
+                    player.sendSystemMessage(Component.literal("§cFailed to create shop!"));
+                }
+
+                ShopManager.getInstance().cancelShopCreation(player.getUUID());
+            }
+        } catch (NumberFormatException e) {
+            player.sendSystemMessage(Component.literal("§cInvalid price! Please enter a number."));
         }
     }
 

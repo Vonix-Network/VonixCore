@@ -87,6 +87,141 @@ commands:
     description: Jobs system commands
     usage: /jobs <list|join|leave|stats|info|browse>
     aliases: [job]
+  co:
+    description: CoreProtect-style protection commands
+    usage: /co <inspect|lookup|rollback|restore|undo|purge|status|near|help>
+    aliases: [coreprotect]
+    permission: vonixcore.protection.use
+  vp:
+    description: VonixCore protection commands
+    usage: /vp <inspect|lookup|rollback|restore|undo|purge|status|near|help>
+    aliases: [vonixprotect]
+    permission: vonixcore.protection.use
+  # Authentication commands
+  login:
+    description: Login to your account
+    usage: /login <password>
+  register:
+    description: Register a new account
+    usage: /register [password]
+  # Utility commands
+  tp:
+    description: Teleport to a player
+    usage: /tp <player> [target]
+    permission: vonixcore.tp
+  tphere:
+    description: Teleport a player to you
+    usage: /tphere <player>
+    permission: vonixcore.tphere
+  tppos:
+    description: Teleport to coordinates
+    usage: /tppos <x> <y> <z>
+    permission: vonixcore.tppos
+  tpall:
+    description: Teleport all players to you
+    usage: /tpall
+    permission: vonixcore.tpall
+  rtp:
+    description: Random teleport
+    usage: /rtp
+    permission: vonixcore.rtp
+  nick:
+    description: Set your nickname
+    usage: /nick [name]
+    permission: vonixcore.nick
+  seen:
+    description: Check when a player was last online
+    usage: /seen <player>
+  whois:
+    description: View player information
+    usage: /whois <player>
+  ping:
+    description: Check your ping
+    usage: /ping
+  near:
+    description: View nearby players
+    usage: /near [radius]
+  getpos:
+    description: Get your coordinates
+    usage: /getpos
+    aliases: [pos, coords]
+  playtime:
+    description: View your playtime
+    usage: /playtime
+  msg:
+    description: Send a private message
+    usage: /msg <player> <message>
+    aliases: [tell, whisper, w]
+  r:
+    description: Reply to a private message
+    usage: /r <message>
+    aliases: [reply]
+  ignore:
+    description: Ignore a player
+    usage: /ignore <player>
+  heal:
+    description: Heal a player
+    usage: /heal [player]
+    permission: vonixcore.heal
+  feed:
+    description: Feed a player
+    usage: /feed [player]
+    permission: vonixcore.feed
+  fly:
+    description: Toggle fly mode
+    usage: /fly [player]
+    permission: vonixcore.fly
+  god:
+    description: Toggle god mode
+    usage: /god [player]
+    permission: vonixcore.god
+  speed:
+    description: Set walk/fly speed
+    usage: /speed <0-10>
+    permission: vonixcore.speed
+  clear:
+    description: Clear inventory
+    usage: /clear [player]
+    aliases: [clearinventory, ci]
+    permission: vonixcore.clear
+  repair:
+    description: Repair held item
+    usage: /repair
+    permission: vonixcore.repair
+  more:
+    description: Fill item stack
+    usage: /more
+    permission: vonixcore.more
+  hat:
+    description: Wear item as hat
+    usage: /hat
+    permission: vonixcore.hat
+  broadcast:
+    description: Broadcast a message
+    usage: /broadcast <message>
+    aliases: [bc]
+    permission: vonixcore.broadcast
+  invsee:
+    description: View player inventory
+    usage: /invsee <player>
+    permission: vonixcore.invsee
+  enderchest:
+    description: Open ender chest
+    usage: /enderchest [player]
+    aliases: [ec]
+    permission: vonixcore.enderchest
+  workbench:
+    description: Open crafting table
+    usage: /workbench
+    aliases: [craft]
+  gc:
+    description: View server stats
+    usage: /gc
+    permission: vonixcore.gc
+  lag:
+    description: View server TPS
+    usage: /lag
+
 
 permissions:
   vonixcore.graves.teleport:
@@ -125,3 +260,22 @@ permissions:
   vonixcore.jobs.admin:
     description: Jobs administration
     default: op
+  vonixcore.protection.use:
+    description: Use protection commands
+    default: op
+  vonixcore.protection.inspect:
+    description: Use inspector mode
+    default: op
+  vonixcore.protection.lookup:
+    description: Lookup block history
+    default: op
+  vonixcore.protection.rollback:
+    description: Rollback changes
+    default: op
+  vonixcore.protection.restore:
+    description: Restore changes
+    default: op
+  vonixcore.protection.purge:
+    description: Purge old data
+    default: op
+

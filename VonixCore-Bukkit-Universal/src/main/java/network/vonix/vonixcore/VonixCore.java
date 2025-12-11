@@ -130,8 +130,60 @@ public class VonixCore extends JavaPlugin {
                 this);
         getServer().getPluginManager().registerEvents(new network.vonix.vonixcore.protection.ProtectionListener(this),
                 this);
+        getServer().getPluginManager().registerEvents(
+                new network.vonix.vonixcore.protection.ExtendedProtectionListener(this),
+                this);
         getServer().getPluginManager().registerEvents(new network.vonix.vonixcore.discord.DiscordListener(this), this);
         // XPSyncListener removed - batch sync only, no per-player events needed
+
+        // Register protection commands
+        network.vonix.vonixcore.protection.ProtectionCommands protectionCmds = new network.vonix.vonixcore.protection.ProtectionCommands(
+                this);
+        if (getCommand("co") != null) {
+            getCommand("co").setExecutor(protectionCmds);
+            getCommand("co").setTabCompleter(protectionCmds);
+        }
+        if (getCommand("vp") != null) {
+            getCommand("vp").setExecutor(protectionCmds);
+            getCommand("vp").setTabCompleter(protectionCmds);
+        }
+        getLogger().info("Protection system initialized.");
+
+        // Register authentication commands and listener
+        network.vonix.vonixcore.auth.AuthCommands authCmds = new network.vonix.vonixcore.auth.AuthCommands(this);
+        if (getCommand("login") != null) {
+            getCommand("login").setExecutor(authCmds);
+            getCommand("login").setTabCompleter(authCmds);
+        }
+        if (getCommand("register") != null) {
+            getCommand("register").setExecutor(authCmds);
+            getCommand("register").setTabCompleter(authCmds);
+        }
+        getServer().getPluginManager().registerEvents(new network.vonix.vonixcore.auth.AuthEventHandler(), this);
+        network.vonix.vonixcore.auth.AuthenticationManager.updateFreezeCache();
+        getLogger().info("Authentication system initialized.");
+
+        // Register utility commands
+        network.vonix.vonixcore.command.UtilityCommands utilityCmds = new network.vonix.vonixcore.command.UtilityCommands(
+                this);
+        String[] utilityCommandNames = { "tp", "tphere", "tppos", "tpall", "rtp", "nick", "seen", "whois", "ping",
+                "near", "getpos", "playtime", "msg", "r", "ignore", "heal", "feed", "fly", "god", "speed",
+                "clear", "repair", "more", "hat", "broadcast", "invsee", "enderchest", "workbench", "gc", "lag" };
+        for (String cmdName : utilityCommandNames) {
+            if (getCommand(cmdName) != null) {
+                getCommand(cmdName).setExecutor(utilityCmds);
+                getCommand(cmdName).setTabCompleter(utilityCmds);
+            }
+        }
+        getLogger().info("Utility commands initialized.");
+
+        // Initialize Database Write Queue
+        new network.vonix.vonixcore.database.DatabaseWriteQueue();
+        getLogger().info("Database write queue initialized.");
+
+        // Initialize Chat Formatter
+        getServer().getPluginManager().registerEvents(new network.vonix.vonixcore.chat.ChatFormatter(), this);
+        getLogger().info("Chat formatter initialized.");
 
         // Initialize Discord
         network.vonix.vonixcore.discord.DiscordManager.getInstance().initialize();
@@ -158,6 +210,15 @@ public class VonixCore extends JavaPlugin {
         if (gravesManager != null) {
             gravesManager.shutdown();
         }
+
+        // Shutdown Database Write Queue (must be before database close)
+        if (network.vonix.vonixcore.database.DatabaseWriteQueue.getInstance() != null) {
+            network.vonix.vonixcore.database.DatabaseWriteQueue.getInstance().shutdown();
+        }
+
+        // Shutdown Authentication
+        network.vonix.vonixcore.auth.AuthenticationManager.clearAll();
+        network.vonix.vonixcore.auth.VonixNetworkAPI.shutdown();
 
         if (database != null) {
             database.close();

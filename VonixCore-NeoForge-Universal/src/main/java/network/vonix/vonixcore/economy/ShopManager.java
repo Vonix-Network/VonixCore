@@ -421,12 +421,14 @@ public class ShopManager {
 
     // ===== DATA CLASSES =====
 
+    /**
+     * State object for tracking multi-step chest shop creation
+     */
     public static class ShopCreationState {
         public BlockPos chestPos;
-        public String itemId;
-        public Double price;
-        public Integer quantity;
-        public int step = 0; // 0=click chest, 1=enter price, 2=enter quantity
+        public String itemId; // Detected from chest inventory
+        public Double price; // From chat input
+        public int step = 0; // 0=click chest, 1=enter price
     }
 
     public record ChestShop(UUID owner, String itemId, Double buyPrice, Double sellPrice, int stock) {
