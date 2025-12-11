@@ -24,7 +24,6 @@ import network.vonix.vonixcore.config.ProtectionConfig;
 import network.vonix.vonixcore.config.XPSyncConfig;
 import network.vonix.vonixcore.config.GravesConfig;
 import network.vonix.vonixcore.graves.GravesManager;
-import network.vonix.vonixcore.graves.GravesListener;
 import network.vonix.vonixcore.graves.GravesCommands;
 import network.vonix.vonixcore.consumer.Consumer;
 import network.vonix.vonixcore.database.Database;
@@ -210,8 +209,7 @@ public class VonixCore {
                     GravesManager.protectionTime = GravesConfig.CONFIG.protectionTime.get();
                     GravesManager.maxGravesPerPlayer = GravesConfig.CONFIG.maxGravesPerPlayer.get();
 
-                    // Register event listener
-                    MinecraftForge.EVENT_BUS.register(new GravesListener());
+                    // GravesListener is auto-registered via @Mod.EventBusSubscriber annotation
 
                     // Register commands
                     GravesCommands.register(event.getServer().getCommands().getDispatcher());
