@@ -311,11 +311,11 @@ public class UtilityCommands {
         }
 
         ServerLevel level = player.serverLevel();
-        player.sendSystemMessage(Component.literal("§eSearching for safe location..."));
+        player.sendSystemMessage(Component.literal("§eSearching for a safe location..."));
 
         BlockPos safePos = findSafeRtpLocation(level, player.blockPosition());
         if (safePos == null) {
-            player.sendSystemMessage(Component.literal("§cCould not find safe location after 50 attempts!"));
+            player.sendSystemMessage(Component.literal("§cCould not find safe location after 100 attempts!"));
             return 0;
         }
 
@@ -330,22 +330,32 @@ public class UtilityCommands {
         boolean isNether = level.dimension() == Level.NETHER;
         boolean isEnd = level.dimension() == Level.END;
         int minDist = 500, maxDist = 5000;
+        int maxAttempts = 100;
 
-        for (int attempt = 0; attempt < 50; attempt++) {
+        for (int attempt = 0; attempt < maxAttempts; attempt++) {
             double angle = RANDOM.nextDouble() * 2 * Math.PI;
             int dist = minDist + RANDOM.nextInt(maxDist - minDist);
             int x = center.getX() + (int) (Math.cos(angle) * dist);
             int z = center.getZ() + (int) (Math.sin(angle) * dist);
 
+            // CRITICAL: Load the chunk before checking blocks
+            // Without this, heightmap and block state checks return invalid data
+            net.minecraft.world.level.ChunkPos chunkPos = new net.minecraft.world.level.ChunkPos(x >> 4, z >> 4);
+            if (!level.hasChunk(chunkPos.x, chunkPos.z)) {
+                level.getChunk(chunkPos.x, chunkPos.z);
+            }
+
             BlockPos pos = findSafeY(level, x, z, isNether, isEnd);
-            if (pos != null && isSafeSpot(level, pos))
+            if (pos != null && isSafeSpot(level, pos)) {
                 return pos;
+            }
         }
         return null;
     }
 
     private static BlockPos findSafeY(ServerLevel level, int x, int z, boolean nether, boolean end) {
         if (nether) {
+            // Nether: Search upward from Y=32 to avoid bedrock floor, ceiling is at Y=127
             for (int y = 32; y <= 120; y++) {
                 BlockPos check = new BlockPos(x, y, z);
                 if (level.getBlockState(check).isSolidRender(level, check)) {
@@ -355,7 +365,8 @@ public class UtilityCommands {
                 }
             }
         } else if (end) {
-            for (int y = 40; y <= 120; y++) {
+            // End: Search upward from Y=40, avoid void
+            for (int y = 50; y <= 120; y++) {
                 BlockPos check = new BlockPos(x, y, z);
                 if (level.getBlockState(check).isSolidRender(level, check)) {
                     BlockPos spawn = check.above();
@@ -364,8 +375,28 @@ public class UtilityCommands {
                 }
             }
         } else {
+            // Overworld: Use heightmap then search around surface
             int surface = level.getHeight(Heightmap.Types.MOTION_BLOCKING, x, z);
-            for (int y = Math.max(61, surface - 10); y <= Math.min(320, surface + 10); y++) {
+
+            // Check if heightmap returned valid data
+            if (surface <= level.getMinBuildHeight()) {
+                // Chunk not properly loaded, search manually
+                for (int y = 64; y <= 256; y++) {
+                    BlockPos check = new BlockPos(x, y, z);
+                    if (level.getBlockState(check).isSolidRender(level, check)) {
+                        BlockPos spawn = check.above();
+                        if (level.getBlockState(spawn).isAir() && level.getBlockState(spawn.above()).isAir())
+                            return spawn;
+                    }
+                }
+                return null;
+            }
+
+            // Search around the surface level
+            int startY = Math.max(level.getMinBuildHeight() + 1, surface - 10);
+            int endY = Math.min(level.getMaxBuildHeight() - 2, surface + 10);
+
+            for (int y = startY; y <= endY; y++) {
                 BlockPos check = new BlockPos(x, y, z);
                 if (level.getBlockState(check).isSolidRender(level, check)) {
                     BlockPos spawn = check.above();
@@ -379,14 +410,64 @@ public class UtilityCommands {
 
     private static boolean isSafeSpot(ServerLevel level, BlockPos pos) {
         BlockPos below = pos.below();
+        BlockPos below2 = pos.below(2);
+
+        // Require at least 2 solid blocks below for stability
         if (!level.getBlockState(below).isSolidRender(level, below))
             return false;
-        if (level.getBlockState(below).is(Blocks.LAVA) || level.getBlockState(below).is(Blocks.MAGMA_BLOCK))
+        if (!level.getBlockState(below2).isSolidRender(level, below2))
             return false;
-        if (level.getBlockState(below).is(Blocks.WATER))
-            return false;
+
+        // Check player space is clear (2 blocks high)
         if (!level.getBlockState(pos).isAir() || !level.getBlockState(pos.above()).isAir())
             return false;
+
+        // Check for fall damage - no more than 3 air blocks below
+        int airBlocksBelow = 0;
+        for (int i = 1; i <= 5; i++) {
+            if (level.getBlockState(pos.below(i)).isAir()) {
+                airBlocksBelow++;
+            } else {
+                break;
+            }
+        }
+        if (airBlocksBelow >= 4)
+            return false;
+
+        // Avoid dangerous ground blocks
+        if (level.getBlockState(below).is(Blocks.LAVA) ||
+                level.getBlockState(below).is(Blocks.MAGMA_BLOCK) ||
+                level.getBlockState(below).is(Blocks.CACTUS) ||
+                level.getBlockState(below).is(Blocks.FIRE) ||
+                level.getBlockState(below).is(Blocks.SOUL_FIRE) ||
+                level.getBlockState(below).is(Blocks.CAMPFIRE) ||
+                level.getBlockState(below).is(Blocks.SOUL_CAMPFIRE) ||
+                level.getBlockState(below).is(Blocks.SWEET_BERRY_BUSH) ||
+                level.getBlockState(below).is(Blocks.WITHER_ROSE) ||
+                level.getBlockState(below).is(Blocks.WATER) ||
+                level.getBlockState(below).is(Blocks.POINTED_DRIPSTONE))
+            return false;
+
+        // Check for dangerous blocks in player space
+        if (level.getBlockState(pos).is(Blocks.POWDER_SNOW) ||
+                level.getBlockState(pos.above()).is(Blocks.POWDER_SNOW))
+            return false;
+
+        // Check for nearby lava in a 3D radius (5x4x5 area)
+        for (int dx = -2; dx <= 2; dx++) {
+            for (int dy = -1; dy <= 2; dy++) {
+                for (int dz = -2; dz <= 2; dz++) {
+                    BlockPos checkPos = pos.offset(dx, dy, dz);
+                    if (level.getBlockState(checkPos).is(Blocks.LAVA))
+                        return false;
+                }
+            }
+        }
+
+        // End dimension: avoid void proximity
+        if (level.dimension() == Level.END && pos.getY() < 50)
+            return false;
+
         return true;
     }
 
@@ -440,9 +521,7 @@ public class UtilityCommands {
     private static int showWhois(CommandContext<CommandSourceStack> ctx, ServerPlayer target) {
         String name = target.getName().getString();
         String display = nicknames.getOrDefault(target.getUUID(), name);
-        // Note: In Forge 1.20.1, latency is not directly exposed. Using average
-        // latency.
-        int ping = target.server.getAverageTickTime() > 50 ? 100 : 50; // Approximate
+        int ping = getPlayerPing(target);
         BlockPos pos = target.blockPosition();
         String dim = target.level().dimension().location().toString();
 
@@ -462,8 +541,7 @@ public class UtilityCommands {
     private static int showPing(CommandContext<CommandSourceStack> ctx) {
         if (!(ctx.getSource().getEntity() instanceof ServerPlayer player))
             return 0;
-        // Note: In Forge 1.20.1, latency is not directly exposed
-        int ping = player.server.getAverageTickTime() > 50 ? 100 : 50; // Approximate
+        int ping = getPlayerPing(player);
         String color = ping < 50 ? "§a" : ping < 150 ? "§e" : "§c";
         player.sendSystemMessage(Component.literal("§7Your ping: " + color + ping + "ms"));
         return 1;
@@ -715,5 +793,20 @@ public class UtilityCommands {
 
     public static void onPlayerLeave(UUID uuid) {
         lastSeen.put(uuid, System.currentTimeMillis());
+    }
+
+    /**
+     * Get player ping in milliseconds (uses reflection for Forge 1.20.1
+     * compatibility)
+     */
+    private static int getPlayerPing(ServerPlayer player) {
+        try {
+            // Forge 1.20.1 uses latency field directly (not a method)
+            var field = player.connection.getClass().getDeclaredField("latency");
+            field.setAccessible(true);
+            return field.getInt(player.connection);
+        } catch (Exception e) {
+            return -1;
+        }
     }
 }

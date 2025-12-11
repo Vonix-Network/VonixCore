@@ -66,6 +66,25 @@ Complete list of all commands available in VonixCore.
 | `/tpall` | Teleport all to you | `/tpall` | `vonixcore.tpall` |
 | `/rtp` | Random teleport | `/rtp` | `vonixcore.rtp` |
 
+### Random Teleport (RTP)
+
+The `/rtp` command teleports players to a random safe location 500-5000 blocks from their current position.
+
+**Safety Features:**
+- **Chunk Loading**: Target chunks are loaded before location validation
+- **100 Attempts**: Up to 100 random locations are tested to find a safe spot
+- **Ground Stability**: Requires at least 2 solid blocks below the spawn point
+- **Fall Damage Prevention**: No teleporting to spots with 4+ air blocks below
+- **Hazard Avoidance**: Avoids lava, magma blocks, fire, cactus, berry bushes, wither roses, pointed dripstone
+- **Suffocation Prevention**: Ensures 2 blocks of air at spawn height
+- **Lava Proximity Check**: Scans a 5x4x5 area around spawn for nearby lava
+- **Dimension-Aware**: Special handling for Nether (avoids bedrock) and End (avoids void)
+
+**Dimension Behavior:**
+- **Overworld**: Uses heightmap for efficient surface detection
+- **Nether**: Searches Y=32-120 for air pockets in netherack
+- **End**: Searches Y=50-120 to avoid void (won't teleport below Y=50)
+
 ---
 
 ## Economy Commands
@@ -105,12 +124,25 @@ The admin shop has infinite inventory - items can be bought and sold without sto
 
 | Command | Description | Usage | Permission |
 |---------|-------------|-------|------------|
-| `/cshop create <price>` | Create chest shop | `/cshop create 50` | `vonixcore.shops.create` |
-| `/cshop remove` | Remove your shop | `/cshop remove` | `vonixcore.shops.create` |
-| `/cshop info` | View shop info | `/cshop info` | - |
-| `/cshop setprice <price>` | Change price | `/cshop setprice 75` | `vonixcore.shops.create` |
-| `/cshop list` | List your shops | `/cshop list` | `vonixcore.shops.create` |
-| `/cshop find <item>` | Find shops selling item | `/cshop find diamond` | - |
+| `/chestshop create` | Start shop creation mode | `/chestshop create` | `vonixcore.shops.create` |
+| `/chestshop remove` | Remove your shop | `/chestshop remove` | `vonixcore.shops.create` |
+| `/chestshop cancel` | Cancel shop creation | `/chestshop cancel` | `vonixcore.shops.create` |
+
+**How to create a chest shop:**
+1. Put items in a chest (the first item type will be your shop's item)
+2. Run `/chestshop create`
+3. Right-click the chest
+4. Enter **buy price** in chat (price players pay to buy from you) - type `0` or `skip` to disable buying
+5. Enter **sell price** in chat (price you pay players who sell to you) - type `0` or `skip` to disable selling
+
+**Visual Features:**
+- **Shop Sign**: Automatically placed on the front of the chest showing item name and prices
+- **Item Hologram**: A floating, glowing item display appears above the chest
+
+**Player Interactions:**
+- Right-click a shop to view info and buy
+- Sneak + right-click to sell items to the shop (if shop has both buy and sell prices)
+- Owners can break their shop chests while sneaking
 
 ### Player Market
 
