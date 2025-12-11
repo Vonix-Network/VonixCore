@@ -8,6 +8,9 @@ import network.vonix.vonixcore.graves.GravesListener;
 import network.vonix.vonixcore.graves.GravesManager;
 import network.vonix.vonixcore.jobs.JobsCommands;
 import network.vonix.vonixcore.jobs.JobsManager;
+import network.vonix.vonixcore.claims.ClaimsManager;
+import network.vonix.vonixcore.claims.ClaimsCommands;
+import network.vonix.vonixcore.claims.ClaimsListener;
 import network.vonix.vonixcore.shops.ShopsCommands;
 import network.vonix.vonixcore.shops.ShopsManager;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -24,6 +27,7 @@ public class VonixCore extends JavaPlugin {
     private GravesManager gravesManager;
     private ShopsManager shopsManager;
     private JobsManager jobsManager;
+    private ClaimsManager claimsManager;
 
     @Override
     public void onEnable() {
@@ -103,6 +107,32 @@ public class VonixCore extends JavaPlugin {
             getLogger().info("Jobs system initialized.");
         } catch (SQLException e) {
             getLogger().log(Level.WARNING, "Failed to initialize jobs system", e);
+        }
+
+        // Initialize Claims system
+        if (getConfig().getBoolean("claims.enabled", true)) {
+            try (Connection conn = database.getConnection()) {
+                claimsManager = new ClaimsManager(this);
+                claimsManager.initializeTable(conn);
+
+                ClaimsCommands claimsCmds = new ClaimsCommands(this, claimsManager);
+                if (getCommand("vonixcoreclaims") != null) {
+                    getCommand("vonixcoreclaims").setExecutor(claimsCmds);
+                    getCommand("vonixcoreclaims").setTabCompleter(claimsCmds);
+                }
+                if (getCommand("vcclaims") != null) {
+                    getCommand("vcclaims").setExecutor(claimsCmds);
+                    getCommand("vcclaims").setTabCompleter(claimsCmds);
+                }
+                if (getCommand("claims") != null) {
+                    getCommand("claims").setExecutor(claimsCmds);
+                    getCommand("claims").setTabCompleter(claimsCmds);
+                }
+                getServer().getPluginManager().registerEvents(new ClaimsListener(this, claimsManager), this);
+                getLogger().info("Claims system initialized.");
+            } catch (SQLException e) {
+                getLogger().log(Level.WARNING, "Failed to initialize claims system", e);
+            }
         }
 
         // Register commands
@@ -210,6 +240,8 @@ public class VonixCore extends JavaPlugin {
         if (gravesManager != null) {
             gravesManager.shutdown();
         }
+
+        // Note: ClaimsManager doesn't need shutdown - all persisted to DB
 
         // Shutdown Database Write Queue (must be before database close)
         if (network.vonix.vonixcore.database.DatabaseWriteQueue.getInstance() != null) {

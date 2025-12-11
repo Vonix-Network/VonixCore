@@ -5,8 +5,36 @@ Daemon will be stopped at the end of the build
 Java: 21.0.8, JVM: 21.0.8+12-LTS-250 (Oracle Corporation), Arch: amd64
 
 > Task :compileJava
-Note: C:\Users\rwcoo\Developement\VonixCore\VonixCore-Forge-1.20.1\src\main\java\network\vonix\vonixcore\economy\shop\ShopEventListener.java uses or overrides a deprecated API.
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Forge-1.20.1\src\main\java\network\vonix\vonixcore\command\ProtectionCommands.java:733: warning: [removal] ResourceLocation(String) in ResourceLocation has been deprecated and marked for removal
+            net.minecraft.resources.ResourceLocation loc = new net.minecraft.resources.ResourceLocation(blockId);
+                                                           ^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Forge-1.20.1\src\main\java\network\vonix\vonixcore\VonixCore.java:102: warning: [removal] get() in FMLJavaModLoadingContext has been deprecated and marked for removal
+        IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
+                                                        ^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Forge-1.20.1\src\main\java\network\vonix\vonixcore\VonixCore.java:108: warning: [removal] get() in ModLoadingContext has been deprecated and marked for removal
+        ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, DatabaseConfig.SPEC, "vonixcore-database.toml");
+                         ^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Forge-1.20.1\src\main\java\network\vonix\vonixcore\VonixCore.java:109: warning: [removal] get() in ModLoadingContext has been deprecated and marked for removal
+        ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, ProtectionConfig.SPEC,
+                         ^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Forge-1.20.1\src\main\java\network\vonix\vonixcore\VonixCore.java:111: warning: [removal] get() in ModLoadingContext has been deprecated and marked for removal
+        ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, EssentialsConfig.SPEC,
+                         ^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Forge-1.20.1\src\main\java\network\vonix\vonixcore\VonixCore.java:113: warning: [removal] get() in ModLoadingContext has been deprecated and marked for removal
+        ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, DiscordConfig.SPEC, "vonixcore-discord.toml");
+                         ^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Forge-1.20.1\src\main\java\network\vonix\vonixcore\VonixCore.java:114: warning: [removal] get() in ModLoadingContext has been deprecated and marked for removal
+        ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, XPSyncConfig.SPEC, "vonixcore-xpsync.toml");
+                         ^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Forge-1.20.1\src\main\java\network\vonix\vonixcore\VonixCore.java:115: warning: [removal] get() in ModLoadingContext has been deprecated and marked for removal
+        ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, GravesConfig.SPEC, "vonixcore-graves.toml");
+                         ^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Forge-1.20.1\src\main\java\network\vonix\vonixcore\VonixCore.java:116: warning: [removal] get() in ModLoadingContext has been deprecated and marked for removal
+        ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, ClaimsConfig.SPEC, "vonixcore-claims.toml");
+                         ^
+Note: Some input files use or override a deprecated API.
 Note: Recompile with -Xlint:deprecation for details.
+9 warnings
 
 > Task :processResources UP-TO-DATE
 > Task :classes
@@ -25,5 +53,5 @@ Note: Recompile with -Xlint:deprecation for details.
 > Task :check UP-TO-DATE
 > Task :build
 
-BUILD SUCCESSFUL in 16s
+BUILD SUCCESSFUL in 20s
 7 actionable tasks: 4 executed, 3 up-to-date

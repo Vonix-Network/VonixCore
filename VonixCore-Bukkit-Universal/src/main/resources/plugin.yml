@@ -222,6 +222,10 @@ commands:
     description: View server TPS
     usage: /lag
 
+  vonixcoreclaims:
+    description: Land claim system
+    usage: /vonixcoreclaims <wand|create|delete|trust|untrust|list|info|admin>
+    aliases: [vcclaims, claims]
 
 permissions:
   vonixcore.graves.teleport:
@@ -277,5 +281,11 @@ permissions:
     default: op
   vonixcore.protection.purge:
     description: Purge old data
+    default: op
+  vonixcore.claims.create:
+    description: Create land claims
+    default: true
+  vonixcore.claims.admin:
+    description: Admin claims (bypass protection, delete any)
     default: op
 

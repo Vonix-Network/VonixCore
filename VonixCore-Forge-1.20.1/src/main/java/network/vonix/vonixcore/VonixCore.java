@@ -23,8 +23,11 @@ import network.vonix.vonixcore.config.EssentialsConfig;
 import network.vonix.vonixcore.config.ProtectionConfig;
 import network.vonix.vonixcore.config.XPSyncConfig;
 import network.vonix.vonixcore.config.GravesConfig;
+import network.vonix.vonixcore.config.ClaimsConfig;
 import network.vonix.vonixcore.graves.GravesManager;
 import network.vonix.vonixcore.graves.GravesCommands;
+import network.vonix.vonixcore.claims.ClaimsManager;
+import network.vonix.vonixcore.claims.ClaimsCommands;
 import network.vonix.vonixcore.consumer.Consumer;
 import network.vonix.vonixcore.database.Database;
 import network.vonix.vonixcore.discord.DiscordManager;
@@ -69,6 +72,7 @@ public class VonixCore {
     private boolean discordEnabled = false;
     private boolean xpsyncEnabled = false;
     private boolean gravesEnabled = false;
+    private boolean claimsEnabled = false;
     private GravesManager gravesManager;
 
     public static VonixCore getInstance() {
@@ -109,6 +113,7 @@ public class VonixCore {
         ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, DiscordConfig.SPEC, "vonixcore-discord.toml");
         ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, XPSyncConfig.SPEC, "vonixcore-xpsync.toml");
         ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, GravesConfig.SPEC, "vonixcore-graves.toml");
+        ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, ClaimsConfig.SPEC, "vonixcore-claims.toml");
 
         LOGGER.info("[{}] Loading v{}...", MOD_NAME, VERSION);
     }
@@ -220,6 +225,19 @@ public class VonixCore {
                 } catch (Exception e) {
                     LOGGER.error("[{}] Failed to initialize Graves: {}", MOD_NAME, e.getMessage());
                 }
+            }
+        }
+
+        // Initialize Claims module
+        if (ClaimsConfig.CONFIG.enabled.get()) {
+            try (Connection conn = database.getConnection()) {
+                ClaimsManager.getInstance().initializeTable(conn);
+                ClaimsCommands.register(event.getServer().getCommands().getDispatcher());
+                claimsEnabled = true;
+                enabledModules.add("Claims");
+                LOGGER.info("[{}] Claims module enabled", MOD_NAME);
+            } catch (Exception e) {
+                LOGGER.error("[{}] Failed to initialize Claims: {}", MOD_NAME, e.getMessage());
             }
         }
 

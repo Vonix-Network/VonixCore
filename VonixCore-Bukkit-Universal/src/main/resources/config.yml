@@ -1,2 +1,23 @@
 # Main configuration file
 # Most settings are in the vonixcore-*.yml files
+
+# Claims Module Configuration
+claims:
+  # Enable claims protection system
+  enabled: true
+  # Default claim radius for /vcclaims create
+  defaultClaimRadius: 10
+  # Maximum claim size (blocks per side). 0 = unlimited
+  maxClaimSize: 100
+  # Maximum claims per player. 0 = unlimited
+  maxClaimsPerPlayer: 5
+  # Require vonixcore.claims.create permission to create claims
+  requirePermissionToCreate: false
+  # Protect blocks from being broken/placed
+  protectBuilding: true
+  # Protect containers (chests, barrels, etc.)
+  protectContainers: true
+  # Prevent explosions in claims
+  preventExplosions: true
+  # Allow VonixCore shop interactions even for non-trusted players
+  allowVonixShopsBypass: true
