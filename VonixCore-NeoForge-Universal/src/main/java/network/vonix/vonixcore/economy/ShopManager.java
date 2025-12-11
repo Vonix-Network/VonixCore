@@ -127,27 +127,29 @@ public class ShopManager {
     /**
      * Complete shop creation with chest position.
      */
-    public boolean createChestShop(ServerPlayer player, BlockPos pos, String itemId, double price, int quantity) {
+    public boolean createChestShop(ServerPlayer player, BlockPos pos, String itemId, Double buyPrice, Double sellPrice,
+            int quantity) {
         UUID uuid = player.getUUID();
         String world = player.level().dimension().location().toString();
 
         try (Connection conn = VonixCore.getInstance().getDatabase().getConnection()) {
             PreparedStatement stmt = conn.prepareStatement(
-                    "INSERT INTO vc_chest_shops (owner_uuid, world, x, y, z, item_id, buy_price, stock, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                    "INSERT INTO vc_chest_shops (owner_uuid, world, x, y, z, item_id, buy_price, sell_price, stock, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
             stmt.setString(1, uuid.toString());
             stmt.setString(2, world);
             stmt.setInt(3, pos.getX());
             stmt.setInt(4, pos.getY());
             stmt.setInt(5, pos.getZ());
             stmt.setString(6, itemId);
-            stmt.setDouble(7, price);
-            stmt.setInt(8, quantity);
-            stmt.setLong(9, System.currentTimeMillis() / 1000L);
+            stmt.setObject(7, buyPrice);
+            stmt.setObject(8, sellPrice);
+            stmt.setInt(9, quantity);
+            stmt.setLong(10, System.currentTimeMillis() / 1000L);
             stmt.executeUpdate();
 
             // Cache the shop
             String key = shopKey(world, pos);
-            shopCache.put(key, new ChestShop(uuid, itemId, price, null, quantity));
+            shopCache.put(key, new ChestShop(uuid, itemId, buyPrice, sellPrice, quantity));
 
             creatingShop.remove(uuid);
             return true;
@@ -427,8 +429,9 @@ public class ShopManager {
     public static class ShopCreationState {
         public BlockPos chestPos;
         public String itemId; // Detected from chest inventory
-        public Double price; // From chat input
-        public int step = 0; // 0=click chest, 1=enter price
+        public Double buyPrice; // From chat input (step 1)
+        public Double sellPrice; // From chat input (step 2)
+        public int step = 0; // 0=click chest, 1=enter buy price, 2=enter sell price
     }
 
     public record ChestShop(UUID owner, String itemId, Double buyPrice, Double sellPrice, int stock) {

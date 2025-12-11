@@ -1,0 +1,51 @@
+﻿To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.8/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+
+> Configure project :
+Java: 21.0.8, JVM: 21.0.8+12-LTS-250 (Oracle Corporation), Arch: amd64
+
+> Task :compileJava
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Forge-1.20.1\src\main\java\network\vonix\vonixcore\VonixCore.java:99: warning: [removal] get() in FMLJavaModLoadingContext has been deprecated and marked for removal
+        IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
+                                                        ^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Forge-1.20.1\src\main\java\network\vonix\vonixcore\VonixCore.java:105: warning: [removal] get() in ModLoadingContext has been deprecated and marked for removal
+        ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, DatabaseConfig.SPEC, "vonixcore-database.toml");
+                         ^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Forge-1.20.1\src\main\java\network\vonix\vonixcore\VonixCore.java:106: warning: [removal] get() in ModLoadingContext has been deprecated and marked for removal
+        ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, ProtectionConfig.SPEC,
+                         ^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Forge-1.20.1\src\main\java\network\vonix\vonixcore\VonixCore.java:108: warning: [removal] get() in ModLoadingContext has been deprecated and marked for removal
+        ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, EssentialsConfig.SPEC,
+                         ^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Forge-1.20.1\src\main\java\network\vonix\vonixcore\VonixCore.java:110: warning: [removal] get() in ModLoadingContext has been deprecated and marked for removal
+        ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, DiscordConfig.SPEC, "vonixcore-discord.toml");
+                         ^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Forge-1.20.1\src\main\java\network\vonix\vonixcore\VonixCore.java:111: warning: [removal] get() in ModLoadingContext has been deprecated and marked for removal
+        ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, XPSyncConfig.SPEC, "vonixcore-xpsync.toml");
+                         ^
+C:\Users\rwcoo\Developement\VonixCore\VonixCore-Forge-1.20.1\src\main\java\network\vonix\vonixcore\VonixCore.java:112: warning: [removal] get() in ModLoadingContext has been deprecated and marked for removal
+        ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, GravesConfig.SPEC, "vonixcore-graves.toml");
+                         ^
+Note: Some input files use or override a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+7 warnings
+
+> Task :processResources UP-TO-DATE
+> Task :classes
+> Task :jar
+> Task :downloadMcpConfig
+> Task :extractSrg UP-TO-DATE
+> Task :createMcpToSrg UP-TO-DATE
+> Task :reobfJar
+> Task :jarJar SKIPPED
+> Task :reobfJarJar SKIPPED
+> Task :assemble
+> Task :compileTestJava NO-SOURCE
+> Task :processTestResources NO-SOURCE
+> Task :testClasses UP-TO-DATE
+> Task :test NO-SOURCE
+> Task :check UP-TO-DATE
+> Task :build
+
+BUILD SUCCESSFUL in 30s
+7 actionable tasks: 4 executed, 3 up-to-date

@@ -219,11 +219,13 @@ public class ShopEventListener {
                 creation.itemId = itemId;
                 creation.step = 1;
 
-                player.sendSystemMessage(Component.literal("§aChest shop creation started!"));
+                player.sendSystemMessage(Component.literal("§a§l✓ §7Chest selected!"));
                 player.sendSystemMessage(Component.literal("§7Item detected: §f" + itemId));
-                player.sendSystemMessage(Component.literal("§7Stock will be managed via chest inventory"));
-                player.sendSystemMessage(Component.literal("§eNow type the price in chat:"));
-                player.sendSystemMessage(Component.literal("§7Or type 'cancel' to cancel."));
+                player.sendSystemMessage(Component.literal(""));
+                player.sendSystemMessage(
+                        Component.literal("§eEnter the §aBUY §eprice in chat §7(price players pay to buy):"));
+                player.sendSystemMessage(Component.literal("§7Type §c0 §7or §cskip §7to disable buying."));
+                player.sendSystemMessage(Component.literal("§7Type §ccancel §7to cancel."));
             } else {
                 player.sendSystemMessage(Component.literal("§cFailed to read chest inventory!"));
                 ShopManager.getInstance().cancelShopCreation(player.getUUID());
@@ -282,34 +284,92 @@ public class ShopEventListener {
         if (creation == null)
             return;
 
-        String message = event.getRawText().trim();
+        String message = event.getRawText().trim().toLowerCase();
         event.setCanceled(true); // Cancel the chat message
 
         // Allow cancel at any step
-        if (message.equalsIgnoreCase("cancel")) {
+        if (message.equals("cancel")) {
             ShopManager.getInstance().cancelShopCreation(player.getUUID());
             player.sendSystemMessage(Component.literal("§cShop creation cancelled."));
             return;
         }
 
         try {
-            // Only step 1: Price input (item already detected from chest)
+            // Step 1: Buy price input
             if (creation.step == 1) {
-                double price = Double.parseDouble(message);
-                if (price < 0) {
-                    player.sendSystemMessage(Component.literal("§cPrice cannot be negative!"));
+                Double buyPrice = null;
+                if (!message.equals("skip") && !message.equals("0")) {
+                    buyPrice = Double.parseDouble(message);
+                    if (buyPrice < 0) {
+                        player.sendSystemMessage(Component.literal("§cPrice cannot be negative!"));
+                        return;
+                    }
+                    if (buyPrice == 0)
+                        buyPrice = null;
+                }
+                creation.buyPrice = buyPrice;
+                creation.step = 2;
+
+                player.sendSystemMessage(Component.literal("§a§l✓ §7Buy price set: "
+                        + (buyPrice != null ? "§a$" + String.format("%.2f", buyPrice) : "§cDisabled")));
+                player.sendSystemMessage(Component.literal(""));
+                player.sendSystemMessage(Component
+                        .literal("§eEnter the §cSELL §eprice in chat §7(price you pay players for their items):"));
+                player.sendSystemMessage(Component.literal("§7Type §c0 §7or §cskip §7to disable selling."));
+                player.sendSystemMessage(Component.literal("§7Type §ccancel §7to cancel."));
+                return;
+            }
+
+            // Step 2: Sell price input - then finalize shop
+            if (creation.step == 2) {
+                Double sellPrice = null;
+                if (!message.equals("skip") && !message.equals("0")) {
+                    sellPrice = Double.parseDouble(message);
+                    if (sellPrice < 0) {
+                        player.sendSystemMessage(Component.literal("§cPrice cannot be negative!"));
+                        return;
+                    }
+                    if (sellPrice == 0)
+                        sellPrice = null;
+                }
+                creation.sellPrice = sellPrice;
+
+                // Validate that at least one price is set
+                if (creation.buyPrice == null && creation.sellPrice == null) {
+                    player.sendSystemMessage(Component.literal("§cYou must set at least a buy or sell price!"));
+                    creation.step = 1;
+                    player.sendSystemMessage(Component.literal("§eEnter the §aBUY §eprice in chat:"));
                     return;
                 }
-                creation.price = price;
 
-                // Create the shop (stock is managed via chest inventory, pass 0 to DB)
+                // Create the shop
                 boolean success = ShopManager.getInstance().createChestShop(
-                        player, creation.chestPos, creation.itemId, creation.price, 0);
+                        player, creation.chestPos, creation.itemId, creation.buyPrice, creation.sellPrice, 0);
 
                 if (success) {
-                    player.sendSystemMessage(Component.literal("§a§l✓ §7Chest shop created successfully!"));
-                    // TODO: Re-enable display entity when method signature is fixed
-                    // DisplayEntityManager display creation
+                    player.sendSystemMessage(Component.literal("§a§l✓ Chest shop created successfully!"));
+
+                    // Create sign on the front of the chest
+                    if (player.level() instanceof ServerLevel serverLevel) {
+                        createShopSign(serverLevel, player, creation);
+
+                        // Create item display hologram above chest
+                        ItemStack displayItem = ItemUtils.createItemFromId(creation.itemId);
+                        if (!displayItem.isEmpty()) {
+                            DisplayEntityManager.getInstance().spawnDisplay(serverLevel, creation.chestPos,
+                                    displayItem);
+                        }
+                    }
+
+                    String symbol = EssentialsConfig.CONFIG.currencySymbol.get();
+                    if (creation.buyPrice != null) {
+                        player.sendSystemMessage(
+                                Component.literal("§7Buy: §a" + symbol + String.format("%.2f", creation.buyPrice)));
+                    }
+                    if (creation.sellPrice != null) {
+                        player.sendSystemMessage(
+                                Component.literal("§7Sell: §c" + symbol + String.format("%.2f", creation.sellPrice)));
+                    }
                 } else {
                     player.sendSystemMessage(Component.literal("§cFailed to create shop!"));
                 }
@@ -318,6 +378,81 @@ public class ShopEventListener {
             }
         } catch (NumberFormatException e) {
             player.sendSystemMessage(Component.literal("§cInvalid price! Please enter a number."));
+        }
+    }
+
+    /**
+     * Create a sign on the front of the chest shop
+     */
+    private static void createShopSign(ServerLevel level, ServerPlayer player, ShopManager.ShopCreationState creation) {
+        BlockPos chestPos = creation.chestPos;
+        BlockState chestState = level.getBlockState(chestPos);
+
+        // Determine the front direction of the chest
+        net.minecraft.core.Direction facing = net.minecraft.core.Direction.NORTH;
+        if (chestState.hasProperty(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING)) {
+            facing = chestState.getValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING);
+        }
+
+        // Place sign on the front of the chest
+        BlockPos signPos = chestPos.relative(facing);
+
+        // Check if the space is available (air or replaceable)
+        if (!level.getBlockState(signPos).canBeReplaced()) {
+            // Try placing on top if front is blocked
+            signPos = chestPos.above();
+            if (!level.getBlockState(signPos).canBeReplaced()) {
+                player.sendSystemMessage(Component.literal("§7(No space for shop sign)"));
+                return;
+            }
+        }
+
+        // Place a wall sign or standing sign
+        BlockState signState;
+        if (signPos.equals(chestPos.above())) {
+            // Standing sign on top
+            signState = Blocks.OAK_SIGN.defaultBlockState();
+        } else {
+            // Wall sign on front
+            signState = Blocks.OAK_WALL_SIGN.defaultBlockState()
+                    .setValue(net.minecraft.world.level.block.WallSignBlock.FACING, facing);
+        }
+
+        level.setBlock(signPos, signState, 3);
+
+        // Set sign text
+        if (level
+                .getBlockEntity(signPos) instanceof net.minecraft.world.level.block.entity.SignBlockEntity signEntity) {
+            String symbol = EssentialsConfig.CONFIG.currencySymbol.get();
+            String itemName = creation.itemId.contains(":") ? creation.itemId.split(":")[1] : creation.itemId;
+            itemName = itemName.replace("_", " ");
+            if (itemName.length() > 12)
+                itemName = itemName.substring(0, 12);
+
+            // Set sign text (front side)
+            signEntity.setText(new net.minecraft.world.level.block.entity.SignText(
+                    new Component[] {
+                            Component.literal("§l[SHOP]"),
+                            Component.literal("§f" + itemName),
+                            Component.literal(creation.buyPrice != null
+                                    ? "§aBuy: " + symbol + String.format("%.0f", creation.buyPrice)
+                                    : ""),
+                            Component.literal(creation.sellPrice != null
+                                    ? "§cSell: " + symbol + String.format("%.0f", creation.sellPrice)
+                                    : "")
+                    },
+                    new Component[] {
+                            Component.literal("§l[SHOP]"),
+                            Component.literal("§f" + itemName),
+                            Component.literal(creation.buyPrice != null
+                                    ? "§aBuy: " + symbol + String.format("%.0f", creation.buyPrice)
+                                    : ""),
+                            Component.literal(creation.sellPrice != null
+                                    ? "§cSell: " + symbol + String.format("%.0f", creation.sellPrice)
+                                    : "")
+                    },
+                    net.minecraft.world.item.DyeColor.BLACK,
+                    false), true);
         }
     }
 
