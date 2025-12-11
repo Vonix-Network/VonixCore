@@ -11,12 +11,14 @@ public class PlayerJob {
     private String jobId;
     private int level;
     private double experience;
+    private double points; // Job-specific currency
     private long joinedAt;
     private long lastWorked;
 
     public PlayerJob() {
         this.level = 1;
         this.experience = 0;
+        this.points = 0;
         this.joinedAt = System.currentTimeMillis();
     }
 
@@ -98,5 +100,17 @@ public class PlayerJob {
 
     public void setLastWorked(long lastWorked) {
         this.lastWorked = lastWorked;
+    }
+
+    public double getPoints() {
+        return points;
+    }
+
+    public void setPoints(double points) {
+        this.points = points;
+    }
+
+    public void addPoints(double amount) {
+        this.points += amount;
     }
 }

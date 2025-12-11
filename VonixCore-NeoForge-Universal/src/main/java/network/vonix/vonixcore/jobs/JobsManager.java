@@ -75,6 +75,7 @@ public class JobsManager {
                     job_id TEXT NOT NULL,
                     level INTEGER DEFAULT 1,
                     experience REAL DEFAULT 0,
+                    points REAL DEFAULT 0,
                     joined_at INTEGER,
                     last_worked INTEGER,
                     UNIQUE(uuid, job_id)
@@ -83,6 +84,13 @@ public class JobsManager {
 
         conn.createStatement().execute(
                 "CREATE INDEX IF NOT EXISTS idx_pj_uuid ON vonixcore_player_jobs(uuid)");
+
+        // Add points column if not exists (for upgrades)
+        try {
+            conn.createStatement().execute("ALTER TABLE vonixcore_player_jobs ADD COLUMN points REAL DEFAULT 0");
+        } catch (SQLException ignored) {
+            // Column already exists
+        }
     }
 
     /**
@@ -118,69 +126,160 @@ public class JobsManager {
      * Create built-in default jobs
      */
     private void createBuiltInJobs() {
-        // Miner
+        // Miner - Mining ores and stone
         Job miner = new Job("miner");
         miner.setName("§7Miner");
         miner.setDescription("Earn money by mining ores and stone");
         miner.setIcon(Items.DIAMOND_PICKAXE);
-        miner.addReward(Job.ActionType.BREAK, "stone", 0.5, 1.0);
-        miner.addReward(Job.ActionType.BREAK, "coal_ore", 2.0, 3.0);
-        miner.addReward(Job.ActionType.BREAK, "iron_ore", 3.0, 5.0);
-        miner.addReward(Job.ActionType.BREAK, "gold_ore", 5.0, 8.0);
-        miner.addReward(Job.ActionType.BREAK, "diamond_ore", 10.0, 15.0);
-        miner.addReward(Job.ActionType.BREAK, "emerald_ore", 12.0, 20.0);
-        miner.addReward(Job.ActionType.BREAK, "deepslate_diamond_ore", 12.0, 18.0);
+        // Break rewards
+        miner.addReward(Job.ActionType.BREAK, "stone", 0.5, 1.0, 0.5);
+        miner.addReward(Job.ActionType.BREAK, "deepslate", 0.75, 1.25, 0.75);
+        miner.addReward(Job.ActionType.BREAK, "coal_ore", 2.0, 3.0, 2.0);
+        miner.addReward(Job.ActionType.BREAK, "deepslate_coal_ore", 2.5, 4.0, 2.5);
+        miner.addReward(Job.ActionType.BREAK, "iron_ore", 3.0, 5.0, 3.0);
+        miner.addReward(Job.ActionType.BREAK, "deepslate_iron_ore", 4.0, 6.0, 4.0);
+        miner.addReward(Job.ActionType.BREAK, "copper_ore", 2.5, 4.0, 2.5);
+        miner.addReward(Job.ActionType.BREAK, "gold_ore", 5.0, 8.0, 5.0);
+        miner.addReward(Job.ActionType.BREAK, "deepslate_gold_ore", 6.0, 10.0, 6.0);
+        miner.addReward(Job.ActionType.BREAK, "redstone_ore", 3.5, 5.0, 3.5);
+        miner.addReward(Job.ActionType.BREAK, "lapis_ore", 6.0, 8.0, 6.0);
+        miner.addReward(Job.ActionType.BREAK, "diamond_ore", 10.0, 15.0, 10.0);
+        miner.addReward(Job.ActionType.BREAK, "deepslate_diamond_ore", 12.0, 18.0, 12.0);
+        miner.addReward(Job.ActionType.BREAK, "emerald_ore", 12.0, 20.0, 12.0);
+        miner.addReward(Job.ActionType.BREAK, "deepslate_emerald_ore", 15.0, 25.0, 15.0);
+        miner.addReward(Job.ActionType.BREAK, "ancient_debris", 20.0, 30.0, 20.0);
+        miner.addReward(Job.ActionType.BREAK, "nether_quartz_ore", 2.0, 3.0, 2.0);
+        // Anti-exploit: Placing ores gives NEGATIVE rewards
+        miner.addReward(Job.ActionType.PLACE, "diamond_ore", -10.0, 0, -10.0);
+        miner.addReward(Job.ActionType.PLACE, "deepslate_diamond_ore", -12.0, 0, -12.0);
+        miner.addReward(Job.ActionType.PLACE, "emerald_ore", -12.0, 0, -12.0);
+        miner.addReward(Job.ActionType.PLACE, "gold_ore", -5.0, 0, -5.0);
+        miner.addReward(Job.ActionType.PLACE, "iron_ore", -3.0, 0, -3.0);
         jobs.put("miner", miner);
 
-        // Woodcutter
+        // Woodcutter - Chopping trees
         Job woodcutter = new Job("woodcutter");
         woodcutter.setName("§2Woodcutter");
         woodcutter.setDescription("Earn money by chopping trees");
         woodcutter.setIcon(Items.DIAMOND_AXE);
-        woodcutter.addReward(Job.ActionType.BREAK, "oak_log", 1.0, 2.0);
-        woodcutter.addReward(Job.ActionType.BREAK, "spruce_log", 1.0, 2.0);
-        woodcutter.addReward(Job.ActionType.BREAK, "birch_log", 1.0, 2.0);
-        woodcutter.addReward(Job.ActionType.BREAK, "jungle_log", 1.5, 2.5);
-        woodcutter.addReward(Job.ActionType.BREAK, "acacia_log", 1.5, 2.5);
-        woodcutter.addReward(Job.ActionType.BREAK, "dark_oak_log", 1.5, 2.5);
-        woodcutter.addReward(Job.ActionType.BREAK, "cherry_log", 2.0, 3.0);
+        woodcutter.addReward(Job.ActionType.BREAK, "oak_log", 1.0, 2.0, 1.0);
+        woodcutter.addReward(Job.ActionType.BREAK, "spruce_log", 1.0, 2.0, 1.0);
+        woodcutter.addReward(Job.ActionType.BREAK, "birch_log", 1.0, 2.0, 1.0);
+        woodcutter.addReward(Job.ActionType.BREAK, "jungle_log", 1.5, 2.5, 1.5);
+        woodcutter.addReward(Job.ActionType.BREAK, "acacia_log", 1.5, 2.5, 1.5);
+        woodcutter.addReward(Job.ActionType.BREAK, "dark_oak_log", 1.5, 2.5, 1.5);
+        woodcutter.addReward(Job.ActionType.BREAK, "cherry_log", 2.0, 3.0, 2.0);
+        woodcutter.addReward(Job.ActionType.BREAK, "mangrove_log", 2.0, 3.0, 2.0);
+        woodcutter.addReward(Job.ActionType.BREAK, "crimson_stem", 2.5, 4.0, 2.5);
+        woodcutter.addReward(Job.ActionType.BREAK, "warped_stem", 2.5, 4.0, 2.5);
         jobs.put("woodcutter", woodcutter);
 
-        // Farmer
+        // Farmer - Farming crops & breeding
         Job farmer = new Job("farmer");
         farmer.setName("§aFarmer");
-        farmer.setDescription("Earn money by farming crops");
+        farmer.setDescription("Earn money by farming crops and breeding animals");
         farmer.setIcon(Items.DIAMOND_HOE);
-        farmer.addReward(Job.ActionType.BREAK, "wheat", 1.0, 1.5);
-        farmer.addReward(Job.ActionType.BREAK, "carrots", 1.0, 1.5);
-        farmer.addReward(Job.ActionType.BREAK, "potatoes", 1.0, 1.5);
-        farmer.addReward(Job.ActionType.BREAK, "beetroots", 1.5, 2.0);
-        farmer.addReward(Job.ActionType.BREAK, "nether_wart", 2.0, 3.0);
+        farmer.addReward(Job.ActionType.BREAK, "wheat", 1.0, 1.5, 1.0);
+        farmer.addReward(Job.ActionType.BREAK, "carrots", 1.0, 1.5, 1.0);
+        farmer.addReward(Job.ActionType.BREAK, "potatoes", 1.0, 1.5, 1.0);
+        farmer.addReward(Job.ActionType.BREAK, "beetroots", 1.5, 2.0, 1.5);
+        farmer.addReward(Job.ActionType.BREAK, "nether_wart", 2.0, 3.0, 2.0);
+        farmer.addReward(Job.ActionType.BREAK, "melon", 1.5, 2.0, 1.5);
+        farmer.addReward(Job.ActionType.BREAK, "pumpkin", 1.5, 2.0, 1.5);
+        farmer.addReward(Job.ActionType.BREAK, "sugar_cane", 0.75, 1.0, 0.75);
+        farmer.addReward(Job.ActionType.BREAK, "cocoa", 2.0, 3.0, 2.0);
+        // Breeding rewards
+        farmer.addReward(Job.ActionType.BREED, "cow", 3.0, 5.0, 3.0);
+        farmer.addReward(Job.ActionType.BREED, "pig", 3.0, 5.0, 3.0);
+        farmer.addReward(Job.ActionType.BREED, "sheep", 3.0, 5.0, 3.0);
+        farmer.addReward(Job.ActionType.BREED, "chicken", 2.0, 3.0, 2.0);
+        farmer.addReward(Job.ActionType.BREED, "rabbit", 2.5, 4.0, 2.5);
         jobs.put("farmer", farmer);
 
-        // Hunter
+        // Hunter - Killing mobs
         Job hunter = new Job("hunter");
         hunter.setName("§cHunter");
         hunter.setDescription("Earn money by killing mobs");
         hunter.setIcon(Items.DIAMOND_SWORD);
-        hunter.addReward(Job.ActionType.KILL, "zombie", 2.0, 3.0);
-        hunter.addReward(Job.ActionType.KILL, "skeleton", 2.5, 4.0);
-        hunter.addReward(Job.ActionType.KILL, "spider", 2.0, 3.0);
-        hunter.addReward(Job.ActionType.KILL, "creeper", 3.0, 5.0);
-        hunter.addReward(Job.ActionType.KILL, "enderman", 5.0, 8.0);
-        hunter.addReward(Job.ActionType.KILL, "blaze", 6.0, 10.0);
-        hunter.addReward(Job.ActionType.KILL, "wither_skeleton", 8.0, 12.0);
+        hunter.addReward(Job.ActionType.KILL, "zombie", 2.0, 3.0, 2.0);
+        hunter.addReward(Job.ActionType.KILL, "skeleton", 2.5, 4.0, 2.5);
+        hunter.addReward(Job.ActionType.KILL, "spider", 2.0, 3.0, 2.0);
+        hunter.addReward(Job.ActionType.KILL, "creeper", 3.0, 5.0, 3.0);
+        hunter.addReward(Job.ActionType.KILL, "enderman", 5.0, 8.0, 5.0);
+        hunter.addReward(Job.ActionType.KILL, "blaze", 6.0, 10.0, 6.0);
+        hunter.addReward(Job.ActionType.KILL, "wither_skeleton", 8.0, 12.0, 8.0);
+        hunter.addReward(Job.ActionType.KILL, "phantom", 4.0, 6.0, 4.0);
+        hunter.addReward(Job.ActionType.KILL, "witch", 5.0, 8.0, 5.0);
+        hunter.addReward(Job.ActionType.KILL, "pillager", 4.0, 7.0, 4.0);
+        hunter.addReward(Job.ActionType.KILL, "ravager", 15.0, 25.0, 15.0);
+        hunter.addReward(Job.ActionType.KILL, "warden", 50.0, 100.0, 50.0);
         jobs.put("hunter", hunter);
 
-        // Builder
+        // Builder - Placing blocks
         Job builder = new Job("builder");
         builder.setName("§6Builder");
         builder.setDescription("Earn money by placing blocks");
         builder.setIcon(Items.BRICKS);
-        builder.addReward(Job.ActionType.PLACE, "*", 0.25, 0.5);
-        builder.addReward(Job.ActionType.PLACE, "bricks", 1.0, 1.5);
-        builder.addReward(Job.ActionType.PLACE, "stone_bricks", 0.75, 1.0);
+        builder.addReward(Job.ActionType.PLACE, "*", 0.25, 0.5, 0.25);
+        builder.addReward(Job.ActionType.PLACE, "bricks", 1.0, 1.5, 1.0);
+        builder.addReward(Job.ActionType.PLACE, "stone_bricks", 0.75, 1.0, 0.75);
+        builder.addReward(Job.ActionType.PLACE, "deepslate_bricks", 1.0, 1.5, 1.0);
+        builder.addReward(Job.ActionType.PLACE, "polished_blackstone_bricks", 1.0, 1.5, 1.0);
+        builder.addReward(Job.ActionType.PLACE, "quartz_block", 1.5, 2.0, 1.5);
         jobs.put("builder", builder);
+
+        // Fisherman - Fishing
+        Job fisherman = new Job("fisherman");
+        fisherman.setName("§3Fisherman");
+        fisherman.setDescription("Earn money by fishing");
+        fisherman.setIcon(Items.FISHING_ROD);
+        fisherman.addReward(Job.ActionType.FISH, "cod", 2.0, 3.0, 2.0);
+        fisherman.addReward(Job.ActionType.FISH, "salmon", 2.5, 4.0, 2.5);
+        fisherman.addReward(Job.ActionType.FISH, "tropical_fish", 5.0, 8.0, 5.0);
+        fisherman.addReward(Job.ActionType.FISH, "pufferfish", 4.0, 6.0, 4.0);
+        fisherman.addReward(Job.ActionType.FISH, "bow", 10.0, 15.0, 10.0);
+        fisherman.addReward(Job.ActionType.FISH, "enchanted_book", 20.0, 30.0, 20.0);
+        fisherman.addReward(Job.ActionType.FISH, "name_tag", 15.0, 20.0, 15.0);
+        fisherman.addReward(Job.ActionType.FISH, "saddle", 15.0, 20.0, 15.0);
+        fisherman.addReward(Job.ActionType.FISH, "nautilus_shell", 25.0, 40.0, 25.0);
+        jobs.put("fisherman", fisherman);
+
+        // Digger - Digging dirt/gravel/sand
+        Job digger = new Job("digger");
+        digger.setName("§eDigger");
+        digger.setDescription("Earn money by digging soil and sand");
+        digger.setIcon(Items.IRON_SHOVEL);
+        digger.addReward(Job.ActionType.BREAK, "dirt", 0.25, 0.5, 0.25);
+        digger.addReward(Job.ActionType.BREAK, "grass_block", 0.5, 1.0, 0.5);
+        digger.addReward(Job.ActionType.BREAK, "sand", 0.5, 1.0, 0.5);
+        digger.addReward(Job.ActionType.BREAK, "red_sand", 0.75, 1.0, 0.75);
+        digger.addReward(Job.ActionType.BREAK, "gravel", 0.5, 1.0, 0.5);
+        digger.addReward(Job.ActionType.BREAK, "clay", 1.5, 2.0, 1.5);
+        digger.addReward(Job.ActionType.BREAK, "soul_sand", 1.0, 1.5, 1.0);
+        digger.addReward(Job.ActionType.BREAK, "soul_soil", 1.0, 1.5, 1.0);
+        digger.addReward(Job.ActionType.BREAK, "mycelium", 2.0, 3.0, 2.0);
+        jobs.put("digger", digger);
+
+        // Crafter - Crafting items
+        Job crafter = new Job("crafter");
+        crafter.setName("§dCrafter");
+        crafter.setDescription("Earn money by crafting items");
+        crafter.setIcon(Items.CRAFTING_TABLE);
+        crafter.addReward(Job.ActionType.CRAFT, "*", 0.1, 0.25, 0.1);
+        crafter.addReward(Job.ActionType.CRAFT, "iron_sword", 2.0, 3.0, 2.0);
+        crafter.addReward(Job.ActionType.CRAFT, "iron_pickaxe", 3.0, 4.0, 3.0);
+        crafter.addReward(Job.ActionType.CRAFT, "diamond_sword", 5.0, 8.0, 5.0);
+        crafter.addReward(Job.ActionType.CRAFT, "diamond_pickaxe", 8.0, 12.0, 8.0);
+        crafter.addReward(Job.ActionType.CRAFT, "iron_block", 2.0, 3.0, 2.0);
+        crafter.addReward(Job.ActionType.CRAFT, "gold_block", 3.0, 5.0, 3.0);
+        crafter.addReward(Job.ActionType.CRAFT, "diamond_block", 10.0, 15.0, 10.0);
+        // Smelting rewards
+        crafter.addReward(Job.ActionType.SMELT, "iron_ingot", 1.0, 1.5, 1.0);
+        crafter.addReward(Job.ActionType.SMELT, "gold_ingot", 1.5, 2.0, 1.5);
+        crafter.addReward(Job.ActionType.SMELT, "copper_ingot", 1.0, 1.5, 1.0);
+        crafter.addReward(Job.ActionType.SMELT, "netherite_scrap", 5.0, 8.0, 5.0);
+        crafter.addReward(Job.ActionType.SMELT, "glass", 0.5, 1.0, 0.5);
+        jobs.put("crafter", crafter);
     }
 
     /**
@@ -217,6 +316,7 @@ public class JobsManager {
                     pj.setJobId(rs.getString("job_id"));
                     pj.setLevel(rs.getInt("level"));
                     pj.setExperience(rs.getDouble("experience"));
+                    pj.setPoints(rs.getDouble("points"));
                     pj.setJoinedAt(rs.getLong("joined_at"));
                     pj.setLastWorked(rs.getLong("last_worked"));
 
@@ -331,13 +431,23 @@ public class JobsManager {
 
             double income = reward.income * incomeMultiplier;
             double exp = reward.experience * expMultiplier;
+            double pts = reward.points * incomeMultiplier; // Points scale with income multiplier
 
-            // Give income
-            if (income > 0) {
-                eco.deposit(player.getUUID(), income);
+            // Give income (supports negative for anti-exploit)
+            if (income != 0) {
+                if (income > 0) {
+                    eco.deposit(player.getUUID(), income);
+                } else {
+                    eco.withdraw(player.getUUID(), -income);
+                }
             }
 
-            // Add experience
+            // Add points
+            if (pts != 0) {
+                pJob.addPoints(pts);
+            }
+
+            // Add experience (only positive)
             if (exp > 0) {
                 boolean leveledUp = pJob.addExperience(exp, job);
                 if (leveledUp) {
@@ -393,6 +503,70 @@ public class JobsManager {
         processAction(player, Job.ActionType.KILL, entityName);
     }
 
+    @SubscribeEvent
+    public void onItemFished(net.neoforged.neoforge.event.entity.player.ItemFishedEvent event) {
+        if (!enabled)
+            return;
+        if (!(event.getEntity() instanceof ServerPlayer player))
+            return;
+
+        for (net.minecraft.world.item.ItemStack drop : event.getDrops()) {
+            String itemName = drop.getItem().getDescriptionId();
+            itemName = itemName.replace("item.minecraft.", "").replace("block.minecraft.", "");
+            processAction(player, Job.ActionType.FISH, itemName);
+        }
+    }
+
+    @SubscribeEvent
+    public void onItemCrafted(net.neoforged.neoforge.event.entity.player.PlayerEvent.ItemCraftedEvent event) {
+        if (!enabled)
+            return;
+        if (!(event.getEntity() instanceof ServerPlayer player))
+            return;
+
+        String itemName = event.getCrafting().getItem().getDescriptionId();
+        itemName = itemName.replace("item.minecraft.", "").replace("block.minecraft.", "");
+        processAction(player, Job.ActionType.CRAFT, itemName);
+    }
+
+    @SubscribeEvent
+    public void onItemSmelted(net.neoforged.neoforge.event.entity.player.PlayerEvent.ItemSmeltedEvent event) {
+        if (!enabled)
+            return;
+        if (!(event.getEntity() instanceof ServerPlayer player))
+            return;
+
+        String itemName = event.getSmelting().getItem().getDescriptionId();
+        itemName = itemName.replace("item.minecraft.", "").replace("block.minecraft.", "");
+        processAction(player, Job.ActionType.SMELT, itemName);
+    }
+
+    @SubscribeEvent
+    public void onAnimalTame(net.neoforged.neoforge.event.entity.living.AnimalTameEvent event) {
+        if (!enabled)
+            return;
+        if (!(event.getTamer() instanceof ServerPlayer player))
+            return;
+
+        String entityName = event.getAnimal().getType().getDescriptionId();
+        entityName = entityName.replace("entity.minecraft.", "");
+        processAction(player, Job.ActionType.TAME, entityName);
+    }
+
+    @SubscribeEvent
+    public void onBabySpawn(net.neoforged.neoforge.event.entity.living.BabyEntitySpawnEvent event) {
+        if (!enabled)
+            return;
+        if (event.getCausedByPlayer() == null)
+            return;
+        if (!(event.getCausedByPlayer() instanceof ServerPlayer player))
+            return;
+
+        String entityName = event.getChild().getType().getDescriptionId();
+        entityName = entityName.replace("entity.minecraft.", "");
+        processAction(player, Job.ActionType.BREED, entityName);
+    }
+
     /**
      * Get player's jobs
      */
@@ -421,15 +595,16 @@ public class JobsManager {
                 PreparedStatement stmt = conn.prepareStatement(
                         """
                                 INSERT OR REPLACE INTO vonixcore_player_jobs
-                                (uuid, job_id, level, experience, joined_at, last_worked)
-                                VALUES (?, ?, ?, ?, ?, ?)
+                                (uuid, job_id, level, experience, points, joined_at, last_worked)
+                                VALUES (?, ?, ?, ?, ?, ?, ?)
                                 """);
                 stmt.setString(1, pj.getPlayerUuid().toString());
                 stmt.setString(2, pj.getJobId());
                 stmt.setInt(3, pj.getLevel());
                 stmt.setDouble(4, pj.getExperience());
-                stmt.setLong(5, pj.getJoinedAt());
-                stmt.setLong(6, pj.getLastWorked());
+                stmt.setDouble(5, pj.getPoints());
+                stmt.setLong(6, pj.getJoinedAt());
+                stmt.setLong(7, pj.getLastWorked());
                 stmt.executeUpdate();
             } catch (SQLException e) {
                 VonixCore.LOGGER.warn("Failed to save player job: {}", e.getMessage());

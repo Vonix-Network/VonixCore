@@ -62,8 +62,15 @@ public class Job {
      * Add a reward for an action
      */
     public void addReward(ActionType actionType, String target, double income, double exp) {
+        addReward(actionType, target, income, exp, income); // Points default to income
+    }
+
+    /**
+     * Add a reward for an action with points
+     */
+    public void addReward(ActionType actionType, String target, double income, double exp, double points) {
         actions.computeIfAbsent(actionType, k -> new HashMap<>())
-                .put(target.toLowerCase(), new JobReward(income, exp));
+                .put(target.toLowerCase(), new JobReward(income, exp, points));
     }
 
     /**
@@ -163,6 +170,7 @@ public class Job {
         ENCHANT, // Enchanting items
         BREED, // Breeding animals
         TAME, // Taming animals
+        SHEAR, // Shearing sheep
         EXPLORE // Exploring new chunks
     }
 
@@ -172,10 +180,16 @@ public class Job {
     public static class JobReward {
         public final double income;
         public final double experience;
+        public final double points;
 
         public JobReward(double income, double experience) {
+            this(income, experience, income); // Points default to income
+        }
+
+        public JobReward(double income, double experience, double points) {
             this.income = income;
             this.experience = experience;
+            this.points = points;
         }
     }
 }
