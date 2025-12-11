@@ -55,13 +55,17 @@ public class ShopEventListener {
             ShopManager.ChestShop shop = ShopManager.getInstance().getShopAt(world, pos);
 
             if (shop != null) {
-                event.setCanceled(true); // Prevent normal chest opening
-
                 if (shop.owner().equals(player.getUUID())) {
-                    // Owner clicked - show management
-                    handleOwnerClick(player, pos, shop);
+                    // Owner clicked - allow chest access for restocking (don't cancel)
+                    // Just show a reminder on first click (non-sneaking)
+                    if (!player.isShiftKeyDown()) {
+                        handleOwnerClick(player, pos, shop);
+                    }
+                    // Let the chest open normally for restocking
+                    return;
                 } else {
                     // Customer clicked - process transaction
+                    event.setCanceled(true); // Prevent chest opening for non-owners
                     handleCustomerClick(player, pos, shop);
                 }
             }
@@ -77,7 +81,7 @@ public class ShopEventListener {
     }
 
     /**
-     * Handle owner clicking their shop
+     * Handle owner clicking their shop - shows stats reminder
      */
     private static void handleOwnerClick(ServerPlayer player, BlockPos pos, ShopManager.ChestShop shop) {
         String symbol = EssentialsConfig.CONFIG.currencySymbol.get();
@@ -93,6 +97,7 @@ public class ShopEventListener {
             player.sendSystemMessage(
                     Component.literal("§7Sell Price: §c" + symbol + String.format("%.2f", shop.sellPrice())));
         }
+        player.sendSystemMessage(Component.literal("§7Sneak-click to open chest for restocking."));
         player.sendSystemMessage(Component.literal("§7Use §e/chestshop remove §7to delete this shop."));
     }
 
