@@ -177,7 +177,13 @@ public class VonixCore {
                     KitManager.getInstance().loadDefaultKits();
                 }
                 AdminManager.getInstance().initializeTable(conn);
-                JobsManager.getInstance().initialize(conn);
+
+                // Initialize Jobs system
+                if (EssentialsConfig.CONFIG.jobsEnabled.get()) {
+                    JobsManager.getInstance().initialize(conn);
+                    network.vonix.vonixcore.jobs.JobsCommands.register(event.getServer().getCommands().getDispatcher());
+                    enabledModules.add("Jobs");
+                }
 
                 essentialsEnabled = true;
                 enabledModules.add("Essentials");

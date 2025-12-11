@@ -90,6 +90,7 @@ Full documentation is available in the [`documentation/`](documentation/) folder
 | [**Configuration**](documentation/configuration.md) | Config file guide |
 | [**Permissions**](documentation/permissions.md) | Permission nodes |
 | [**Economy**](documentation/economy.md) | Economy & shops |
+| [**Jobs**](documentation/jobs.md) | Earn money by playing |
 | [**Protection**](documentation/protection.md) | Block logging & rollback |
 | [**Claims**](documentation/claims.md) | Land protection |
 | [**Graves**](documentation/graves.md) | Death protection |
