@@ -16,6 +16,10 @@ VonixCore uses modular configuration files for easy management:
 | `vonixcore-graves.yml` | Graves system |
 | `vonixcore-shops.yml` | Shop configuration |
 
+> **Platform Note:**
+> - **NeoForge/Forge**: Config files use `.toml` format and are located in `config/vonixcore/`
+> - **Bukkit**: Config files use `.yml` format and are located in `plugins/VonixCore/`
+
 ---
 
 ## Database Configuration

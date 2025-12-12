@@ -71,6 +71,10 @@ max_retries = 3
 2. **Regular Interval**: Syncs all online players in batches (default: every 5 minutes)
 3. **Server Shutdown**: Syncs ALL players from world data (NeoForge only)
 
+> **Platform Differences:**
+> - **NeoForge/Forge**: Can sync offline players by reading `world/playerdata/*.dat` and `world/stats/*.json`
+> - **Bukkit**: Only syncs online players; offline data not accessible via API
+
 > **Note:** Per-player sync on join/leave was removed in v1.0.0 for performance optimization. All syncing now happens in batches at configured intervals, reducing API calls and server load.
 
 ### What Gets Synced

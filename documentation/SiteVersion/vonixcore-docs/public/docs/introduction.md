@@ -6,9 +6,23 @@ A comprehensive, cross-platform Minecraft server core plugin/mod providing essen
 
 | Platform | Minecraft Version | Status |
 |----------|------------------|--------|
-| **NeoForge** | 1.21.x | ✅ Fully Supported |
+| **NeoForge** | 1.20.2 - 1.21.x | ✅ Fully Supported |
 | **Forge** | 1.20.1 | ✅ Fully Supported |
 | **Bukkit/Spigot/Paper** | 1.18+ | ✅ Fully Supported |
+
+### Platform Differences
+
+| Feature | NeoForge | Forge 1.20.1 | Bukkit |
+|---------|----------|--------------|--------|
+| **Config Format** | `.toml` | `.toml` | `.yml` |
+| **Config Location** | `config/vonixcore/` | `config/vonixcore/` | `plugins/VonixCore/` |
+| **Permissions** | OP levels (0-4) | OP levels (0-4) | LuckPerms/Vault |
+| **GUI Shops** | ✅ Full | ✅ Full | ✅ Full |
+| **Chest Shops** | ✅ Full | ✅ Full | ✅ Full |
+| **Jobs System** | ✅ Full | ✅ Full | ✅ Full |
+| **XP Sync** | ✅ All players | ✅ All players | ✅ Online only |
+| **Offline Data** | NBT + Stats | NBT + Stats | Stats only |
+| **Display Entities** | ✅ Holograms | ✅ Holograms | Armor Stands |
 
 ## ✨ Features
 

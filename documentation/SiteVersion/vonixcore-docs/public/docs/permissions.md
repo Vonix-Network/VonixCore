@@ -4,7 +4,13 @@ VonixCore includes a complete permission system that works standalone or integra
 
 ---
 
-## 🔍 LuckPerms Detection
+## 🔍 Platform-Specific Permissions
+
+> **Platform Differences:**
+> - **NeoForge/Forge**: Uses Minecraft's built-in OP levels (0-4). Level 2+ for most admin commands.
+> - **Bukkit**: Full integration with LuckPerms, PermissionsEx, or Vault. Permission nodes below work directly.
+
+### LuckPerms Detection (Bukkit Only)
 
 VonixCore automatically detects if LuckPerms is installed:
 
