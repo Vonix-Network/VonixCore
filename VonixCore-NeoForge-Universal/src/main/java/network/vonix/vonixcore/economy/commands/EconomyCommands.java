@@ -11,6 +11,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 import network.vonix.vonixcore.config.EssentialsConfig;
 import network.vonix.vonixcore.economy.EconomyManager;
+import network.vonix.vonixcore.economy.EconomyPlanLoader;
 import network.vonix.vonixcore.economy.ShopManager;
 import network.vonix.vonixcore.economy.shop.ItemUtils;
 import network.vonix.vonixcore.economy.shop.ShopGUIManager;
@@ -109,7 +110,19 @@ public class EconomyCommands {
                                         .executes(ctx -> ecoSet(
                                                 ctx.getSource(),
                                                 StringArgumentType.getString(ctx, "player"),
-                                                DoubleArgumentType.getDouble(ctx, "amount")))))));
+                                                DoubleArgumentType.getDouble(ctx, "amount"))))))
+                .then(Commands.literal("import")
+                        .executes(ctx -> ecoImport(ctx.getSource(), null))
+                        .then(Commands.argument("file", StringArgumentType.greedyString())
+                                .executes(ctx -> ecoImport(
+                                        ctx.getSource(),
+                                        StringArgumentType.getString(ctx, "file")))))
+                .then(Commands.literal("export")
+                        .executes(ctx -> ecoExport(ctx.getSource(), null))
+                        .then(Commands.argument("file", StringArgumentType.greedyString())
+                                .executes(ctx -> ecoExport(
+                                        ctx.getSource(),
+                                        StringArgumentType.getString(ctx, "file"))))));
     }
 
     private static int showBalance(CommandSourceStack source) {
@@ -394,5 +407,64 @@ public class EconomyCommands {
                         .literal("§aSet " + targetName + "'s balance to " + symbol + String.format("%.2f", amount)),
                 true);
         return 1;
+    }
+
+    private static int ecoImport(CommandSourceStack source, String fileName) {
+        java.nio.file.Path filePath;
+        if (fileName == null || fileName.isEmpty()) {
+            filePath = EconomyPlanLoader.getDefaultPath();
+        } else {
+            // If just a filename, look in config folder
+            if (!fileName.contains("/") && !fileName.contains("\\")) {
+                filePath = network.vonix.vonixcore.VonixCore.getInstance().getConfigPath().resolve(fileName);
+            } else {
+                filePath = java.nio.file.Path.of(fileName);
+            }
+        }
+
+        if (!java.nio.file.Files.exists(filePath)) {
+            source.sendFailure(Component.literal("§cFile not found: " + filePath));
+            return 0;
+        }
+
+        EconomyPlanLoader.EconomyPlan plan = EconomyPlanLoader.loadFromFile(filePath);
+        if (plan == null) {
+            source.sendFailure(Component.literal("§cFailed to load economy plan from file."));
+            return 0;
+        }
+
+        int imported = EconomyPlanLoader.importToDatabase(plan);
+        source.sendSuccess(
+                () -> Component.literal("§aImported " + imported + " items from " + filePath.getFileName()), true);
+        return 1;
+    }
+
+    private static int ecoExport(CommandSourceStack source, String fileName) {
+        java.nio.file.Path filePath;
+        if (fileName == null || fileName.isEmpty()) {
+            filePath = EconomyPlanLoader.getDefaultPath();
+        } else {
+            // If just a filename, save in config folder
+            if (!fileName.contains("/") && !fileName.contains("\\")) {
+                filePath = network.vonix.vonixcore.VonixCore.getInstance().getConfigPath().resolve(fileName);
+            } else {
+                filePath = java.nio.file.Path.of(fileName);
+            }
+        }
+
+        // Ensure .json extension
+        if (!filePath.toString().endsWith(".json")) {
+            filePath = java.nio.file.Path.of(filePath.toString() + ".json");
+        }
+
+        if (EconomyPlanLoader.exportToFile(filePath)) {
+            java.nio.file.Path finalPath = filePath;
+            source.sendSuccess(
+                    () -> Component.literal("§aExported economy plan to: " + finalPath.getFileName()), true);
+            return 1;
+        } else {
+            source.sendFailure(Component.literal("§cFailed to export economy plan."));
+            return 0;
+        }
     }
 }

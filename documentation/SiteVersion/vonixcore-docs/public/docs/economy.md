@@ -227,6 +227,35 @@ Set server shop prices (requires `vonixcore.adminshop`):
 > Diamond: Buy $100, Sell $50
 ```
 
+### Economy Plan Import/Export
+
+Bulk import or export admin shop prices using JSON files:
+
+```
+/eco import [filename]   - Import prices from JSON file
+/eco export [filename]   - Export current prices to JSON file
+```
+
+**Default file:** `config/vonixcore/economy_plan.json`
+
+**JSON Format:**
+```json
+{
+  "version": 1,
+  "items": [
+    {"id": "minecraft:diamond", "buy": 40.00, "sell": 8.00},
+    {"id": "minecraft:netherite_ingot", "buy": 200.00, "sell": null},
+    {"id": "minecraft:rotten_flesh", "buy": null, "sell": 0.05}
+  ]
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `id` | Full item ID (namespace:item) |
+| `buy` | Buy price, or `null` = cannot buy |
+| `sell` | Sell price, or `null` = cannot sell |
+
 ### Daily Rewards
 
 ```

@@ -263,11 +263,10 @@ public class XPSyncManager {
                         playerData.addProperty("username", uuidStr);
                     }
 
+                    // Always include playtime (even if 0) to ensure consistency
                     if (XPSyncConfig.CONFIG.trackPlaytime.get()) {
                         int playtime = getPlaytimeFromStats(uuid, statsPath);
-                        if (playtime > 0) {
-                            playerData.addProperty("playtimeSeconds", playtime);
-                        }
+                        playerData.addProperty("playtimeSeconds", Math.max(0, playtime));
                     }
 
                     players.add(playerData);
@@ -300,10 +299,20 @@ public class XPSyncManager {
             playerData.addProperty("currentHealth", player.getHealth());
         }
 
+        // Always include playtime when tracking is enabled (even if 0)
         if (XPSyncConfig.CONFIG.trackPlaytime.get()) {
-            int playTimeTicks = player.getStats().getValue(Stats.CUSTOM.get(Stats.PLAY_TIME));
-            int playTimeSeconds = playTimeTicks / 20;
-            playerData.addProperty("playtimeSeconds", playTimeSeconds);
+            try {
+                int playTimeTicks = player.getStats().getValue(Stats.CUSTOM.get(Stats.PLAY_TIME));
+                int playTimeSeconds = Math.max(0, playTimeTicks / 20);
+                playerData.addProperty("playtimeSeconds", playTimeSeconds);
+            } catch (Exception e) {
+                // Fallback: still include 0 so API knows we attempted
+                playerData.addProperty("playtimeSeconds", 0);
+                if (XPSyncConfig.CONFIG.verboseLogging.get()) {
+                    VonixCore.LOGGER.warn("[XPSync] Failed to get playtime for {}: {}", player.getName().getString(),
+                            e.getMessage());
+                }
+            }
         }
 
         return playerData;
@@ -420,6 +429,8 @@ public class XPSyncManager {
             playersArray.add(buildPlayerDataFromOnline(player));
         }
         root.add("players", playersArray);
+        // Store count for verification after API response
+        root.addProperty("_playerCount", players.size());
 
         return root;
     }
@@ -507,7 +518,10 @@ public class XPSyncManager {
             String responseBody = readResponse(conn, statusCode);
 
             if (statusCode == 200) {
-                handleSuccessResponse(responseBody);
+                // Extract expected count from payload (stored by buildPayload)
+                int expectedCount = payload.has("_playerCount") ? payload.get("_playerCount").getAsInt()
+                        : (payload.has("players") ? payload.getAsJsonArray("players").size() : 0);
+                handleSuccessResponse(responseBody, expectedCount);
                 return true;
             } else if (statusCode == 401) {
                 VonixCore.LOGGER.error("[XPSync] Authentication failed! Check your API key.");
@@ -516,7 +530,8 @@ public class XPSyncManager {
                 VonixCore.LOGGER.error("[XPSync] API key invalid or server not recognized.");
                 return true; // Don't retry auth errors
             } else if (statusCode >= 500) {
-                VonixCore.LOGGER.warn("[XPSync] Server error {} (attempt {}/{}): {}", statusCode, attempt, MAX_RETRIES, responseBody);
+                VonixCore.LOGGER.warn("[XPSync] Server error {} (attempt {}/{}): {}", statusCode, attempt, MAX_RETRIES,
+                        responseBody);
                 return false; // Retry server errors
             } else {
                 VonixCore.LOGGER.error("[XPSync] Failed to sync. HTTP {}: {}", statusCode, responseBody);
@@ -524,7 +539,8 @@ public class XPSyncManager {
             }
 
         } catch (java.net.ConnectException e) {
-            VonixCore.LOGGER.warn("[XPSync] Cannot connect to API (attempt {}/{}): {}", attempt, MAX_RETRIES, apiEndpoint);
+            VonixCore.LOGGER.warn("[XPSync] Cannot connect to API (attempt {}/{}): {}", attempt, MAX_RETRIES,
+                    apiEndpoint);
             return false;
         } catch (java.net.SocketTimeoutException e) {
             VonixCore.LOGGER.warn("[XPSync] Request timed out (attempt {}/{}): {}", attempt, MAX_RETRIES, apiEndpoint);
@@ -533,7 +549,8 @@ public class XPSyncManager {
             VonixCore.LOGGER.error("[XPSync] Unknown host: {}", apiEndpoint);
             return true; // Don't retry DNS errors
         } catch (Exception e) {
-            VonixCore.LOGGER.warn("[XPSync] Error sending to API (attempt {}/{}): {}", attempt, MAX_RETRIES, e.getMessage());
+            VonixCore.LOGGER.warn("[XPSync] Error sending to API (attempt {}/{}): {}", attempt, MAX_RETRIES,
+                    e.getMessage());
             return false;
         } finally {
             if (conn != null) {
@@ -542,7 +559,7 @@ public class XPSyncManager {
         }
     }
 
-    private void handleSuccessResponse(String responseBody) {
+    private void handleSuccessResponse(String responseBody, int expectedCount) {
         if (responseBody == null || responseBody.isEmpty())
             return;
 
@@ -550,7 +567,14 @@ public class XPSyncManager {
             JsonObject response = JsonParser.parseString(responseBody).getAsJsonObject();
             if (response.has("success") && response.get("success").getAsBoolean()) {
                 int synced = response.has("syncedCount") ? response.get("syncedCount").getAsInt() : 0;
-                VonixCore.LOGGER.info("[XPSync] Successfully synced {} players", synced);
+                if (synced == expectedCount) {
+                    VonixCore.LOGGER.info("[XPSync] Successfully synced {} players", synced);
+                } else if (synced > 0) {
+                    VonixCore.LOGGER.warn("[XPSync] Partial sync: {} of {} players synced", synced, expectedCount);
+                } else {
+                    VonixCore.LOGGER.warn("[XPSync] API returned success but syncedCount=0 (expected {})",
+                            expectedCount);
+                }
             } else {
                 String error = response.has("error") ? response.get("error").getAsString() : "Unknown";
                 VonixCore.LOGGER.warn("[XPSync] API response: {}", error);
