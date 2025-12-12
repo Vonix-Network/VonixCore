@@ -147,7 +147,7 @@ public class JobsManager {
         miner.addReward(Job.ActionType.BREAK, "deepslate_diamond_ore", 12.0, 18.0, 12.0);
         miner.addReward(Job.ActionType.BREAK, "emerald_ore", 12.0, 20.0, 12.0);
         miner.addReward(Job.ActionType.BREAK, "deepslate_emerald_ore", 15.0, 25.0, 15.0);
-        miner.addReward(Job.ActionType.BREAK, "ancient_debris", 20.0, 30.0, 20.0);
+        miner.addReward(Job.ActionType.BREAK, "ancient_debris", 35.0, 30.0, 35.0);
         miner.addReward(Job.ActionType.BREAK, "nether_quartz_ore", 2.0, 3.0, 2.0);
         // Anti-exploit: Placing ores gives NEGATIVE rewards
         miner.addReward(Job.ActionType.PLACE, "diamond_ore", -10.0, 0, -10.0);
@@ -212,7 +212,7 @@ public class JobsManager {
         hunter.addReward(Job.ActionType.KILL, "witch", 5.0, 8.0, 5.0);
         hunter.addReward(Job.ActionType.KILL, "pillager", 4.0, 7.0, 4.0);
         hunter.addReward(Job.ActionType.KILL, "ravager", 15.0, 25.0, 15.0);
-        hunter.addReward(Job.ActionType.KILL, "warden", 50.0, 100.0, 50.0);
+        hunter.addReward(Job.ActionType.KILL, "warden", 350.0, 100.0, 350.0);
         jobs.put("hunter", hunter);
 
         // Builder - Placing blocks

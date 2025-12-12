@@ -4,7 +4,7 @@ import org.bukkit.configuration.file.YamlConfiguration;
 
 public class XPSyncConfig {
 
-    public static boolean enabled;
+    public static boolean enabled = false;
 
     public static String apiEndpoint;
     public static String apiKey;

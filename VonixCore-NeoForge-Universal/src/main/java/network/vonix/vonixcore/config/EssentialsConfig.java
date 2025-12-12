@@ -119,8 +119,9 @@ public class EssentialsConfig {
                                 .push("economy");
 
                 startingBalance = builder.comment(
-                                "Starting balance for new players")
-                                .defineInRange("starting_balance", 100.0, 0.0, 1000000.0);
+                                "Starting balance for new players",
+                                "Allows purchase of full Iron set + Food on join")
+                                .defineInRange("starting_balance", 250.0, 0.0, 1000000.0);
 
                 currencySymbol = builder.comment(
                                 "Currency symbol to display (e.g., $, €, £)")
