@@ -75,8 +75,15 @@ Complete list of all commands available in VonixCore.
 | `/balance` | Check your balance | `/balance` | - |
 | `/bal` | Alias for balance | `/bal` | - |
 | `/pay <player> <amount>` | Pay another player | `/pay Steve 100` | - |
+| `/eco give <player> <amount>` | Give money (admin) | `/eco give Steve 100` | `vonixcore.eco` |
+| `/eco take <player> <amount>` | Take money (admin) | `/eco take Steve 50` | `vonixcore.eco` |
+| `/eco set <player> <amount>` | Set balance (admin) | `/eco set Steve 1000` | `vonixcore.eco` |
+| `/eco import [file]` | Import prices from JSON | `/eco import economy_plan.json` | `vonixcore.eco` |
+| `/eco export [file]` | Export prices to JSON | `/eco export backup.json` | `vonixcore.eco` |
 
 ---
+
+## Shop Commands
 
 ### Server Shop (Admin Shop)
 
