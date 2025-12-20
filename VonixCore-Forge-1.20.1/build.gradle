@@ -226,6 +226,15 @@ shadowJar {
     exclude 'META-INF/LICENSE*'
     exclude 'META-INF/DEPENDENCIES'
     
+    // Exclude Kotlin - provided by KotlinForForge in modpacks
+    exclude 'kotlin/**'
+    exclude 'kotlinx/**'
+    exclude 'org/jetbrains/kotlin/**'
+    exclude 'org/intellij/**'
+    exclude 'META-INF/kotlin*'
+    exclude 'META-INF/org.jetbrains.kotlin*'
+    exclude 'META-INF/*.kotlin_module'
+    
     // Merge service files
     mergeServiceFiles()
     
