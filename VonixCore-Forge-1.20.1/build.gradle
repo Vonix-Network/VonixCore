@@ -206,8 +206,8 @@ shadowJar {
     configurations = [project.configurations.shade]
     
     // Relocate packages to avoid conflicts with other mods
+    // NOTE: Do NOT relocate org.sqlite - it uses JNI which expects original class names
     relocate 'com.zaxxer.hikari', 'network.vonix.vonixcore.libs.hikari'
-    relocate 'org.sqlite', 'network.vonix.vonixcore.libs.sqlite'
     relocate 'org.javacord', 'network.vonix.vonixcore.libs.javacord'
     relocate 'com.squareup.okhttp3', 'network.vonix.vonixcore.libs.okhttp3'
     relocate 'okio', 'network.vonix.vonixcore.libs.okio'
@@ -234,6 +234,61 @@ shadowJar {
     exclude 'META-INF/kotlin*'
     exclude 'META-INF/org.jetbrains.kotlin*'
     exclude 'META-INF/*.kotlin_module'
+    
+    // Exclude SLF4J - provided by Minecraft/Forge
+    exclude 'org/slf4j/**'
+    exclude 'META-INF/services/org.slf4j*'
+    
+    // Exclude Log4j - provided by Minecraft/Forge
+    exclude 'org/apache/logging/**'
+    exclude 'META-INF/org/apache/logging/**'
+    exclude 'META-INF/log4j*'
+    exclude 'META-INF/versions/*/org/apache/logging/**'
+    exclude 'META-INF/services/org.apache.logging*'
+    exclude 'Log4j*'
+    
+    // Exclude Gson - provided by Minecraft
+    exclude 'com/google/gson/**'
+    
+    // Exclude Guava - provided by Minecraft
+    exclude 'com/google/common/**'
+    exclude 'com/google/thirdparty/**'
+    
+    // Exclude Apache Commons - often provided by Forge/mods
+    exclude 'org/apache/commons/logging/**'
+    exclude 'org/apache/commons/codec/**'
+    
+    // Exclude Netty - provided by Minecraft
+    exclude 'io/netty/**'
+    
+    // Exclude FastUtil - provided by Minecraft
+    exclude 'it/unimi/dsi/fastutil/**'
+    
+    // Exclude LWJGL - provided by Minecraft
+    exclude 'org/lwjgl/**'
+    
+    // Exclude JNA - often conflicts
+    exclude 'com/sun/jna/**'
+    
+    // Exclude OSHI - system info library often provided
+    exclude 'oshi/**'
+    
+    // Exclude LatencyUtils/HdrHistogram - sometimes bundled
+    exclude 'org/LatencyUtils/**'
+    exclude 'org/HdrHistogram/**'
+    
+    // Exclude Checker Framework annotations - not needed at runtime
+    exclude 'org/checkerframework/**'
+    
+    // Exclude FindBugs/SpotBugs annotations - not needed at runtime
+    exclude 'edu/umd/cs/findbugs/**'
+    exclude 'com/github/spotbugs/**'
+    
+    // Exclude javax annotations - provided
+    exclude 'javax/annotation/**'
+    
+    // Exclude JetBrains annotations - not needed at runtime
+    exclude 'org/jetbrains/annotations/**'
     
     // Merge service files
     mergeServiceFiles()
