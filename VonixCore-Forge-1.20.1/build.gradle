@@ -3,6 +3,7 @@ plugins {
     id 'idea'
     id 'maven-publish'
     id 'net.minecraftforge.gradle' version '[6.0,6.2)'
+    id 'com.gradleup.shadow' version '8.3.5'
 }
 
 version = mod_version
@@ -121,6 +122,12 @@ repositories {
     }
 }
 
+// Configuration for shading dependencies into the JAR
+configurations {
+    shade
+    implementation.extendsFrom shade
+}
+
 dependencies {
     // Specify the version of Minecraft to use.
     // Any artifact can be supplied so long as it has a "userdev" classifier artifact and is a compatible patcher artifact.
@@ -130,36 +137,47 @@ dependencies {
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
 
     // ========================================
-    // VonixCore Dependencies
+    // VonixCore Dependencies (shaded into JAR)
     // ========================================
     
     // Database dependencies - HikariCP for efficient connection pooling
-    implementation 'com.zaxxer:HikariCP:5.1.0'
+    shade 'com.zaxxer:HikariCP:5.1.0'
     // SQLite JDBC driver for embedded database support
-    implementation 'org.xerial:sqlite-jdbc:3.45.1.0'
+    shade 'org.xerial:sqlite-jdbc:3.45.1.0'
     
     // Discord Integration Dependencies
     // Javacord for Discord Bot API (gateway, slash commands, bot status)
-    implementation 'org.javacord:javacord:3.8.0'
+    shade 'org.javacord:javacord:3.8.0'
     
     // OkHttp for webhook requests (faster than Javacord webhooks)
-    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
-    implementation 'com.squareup.okio:okio-jvm:3.9.0'
+    shade 'com.squareup.okhttp3:okhttp:4.12.0'
+    shade 'com.squareup.okio:okio-jvm:3.9.0'
+    shade 'com.squareup.okio:okio:3.9.0'
     
-    // Kotlin stdlib required by OkHttp 4.x
+    
+    // Kotlin stdlib required by OkHttp 4.x - PROVIDED by KotlinForForge (don't bundle!)
     compileOnly 'org.jetbrains.kotlin:kotlin-stdlib:1.9.22'
+    compileOnly 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.22'
+    compileOnly 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.9.22'
     
     // Jackson for JSON processing (Javacord transitive dependency)
-    implementation 'com.fasterxml.jackson.core:jackson-databind:2.17.0'
-    implementation 'com.fasterxml.jackson.core:jackson-core:2.17.0'
-    implementation 'com.fasterxml.jackson.core:jackson-annotations:2.17.0'
+    shade 'com.fasterxml.jackson.core:jackson-databind:2.17.0'
+    shade 'com.fasterxml.jackson.core:jackson-core:2.17.0'
+    shade 'com.fasterxml.jackson.core:jackson-annotations:2.17.0'
     
     // Javacord transitive dependencies
-    implementation 'io.vavr:vavr:0.10.4'
-    implementation 'com.neovisionaries:nv-websocket-client:2.14'
-    implementation 'com.squareup.okhttp3:logging-interceptor:4.12.0'
+    shade 'io.vavr:vavr:0.10.4'
+    shade 'io.vavr:vavr-match:0.10.4'
+    shade 'com.neovisionaries:nv-websocket-client:2.14'
+    shade 'com.squareup.okhttp3:logging-interceptor:4.12.0'
     
-    // LuckPerms API (optional runtime dependency)
+    // XSalsa20Poly1305 encryption library (required by Javacord for voice)
+    shade 'com.codahale:xsalsa20poly1305:0.11.0'
+    
+    // Bouncy Castle crypto provider
+    shade 'org.bouncycastle:bcprov-jdk18on:1.78.1'
+    
+    // LuckPerms API (optional runtime dependency - NOT shaded)
     compileOnly 'net.luckperms:api:5.4'
 }
 
@@ -182,23 +200,71 @@ tasks.named('processResources', ProcessResources).configure {
     }
 }
 
-// Example for how to get properties into the manifest for reading at runtime.
-tasks.named('jar', Jar).configure {
+// Configure shadowJar to bundle shaded dependencies
+shadowJar {
+    archiveClassifier = ''
+    configurations = [project.configurations.shade]
+    
+    // Relocate packages to avoid conflicts with other mods
+    relocate 'com.zaxxer.hikari', 'network.vonix.vonixcore.libs.hikari'
+    relocate 'org.sqlite', 'network.vonix.vonixcore.libs.sqlite'
+    relocate 'org.javacord', 'network.vonix.vonixcore.libs.javacord'
+    relocate 'com.squareup.okhttp3', 'network.vonix.vonixcore.libs.okhttp3'
+    relocate 'okio', 'network.vonix.vonixcore.libs.okio'
+    relocate 'com.fasterxml.jackson', 'network.vonix.vonixcore.libs.jackson'
+    relocate 'io.vavr', 'network.vonix.vonixcore.libs.vavr'
+    relocate 'com.neovisionaries.ws', 'network.vonix.vonixcore.libs.nv_ws'
+    relocate 'com.codahale.xsalsa20poly1305', 'network.vonix.vonixcore.libs.xsalsa'
+    relocate 'org.bouncycastle', 'network.vonix.vonixcore.libs.bouncycastle'
+    
+    // Exclude unnecessary files from shaded JARs
+    exclude 'META-INF/maven/**'
+    exclude 'META-INF/*.SF'
+    exclude 'META-INF/*.DSA'
+    exclude 'META-INF/*.RSA'
+    exclude 'META-INF/NOTICE*'
+    exclude 'META-INF/LICENSE*'
+    exclude 'META-INF/DEPENDENCIES'
+    
+    // Merge service files
+    mergeServiceFiles()
+    
     manifest {
         attributes([
                 'Specification-Title'     : mod_id,
                 'Specification-Vendor'    : mod_authors,
-                'Specification-Version'   : '1', // We are version 1 of ourselves
+                'Specification-Version'   : '1',
                 'Implementation-Title'    : project.name,
                 'Implementation-Version'  : project.jar.archiveVersion,
                 'Implementation-Vendor'   : mod_authors,
                 'Implementation-Timestamp': new Date().format("yyyy-MM-dd'T'HH:mm:ssZ")
         ])
     }
-
-    // This is the preferred method to reobfuscate your jar file
-    finalizedBy 'reobfJar'
 }
+
+// Regular jar is the slim version without dependencies
+jar {
+    archiveClassifier = 'slim'
+    manifest {
+        attributes([
+                'Specification-Title'     : mod_id,
+                'Specification-Vendor'    : mod_authors,
+                'Specification-Version'   : '1',
+                'Implementation-Title'    : project.name,
+                'Implementation-Version'  : project.jar.archiveVersion,
+                'Implementation-Vendor'   : mod_authors,
+                'Implementation-Timestamp': new Date().format("yyyy-MM-dd'T'HH:mm:ssZ")
+        ])
+    }
+}
+
+// reobfJar should run on shadowJar output
+reobf {
+    shadowJar {}
+}
+
+// Build task should produce the shadowJar
+build.dependsOn shadowJar
 
 // However if you are in a multi-project build, dev time needs unobfed jar files, so you can delay the obfuscation until publishing by doing:
 // tasks.named('publish').configure {

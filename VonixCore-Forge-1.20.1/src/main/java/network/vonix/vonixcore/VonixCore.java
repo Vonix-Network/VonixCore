@@ -24,6 +24,7 @@ import network.vonix.vonixcore.config.ProtectionConfig;
 import network.vonix.vonixcore.config.XPSyncConfig;
 import network.vonix.vonixcore.config.GravesConfig;
 import network.vonix.vonixcore.config.ClaimsConfig;
+import network.vonix.vonixcore.auth.AuthConfig;
 import network.vonix.vonixcore.graves.GravesManager;
 import network.vonix.vonixcore.graves.GravesCommands;
 import network.vonix.vonixcore.claims.ClaimsManager;
@@ -116,6 +117,7 @@ public class VonixCore {
         ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, XPSyncConfig.SPEC, "vonixcore-xpsync.toml");
         ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, GravesConfig.SPEC, "vonixcore-graves.toml");
         ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, ClaimsConfig.SPEC, "vonixcore-claims.toml");
+        ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, AuthConfig.SPEC, "vonixcore-auth.toml");
 
         LOGGER.info("[{}] Loading v{}...", MOD_NAME, VERSION);
     }
