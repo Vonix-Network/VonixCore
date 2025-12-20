@@ -199,11 +199,20 @@ public class TeleportManager {
     }
 
     /**
+     * Clear all state (call on server shutdown).
+     */
+    public void clear() {
+        tpaRequests.clear();
+        lastLocations.clear();
+        cooldowns.clear();
+    }
+
+    /**
      * TPA request record.
      */
     public record TpaRequest(UUID requesterUuid, String requesterName, boolean tpaHere, long timestamp) {
         private static final long EXPIRE_MS = 120000; // 2 minutes
-        
+
         public boolean isExpired() {
             return System.currentTimeMillis() - timestamp > EXPIRE_MS;
         }

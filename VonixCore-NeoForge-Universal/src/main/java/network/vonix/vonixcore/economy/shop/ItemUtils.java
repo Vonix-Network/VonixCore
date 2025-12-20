@@ -143,6 +143,175 @@ public class ItemUtils {
     }
 
     /**
+     * Count how many of a specific item are in a chest at a position
+     * Supports regular chests and double chests
+     */
+    public static int countChestItems(net.minecraft.world.level.Level level, net.minecraft.core.BlockPos pos,
+            String itemId) {
+        if (level == null || pos == null || itemId == null)
+            return 0;
+
+        net.minecraft.world.level.block.entity.BlockEntity blockEntity = level.getBlockEntity(pos);
+        if (blockEntity == null)
+            return 0;
+
+        int count = 0;
+
+        // Handle chest containers (regular chest, double chest, etc.)
+        if (blockEntity instanceof net.minecraft.world.Container container) {
+            for (int i = 0; i < container.getContainerSize(); i++) {
+                ItemStack stack = container.getItem(i);
+                if (!stack.isEmpty() && getItemId(stack).equals(itemId)) {
+                    count += stack.getCount();
+                }
+            }
+        }
+
+        // Also check if this is a double chest by checking ChestBlockEntity
+        if (blockEntity instanceof net.minecraft.world.level.block.entity.ChestBlockEntity chestBE) {
+            // For double chests, getContainer() returns the combined container
+            net.minecraft.world.Container combinedContainer = net.minecraft.world.level.block.ChestBlock.getContainer(
+                    (net.minecraft.world.level.block.ChestBlock) level.getBlockState(pos).getBlock(),
+                    level.getBlockState(pos),
+                    level,
+                    pos,
+                    true);
+            if (combinedContainer != null && combinedContainer != chestBE) {
+                count = 0; // Reset and count from combined container
+                for (int i = 0; i < combinedContainer.getContainerSize(); i++) {
+                    ItemStack stack = combinedContainer.getItem(i);
+                    if (!stack.isEmpty() && getItemId(stack).equals(itemId)) {
+                        count += stack.getCount();
+                    }
+                }
+            }
+        }
+
+        return count;
+    }
+
+    /**
+     * Remove items from a chest at a position
+     * 
+     * @return true if successfully removed the requested amount
+     */
+    public static boolean removeChestItems(net.minecraft.world.level.Level level, net.minecraft.core.BlockPos pos,
+            String itemId, int amount) {
+        if (level == null || pos == null || itemId == null || amount <= 0)
+            return false;
+        if (countChestItems(level, pos, itemId) < amount)
+            return false;
+
+        net.minecraft.world.level.block.entity.BlockEntity blockEntity = level.getBlockEntity(pos);
+        if (blockEntity == null)
+            return false;
+
+        net.minecraft.world.Container container = null;
+
+        // Check for double chest first
+        if (blockEntity instanceof net.minecraft.world.level.block.entity.ChestBlockEntity) {
+            container = net.minecraft.world.level.block.ChestBlock.getContainer(
+                    (net.minecraft.world.level.block.ChestBlock) level.getBlockState(pos).getBlock(),
+                    level.getBlockState(pos),
+                    level,
+                    pos,
+                    true);
+        }
+
+        // Fallback to regular container
+        if (container == null && blockEntity instanceof net.minecraft.world.Container c) {
+            container = c;
+        }
+
+        if (container == null)
+            return false;
+
+        int remaining = amount;
+        for (int i = 0; i < container.getContainerSize() && remaining > 0; i++) {
+            ItemStack stack = container.getItem(i);
+            if (!stack.isEmpty() && getItemId(stack).equals(itemId)) {
+                int toRemove = Math.min(remaining, stack.getCount());
+                stack.shrink(toRemove);
+                remaining -= toRemove;
+
+                if (stack.isEmpty()) {
+                    container.setItem(i, ItemStack.EMPTY);
+                }
+            }
+        }
+
+        container.setChanged();
+        return remaining == 0;
+    }
+
+    /**
+     * Add items to a chest at a position
+     * 
+     * @return number of items that couldn't fit
+     */
+    public static int addChestItems(net.minecraft.world.level.Level level, net.minecraft.core.BlockPos pos,
+            String itemId, int amount) {
+        if (level == null || pos == null || itemId == null || amount <= 0)
+            return amount;
+
+        net.minecraft.world.level.block.entity.BlockEntity blockEntity = level.getBlockEntity(pos);
+        if (blockEntity == null)
+            return amount;
+
+        net.minecraft.world.Container container = null;
+
+        // Check for double chest first
+        if (blockEntity instanceof net.minecraft.world.level.block.entity.ChestBlockEntity) {
+            container = net.minecraft.world.level.block.ChestBlock.getContainer(
+                    (net.minecraft.world.level.block.ChestBlock) level.getBlockState(pos).getBlock(),
+                    level.getBlockState(pos),
+                    level,
+                    pos,
+                    true);
+        }
+
+        // Fallback to regular container
+        if (container == null && blockEntity instanceof net.minecraft.world.Container c) {
+            container = c;
+        }
+
+        if (container == null)
+            return amount;
+
+        ItemStack template = createItemFromId(itemId);
+        if (template.isEmpty())
+            return amount;
+
+        int remaining = amount;
+        int maxStack = template.getMaxStackSize();
+
+        // First, try to stack with existing items
+        for (int i = 0; i < container.getContainerSize() && remaining > 0; i++) {
+            ItemStack stack = container.getItem(i);
+            if (!stack.isEmpty() && getItemId(stack).equals(itemId) && stack.getCount() < maxStack) {
+                int toAdd = Math.min(remaining, maxStack - stack.getCount());
+                stack.grow(toAdd);
+                remaining -= toAdd;
+            }
+        }
+
+        // Then, try to fill empty slots
+        for (int i = 0; i < container.getContainerSize() && remaining > 0; i++) {
+            ItemStack stack = container.getItem(i);
+            if (stack.isEmpty()) {
+                int toAdd = Math.min(remaining, maxStack);
+                ItemStack newStack = template.copy();
+                newStack.setCount(toAdd);
+                container.setItem(i, newStack);
+                remaining -= toAdd;
+            }
+        }
+
+        container.setChanged();
+        return remaining;
+    }
+
+    /**
      * Count items matching an ItemStack (including NBT)
      */
     public static int countMatchingItems(ServerPlayer player, ItemStack target) {

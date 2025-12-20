@@ -86,9 +86,12 @@ public class ShopEventListener {
     private static void handleOwnerClick(ServerPlayer player, BlockPos pos, ShopManager.ChestShop shop) {
         String symbol = EssentialsConfig.CONFIG.currencySymbol.get();
 
+        // Get live stock from chest inventory
+        int liveStock = ItemUtils.countChestItems(player.level(), pos, shop.itemId());
+
         player.sendSystemMessage(Component.literal("§6=== Your Shop ==="));
         player.sendSystemMessage(Component.literal("§7Item: §f" + shop.itemId()));
-        player.sendSystemMessage(Component.literal("§7Stock: §f" + shop.stock()));
+        player.sendSystemMessage(Component.literal("§7Stock: §f" + liveStock));
         if (shop.buyPrice() != null) {
             player.sendSystemMessage(
                     Component.literal("§7Buy Price: §a" + symbol + String.format("%.2f", shop.buyPrice())));
@@ -108,12 +111,15 @@ public class ShopEventListener {
         String symbol = EssentialsConfig.CONFIG.currencySymbol.get();
         EconomyManager eco = EconomyManager.getInstance();
 
+        // Get live stock from chest inventory
+        int liveStock = ItemUtils.countChestItems(player.level(), pos, shop.itemId());
+
         // For now, left-click = buy, sneak-click = sell
         boolean isSneaking = player.isShiftKeyDown();
 
         if (!isSneaking && shop.buyPrice() != null && shop.buyPrice() > 0) {
             // Buy one item
-            if (shop.stock() <= 0) {
+            if (liveStock <= 0) {
                 player.sendSystemMessage(Component.literal("§cThis shop is out of stock!"));
                 return;
             }
@@ -127,16 +133,23 @@ public class ShopEventListener {
                 return;
             }
 
-            // Process buy
-            if (eco.withdraw(player.getUUID(), price)) {
-                eco.deposit(shop.owner(), price);
-                var leftover = ItemUtils.giveItems(player, shop.itemId(), 1);
-                if (!leftover.isEmpty()) {
-                    player.drop(leftover, false);
+            // Process buy: remove item from chest, give to player, transfer money
+            if (ItemUtils.removeChestItems(player.level(), pos, shop.itemId(), 1)) {
+                if (eco.withdraw(player.getUUID(), price)) {
+                    eco.deposit(shop.owner(), price);
+                    var leftover = ItemUtils.giveItems(player, shop.itemId(), 1);
+                    if (!leftover.isEmpty()) {
+                        player.drop(leftover, false);
+                    }
+                    player.sendSystemMessage(Component
+                            .literal("§aPurchased 1x " + shop.itemId() + " for " + symbol
+                                    + String.format("%.2f", price)));
+                } else {
+                    // Refund the item to chest if payment failed
+                    ItemUtils.addChestItems(player.level(), pos, shop.itemId(), 1);
                 }
-                // TODO: Decrease stock in database
-                player.sendSystemMessage(Component
-                        .literal("§aPurchased 1x " + shop.itemId() + " for " + symbol + String.format("%.2f", price)));
+            } else {
+                player.sendSystemMessage(Component.literal("§cFailed to remove item from shop!"));
             }
 
         } else if (isSneaking && shop.sellPrice() != null && shop.sellPrice() > 0) {
@@ -157,11 +170,17 @@ public class ShopEventListener {
                 return;
             }
 
-            // Process sell
+            // Process sell: remove from player, add to chest, transfer money
             if (ItemUtils.removeItems(player, shop.itemId(), 1)) {
+                int notAdded = ItemUtils.addChestItems(player.level(), pos, shop.itemId(), 1);
+                if (notAdded > 0) {
+                    // Chest is full, refund player and notify
+                    ItemUtils.giveItems(player, shop.itemId(), 1);
+                    player.sendSystemMessage(Component.literal("§cThe shop chest is full!"));
+                    return;
+                }
                 eco.withdraw(shop.owner(), price);
                 eco.deposit(player.getUUID(), price);
-                // TODO: Increase stock in database
                 player.sendSystemMessage(Component
                         .literal("§aSold 1x " + shop.itemId() + " for " + symbol + String.format("%.2f", price)));
             }
@@ -169,7 +188,7 @@ public class ShopEventListener {
             // Show shop info
             player.sendSystemMessage(Component.literal("§6=== Shop ==="));
             player.sendSystemMessage(Component.literal("§7Item: §f" + shop.itemId()));
-            player.sendSystemMessage(Component.literal("§7Stock: §f" + shop.stock()));
+            player.sendSystemMessage(Component.literal("§7Stock: §f" + liveStock));
             if (shop.buyPrice() != null) {
                 player.sendSystemMessage(
                         Component.literal("§aClick to buy for " + symbol + String.format("%.2f", shop.buyPrice())));

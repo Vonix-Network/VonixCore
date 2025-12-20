@@ -335,6 +335,38 @@ public class VonixCore {
             }
         }
 
+        // Shutdown Authentication
+        try {
+            AuthenticationManager.clearAll();
+            AuthenticationManager.shutdown();
+            network.vonix.vonixcore.auth.api.VonixNetworkAPI.shutdown();
+            LOGGER.debug("[{}] Auth shutdown complete", MOD_NAME);
+        } catch (Exception e) {
+            LOGGER.error("[{}] Error during Auth shutdown", MOD_NAME, e);
+        }
+
+        // Shutdown Jobs and Teleport
+        if (essentialsEnabled) {
+            try {
+                JobsManager.getInstance().shutdown();
+                network.vonix.vonixcore.teleport.TeleportManager.getInstance().clear();
+                LOGGER.debug("[{}] Jobs/Teleport shutdown complete", MOD_NAME);
+            } catch (Exception e) {
+                LOGGER.error("[{}] Error during Jobs shutdown", MOD_NAME, e);
+            }
+        }
+
+        // Shutdown async executor
+        try {
+            ASYNC_EXECUTOR.shutdown();
+            if (!ASYNC_EXECUTOR.awaitTermination(5, TimeUnit.SECONDS)) {
+                ASYNC_EXECUTOR.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            ASYNC_EXECUTOR.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
+
         // Close database last
         if (database != null) {
             try {
