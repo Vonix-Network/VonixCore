@@ -6,6 +6,7 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.event.ServerChatEvent;
+import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.event.server.ServerStartingEvent;
 import network.vonix.vonixcore.VonixCore;
@@ -15,6 +16,7 @@ import network.vonix.vonixcore.command.WorldCommands;
 import network.vonix.vonixcore.config.EssentialsConfig;
 import network.vonix.vonixcore.permissions.PermissionCommands;
 import network.vonix.vonixcore.permissions.PermissionManager;
+import network.vonix.vonixcore.teleport.TeleportManager;
 
 import java.sql.Connection;
 
@@ -112,6 +114,22 @@ public class EssentialsEventHandler {
 
             // Clear permission cache for this player
             PermissionManager.getInstance().clearUserCache(player.getUUID());
+        }
+    }
+
+    /**
+     * Save death location for /back command.
+     * This allows players to return to their death location using /back.
+     */
+    @SubscribeEvent
+    public static void onPlayerDeath(LivingDeathEvent event) {
+        if (!EssentialsConfig.CONFIG.enabled.get()) {
+            return;
+        }
+
+        if (event.getEntity() instanceof ServerPlayer player) {
+            // Save death location for /back command
+            TeleportManager.getInstance().saveLastLocation(player);
         }
     }
 }
