@@ -249,24 +249,44 @@ public class DiscordManager {
                 return;
             }
 
-            VonixCore.LOGGER.info("[Discord] Connecting to Discord...");
+            VonixCore.LOGGER.info("[Discord] Connecting to Discord (async)...");
 
-            discordApi = new DiscordApiBuilder()
+            // Connect asynchronously to avoid blocking server startup
+            new DiscordApiBuilder()
                     .setToken(botToken)
                     .setIntents(Intent.GUILD_MESSAGES, Intent.MESSAGE_CONTENT)
                     .login()
-                    .join();
+                    .orTimeout(15, TimeUnit.SECONDS)
+                    .whenComplete((api, error) -> {
+                        if (error != null) {
+                            VonixCore.LOGGER.error("[Discord] Failed to connect: {}", error.getMessage());
+                            return;
+                        }
+                        discordApi = api;
+                        onJavacordConnected(channelId);
+                    });
+        } catch (Exception e) {
+            VonixCore.LOGGER.error("[Discord] Failed to initialize Javacord", e);
+            discordApi = null;
+        }
+    }
 
+    /**
+     * Called after Javacord successfully connects to Discord.
+     * Runs asynchronously to avoid blocking server startup.
+     */
+    private void onJavacordConnected(String channelId) {
+        try {
             VonixCore.LOGGER.info("[Discord] Connected as: {}", discordApi.getYourself().getName());
 
             // Register message listener
             long channelIdLong = Long.parseLong(channelId);
-            String eventChannelId = DiscordConfig.CONFIG.eventChannelId.get();
+            String eventChannelIdStr = DiscordConfig.CONFIG.eventChannelId.get();
             Long eventChannelIdLong = null;
 
-            if (eventChannelId != null && !eventChannelId.isEmpty()) {
+            if (eventChannelIdStr != null && !eventChannelIdStr.isEmpty()) {
                 try {
-                    eventChannelIdLong = Long.parseLong(eventChannelId);
+                    eventChannelIdLong = Long.parseLong(eventChannelIdStr);
                 } catch (NumberFormatException e) {
                     // Ignore
                 }
@@ -284,7 +304,8 @@ public class DiscordManager {
             // Initialize account linking
             if (DiscordConfig.CONFIG.enableAccountLinking.get()) {
                 try {
-                    linkedAccountsManager = new LinkedAccountsManager(server.getServerDirectory().toPath().resolve("config"));
+                    linkedAccountsManager = new LinkedAccountsManager(
+                            server.getServerDirectory().toPath().resolve("config"));
                     VonixCore.LOGGER.info("[Discord] Account linking initialized ({} accounts)",
                             linkedAccountsManager.getLinkedCount());
                 } catch (Exception e) {
@@ -292,18 +313,17 @@ public class DiscordManager {
                 }
             }
 
-            // Register slash commands
-            registerListCommand();
+            // Register slash commands ASYNCHRONOUSLY to avoid blocking
+            registerListCommandAsync();
             if (DiscordConfig.CONFIG.enableAccountLinking.get() && linkedAccountsManager != null) {
-                registerLinkCommands();
+                registerLinkCommandsAsync();
             }
 
             // Set bot status
             updateBotStatus();
 
         } catch (Exception e) {
-            VonixCore.LOGGER.error("[Discord] Failed to initialize Javacord", e);
-            discordApi = null;
+            VonixCore.LOGGER.error("[Discord] Error during post-connection setup", e);
         }
     }
 
@@ -548,25 +568,29 @@ public class DiscordManager {
 
     // ========= Slash Commands =========
 
-    private void registerListCommand() {
+    private void registerListCommandAsync() {
         if (discordApi == null) {
             return;
         }
 
-        try {
-            SlashCommand.with("list", "Show online players")
-                    .createGlobal(discordApi)
-                    .join();
+        // Add listener first (doesn't require command to exist)
+        discordApi.addSlashCommandCreateListener(event -> {
+            SlashCommandInteraction interaction = event.getSlashCommandInteraction();
+            if (interaction.getCommandName().equals("list")) {
+                handleListCommand(interaction);
+            }
+        });
 
-            discordApi.addSlashCommandCreateListener(event -> {
-                SlashCommandInteraction interaction = event.getSlashCommandInteraction();
-                if (interaction.getCommandName().equals("list")) {
-                    handleListCommand(interaction);
-                }
-            });
-        } catch (Exception e) {
-            VonixCore.LOGGER.error("[Discord] Error registering /list command", e);
-        }
+        // Register command asynchronously - don't block with .join()
+        SlashCommand.with("list", "Show online players")
+                .createGlobal(discordApi)
+                .whenComplete((cmd, error) -> {
+                    if (error != null) {
+                        VonixCore.LOGGER.error("[Discord] Failed to register /list command: {}", error.getMessage());
+                    } else {
+                        VonixCore.LOGGER.debug("[Discord] /list command registered");
+                    }
+                });
     }
 
     private EmbedBuilder buildPlayerListEmbed() {
@@ -629,51 +653,59 @@ public class DiscordManager {
         }
     }
 
-    private void registerLinkCommands() {
+    private void registerLinkCommandsAsync() {
         if (discordApi == null || linkedAccountsManager == null) {
             return;
         }
 
-        try {
-            SlashCommand.with("link", "Link your Minecraft account to Discord",
-                    java.util.Arrays.asList(
-                            org.javacord.api.interaction.SlashCommandOption.create(
-                                    org.javacord.api.interaction.SlashCommandOptionType.STRING,
-                                    "code",
-                                    "The 6-digit code from /vonix discord link in-game",
-                                    true)))
-                    .createGlobal(discordApi).join();
+        // Add listener first (doesn't require commands to exist)
+        discordApi.addSlashCommandCreateListener(event -> {
+            SlashCommandInteraction interaction = event.getSlashCommandInteraction();
 
-            SlashCommand.with("unlink", "Unlink your Discord account from Minecraft")
-                    .createGlobal(discordApi).join();
+            if (interaction.getCommandName().equals("link")) {
+                String code = interaction.getArgumentStringValueByName("code").orElse("");
+                String discordId = String.valueOf(interaction.getUser().getId());
+                String discordUsername = interaction.getUser().getName();
 
-            discordApi.addSlashCommandCreateListener(event -> {
-                SlashCommandInteraction interaction = event.getSlashCommandInteraction();
+                LinkedAccountsManager.LinkResult result = linkedAccountsManager.verifyAndLink(code, discordId,
+                        discordUsername);
 
-                if (interaction.getCommandName().equals("link")) {
-                    String code = interaction.getArgumentStringValueByName("code").orElse("");
-                    String discordId = String.valueOf(interaction.getUser().getId());
-                    String discordUsername = interaction.getUser().getName();
+                interaction.createImmediateResponder()
+                        .setContent((result.success ? "✅ " : "❌ ") + result.message)
+                        .respond();
+            } else if (interaction.getCommandName().equals("unlink")) {
+                String discordId = String.valueOf(interaction.getUser().getId());
+                boolean success = linkedAccountsManager.unlinkDiscord(discordId);
 
-                    LinkedAccountsManager.LinkResult result = linkedAccountsManager.verifyAndLink(code, discordId,
-                            discordUsername);
+                interaction.createImmediateResponder()
+                        .setContent(success ? "✅ Your Minecraft account has been unlinked."
+                                : "❌ You don't have a linked Minecraft account.")
+                        .respond();
+            }
+        });
 
-                    interaction.createImmediateResponder()
-                            .setContent((result.success ? "✅ " : "❌ ") + result.message)
-                            .respond();
-                } else if (interaction.getCommandName().equals("unlink")) {
-                    String discordId = String.valueOf(interaction.getUser().getId());
-                    boolean success = linkedAccountsManager.unlinkDiscord(discordId);
+        // Register commands asynchronously - don't block with .join()
+        SlashCommand.with("link", "Link your Minecraft account to Discord",
+                java.util.Arrays.asList(
+                        org.javacord.api.interaction.SlashCommandOption.create(
+                                org.javacord.api.interaction.SlashCommandOptionType.STRING,
+                                "code",
+                                "The 6-digit code from /vonix discord link in-game",
+                                true)))
+                .createGlobal(discordApi)
+                .whenComplete((cmd, error) -> {
+                    if (error != null) {
+                        VonixCore.LOGGER.error("[Discord] Failed to register /link command: {}", error.getMessage());
+                    }
+                });
 
-                    interaction.createImmediateResponder()
-                            .setContent(success ? "✅ Your Minecraft account has been unlinked."
-                                    : "❌ You don't have a linked Minecraft account.")
-                            .respond();
-                }
-            });
-        } catch (Exception e) {
-            VonixCore.LOGGER.error("[Discord] Error registering link commands", e);
-        }
+        SlashCommand.with("unlink", "Unlink your Discord account from Minecraft")
+                .createGlobal(discordApi)
+                .whenComplete((cmd, error) -> {
+                    if (error != null) {
+                        VonixCore.LOGGER.error("[Discord] Failed to register /unlink command: {}", error.getMessage());
+                    }
+                });
     }
 
     // ========= Webhook Sending =========
@@ -845,4 +877,3 @@ public class DiscordManager {
         }
     }
 }
-

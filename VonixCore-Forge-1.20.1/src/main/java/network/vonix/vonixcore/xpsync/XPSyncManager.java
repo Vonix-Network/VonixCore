@@ -27,6 +27,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -45,6 +46,11 @@ public class XPSyncManager {
     private final String serverName;
     private final Gson gson;
     private ScheduledExecutorService scheduler;
+
+    // High-water mark tracking: stores the maximum XP ever seen per player UUID
+    // This ensures XP never decreases, even when players die or spend XP on
+    // enchanting
+    private static final ConcurrentHashMap<UUID, Integer> highWaterMarkXp = new ConcurrentHashMap<>();
 
     // Timeouts in milliseconds
     private static final int CONNECT_TIMEOUT = 10000;
@@ -67,10 +73,11 @@ public class XPSyncManager {
     public void start() {
         int intervalSeconds = XPSyncConfig.CONFIG.syncInterval.get();
 
-        // Use a single-threaded scheduled executor for clean shutdown
+        // Use a single-threaded scheduled executor with daemon threads for clean
+        // shutdown
         scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
             Thread t = new Thread(r, "VonixCore-XPSync-Thread");
-            t.setDaemon(false);
+            t.setDaemon(true); // Daemon thread won't block JVM shutdown
             return t;
         });
 
@@ -252,6 +259,14 @@ public class XPSyncManager {
                         xpTotal = calculateTotalXP(xpLevel, xpProgress);
                     }
 
+                    // Use high-water mark: only use current XP if higher than stored max
+                    int storedMax = highWaterMarkXp.getOrDefault(uuid, 0);
+                    if (xpTotal > storedMax) {
+                        highWaterMarkXp.put(uuid, xpTotal);
+                    } else {
+                        xpTotal = storedMax;
+                    }
+
                     playerData.addProperty("level", xpLevel);
                     playerData.addProperty("totalExperience", xpTotal);
 
@@ -423,20 +438,35 @@ public class XPSyncManager {
         return root;
     }
 
+    /**
+     * Get the lifetime total XP for a player using high-water mark tracking.
+     * This ensures XP never decreases even when players die or spend XP.
+     */
     private int getTotalExperience(ServerPlayer player) {
+        // Calculate current XP from level and progress
         int level = player.experienceLevel;
-        int totalXP = 0;
+        int currentXP = 0;
 
         if (level >= 32) {
-            totalXP = (int) (4.5 * level * level - 162.5 * level + 2220);
+            currentXP = (int) (4.5 * level * level - 162.5 * level + 2220);
         } else if (level >= 17) {
-            totalXP = (int) (2.5 * level * level - 40.5 * level + 360);
+            currentXP = (int) (2.5 * level * level - 40.5 * level + 360);
         } else {
-            totalXP = level * level + 6 * level;
+            currentXP = level * level + 6 * level;
         }
 
-        totalXP += Math.round(player.experienceProgress * player.getXpNeededForNextLevel());
-        return totalXP;
+        currentXP += Math.round(player.experienceProgress * player.getXpNeededForNextLevel());
+
+        // Use high-water mark: only update if current XP is higher than stored
+        UUID playerUuid = player.getUUID();
+        int storedMax = highWaterMarkXp.getOrDefault(playerUuid, 0);
+
+        if (currentXP > storedMax) {
+            highWaterMarkXp.put(playerUuid, currentXP);
+            return currentXP;
+        }
+
+        return storedMax;
     }
 
     private String readResponse(HttpURLConnection conn, int statusCode) throws IOException {

@@ -1,11 +1,9 @@
 package network.vonix.vonixcore;
 
+import network.vonix.vonixcore.auth.AuthConfig;
 import network.vonix.vonixcore.config.*;
 import network.vonix.vonixcore.database.Database;
 import network.vonix.vonixcore.economy.TransactionLog;
-import network.vonix.vonixcore.graves.GravesCommands;
-import network.vonix.vonixcore.graves.GravesListener;
-import network.vonix.vonixcore.graves.GravesManager;
 import network.vonix.vonixcore.jobs.JobsCommands;
 import network.vonix.vonixcore.jobs.JobsManager;
 import network.vonix.vonixcore.claims.ClaimsManager;
@@ -24,7 +22,6 @@ public class VonixCore extends JavaPlugin {
     private static VonixCore instance;
     private Database database;
     private ConfigManager configManager;
-    private GravesManager gravesManager;
     private ShopsManager shopsManager;
     private JobsManager jobsManager;
     private ClaimsManager claimsManager;
@@ -49,14 +46,6 @@ public class VonixCore extends JavaPlugin {
             getServer().getPluginManager().disablePlugin(this);
             return;
         }
-
-        // Initialize Graves system
-        gravesManager = new GravesManager(this);
-        GravesCommands gravesCommands = new GravesCommands(this, gravesManager);
-        getCommand("graves").setExecutor(gravesCommands);
-        getCommand("graves").setTabCompleter(gravesCommands);
-        getServer().getPluginManager().registerEvents(new GravesListener(this, gravesManager), this);
-        getLogger().info("Graves system initialized.");
 
         // Initialize Shops system
         try (Connection conn = database.getConnection()) {
@@ -151,6 +140,7 @@ public class VonixCore extends JavaPlugin {
         getCommand("tpa").setExecutor(new network.vonix.vonixcore.teleport.TeleportCommands());
         getCommand("tpaccept").setExecutor(new network.vonix.vonixcore.teleport.TeleportCommands());
         getCommand("tpdeny").setExecutor(new network.vonix.vonixcore.teleport.TeleportCommands());
+        getCommand("back").setExecutor(new network.vonix.vonixcore.teleport.TeleportCommands());
 
         getCommand("balance").setExecutor(new network.vonix.vonixcore.economy.EconomyCommands());
         getCommand("pay").setExecutor(new network.vonix.vonixcore.economy.EconomyCommands());
@@ -236,11 +226,6 @@ public class VonixCore extends JavaPlugin {
             shopsManager.shutdown();
         }
 
-        // Shutdown Graves
-        if (gravesManager != null) {
-            gravesManager.shutdown();
-        }
-
         // Note: ClaimsManager doesn't need shutdown - all persisted to DB
 
         // Shutdown Database Write Queue (must be before database close)
@@ -273,6 +258,7 @@ public class VonixCore extends JavaPlugin {
         DiscordConfig.load(configManager.loadConfig("vonixcore-discord.yml"));
         XPSyncConfig.load(configManager.loadConfig("vonixcore-xpsync.yml"));
         ProtectionConfig.load(configManager.loadConfig("vonixcore-protection.yml"));
+        AuthConfig.load(configManager.loadConfig("vonixcore-auth.yml"));
         ShopsConfig.load(getDataFolder());
     }
 
@@ -282,10 +268,6 @@ public class VonixCore extends JavaPlugin {
 
     public Database getDatabase() {
         return database;
-    }
-
-    public GravesManager getGravesManager() {
-        return gravesManager;
     }
 
     public ShopsManager getShopsManager() {

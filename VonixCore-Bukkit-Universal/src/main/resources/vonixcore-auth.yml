@@ -1,8 +1,31 @@
-enabled: true
-sessions:
-  enabled: true
-  timeout: 86400
-security:
-  min-password-length: 8
-  max-login-attempts: 5
-  lockout-duration: 300
+# VonixCore Authentication Configuration
+# This file configures the authentication system for VonixCore
+
+auth:
+  # LuckPerms Integration
+  enable_luckperms_sync: true
+  admin_rank_ids: "admin,owner,developer"
+  
+  # Authentication Requirements
+  require_authentication: true
+  freeze_unauthenticated: true
+  warn_of_auth: false
+  login_timeout: 60
+  
+  # API URLs and Settings
+  urls:
+    api_base_url: "https://vonix.network/api"
+    registration_api_key: "YOUR_API_KEY_HERE"
+    api_timeout: 5000
+    registration_url: "https://vonix.network/register"
+  
+  # Messages (supports color codes with §)
+  messages:
+    login_required_message: "§c§l⚠ §cYou must authenticate to play on this server."
+    auth_warning_message: "§e⚠ It is recommended to authenticate with Vonix Network."
+    generating_code_message: "§6⏳ §7Generating registration code..."
+    registration_code_message: "§aYour registration code is: §e{code}"
+    already_authenticated_message: "§aYou are already authenticated!"
+    authenticating_message: "§6⏳ §7Authenticating..."
+    authentication_success_message: "§a§l✓ §7Successfully authenticated as §e{username}"
+    login_failed_message: "§c§l✗ §7Login failed: §c{error}"

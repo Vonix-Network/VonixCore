@@ -43,12 +43,6 @@ dependencies {
     implementation 'org.javacord:javacord:3.8.0'
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
     
-    // Graves dependencies
-    implementation 'org.bstats:bstats-bukkit:3.0.2'
-    implementation 'net.kyori:adventure-api:4.17.0'
-    implementation 'net.kyori:adventure-text-minimessage:4.17.0'
-    implementation 'net.kyori:adventure-platform-bukkit:4.3.4'
-    implementation 'de.themoep:minedown-adventure:1.7.2-SNAPSHOT'
     
     // Optional soft dependencies (compile only)
     compileOnly 'com.github.MilkBowl:VaultAPI:1.7.1'
@@ -83,7 +77,7 @@ processResources {
 }
 
 shadowJar {
-    archiveClassifier.set('all')
+    archiveClassifier.set('')  // No classifier - this becomes the main output
     
     // Relocate dependencies to avoid conflicts
     relocate 'com.zaxxer.hikari', 'network.vonix.vonixcore.libs.hikari'
@@ -97,18 +91,17 @@ shadowJar {
     exclude 'META-INF/*.SF'
     exclude 'META-INF/*.DSA'
     exclude 'META-INF/*.RSA'
+    
+    // Merge service files for proper dependency loading
+    mergeServiceFiles()
 }
 
-// Use jar task as fallback if shadowJar fails
-tasks.register('fatJar', Jar) {
-    archiveClassifier.set('all')
-    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-    
-    from sourceSets.main.output
-    
-    dependsOn configurations.runtimeClasspath
-    from {
-        configurations.runtimeClasspath.findAll { it.name.endsWith('jar') }.collect { zipTree(it) }
-    }
+// Make build task depend on shadowJar instead of regular jar
+tasks.named('build') {
+    dependsOn shadowJar
 }
 
+// Disable the regular jar task to avoid confusion
+tasks.named('jar') {
+    enabled = false
+}

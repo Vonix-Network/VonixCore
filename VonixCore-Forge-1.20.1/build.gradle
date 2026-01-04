@@ -147,7 +147,11 @@ dependencies {
     
     // Discord Integration Dependencies
     // Javacord for Discord Bot API (gateway, slash commands, bot status)
-    shade 'org.javacord:javacord:3.8.0'
+    // IMPORTANT: Exclude log4j-api to prevent LinkageError with Minecraft's log4j
+    shade('org.javacord:javacord:3.8.0') {
+        exclude group: 'org.apache.logging.log4j', module: 'log4j-api'
+        exclude group: 'org.slf4j', module: 'slf4j-api'
+    }
     
     // OkHttp for webhook requests (faster than Javacord webhooks)
     shade 'com.squareup.okhttp3:okhttp:4.12.0'

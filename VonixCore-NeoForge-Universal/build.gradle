@@ -133,13 +133,23 @@ dependencies {
     // ========================================
     
     // Javacord for Discord Bot API (gateway, slash commands, bot status)
-    implementation 'org.javacord:javacord:3.8.0'
+    // IMPORTANT: Exclude log4j-api to prevent LinkageError with Minecraft's log4j
+    implementation('org.javacord:javacord:3.8.0') {
+        exclude group: 'org.apache.logging.log4j', module: 'log4j-api'
+        exclude group: 'org.slf4j', module: 'slf4j-api'
+    }
     jarJar(group: 'org.javacord', name: 'javacord', version: '[3.8.0,4.0.0)')
     
     // Javacord core and API modules
-    implementation 'org.javacord:javacord-api:3.8.0'
+    implementation('org.javacord:javacord-api:3.8.0') {
+        exclude group: 'org.apache.logging.log4j', module: 'log4j-api'
+        exclude group: 'org.slf4j', module: 'slf4j-api'
+    }
     jarJar(group: 'org.javacord', name: 'javacord-api', version: '[3.8.0,4.0.0)')
-    implementation 'org.javacord:javacord-core:3.8.0'
+    implementation('org.javacord:javacord-core:3.8.0') {
+        exclude group: 'org.apache.logging.log4j', module: 'log4j-api'
+        exclude group: 'org.slf4j', module: 'slf4j-api'
+    }
     jarJar(group: 'org.javacord', name: 'javacord-core', version: '[3.8.0,4.0.0)')
     
     // OkHttp for webhook requests (faster than Javacord webhooks)

@@ -16,9 +16,12 @@ import org.javacord.api.DiscordApiBuilder;
 import org.javacord.api.entity.activity.ActivityType;
 import org.javacord.api.entity.intent.Intent;
 import org.javacord.api.entity.message.embed.EmbedBuilder;
+import org.javacord.api.interaction.SlashCommand;
+import org.javacord.api.interaction.SlashCommandInteraction;
 
 import java.awt.Color;
 import java.io.IOException;
+import java.util.Collection;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -190,6 +193,9 @@ public class DiscordManager {
                     }
                 });
 
+                // Register /list slash command
+                registerListCommand();
+
                 updateBotStatus();
 
             } catch (Exception e) {
@@ -199,6 +205,93 @@ public class DiscordManager {
         }).start();
     }
 
+    /**
+     * Register the /list slash command with Discord
+     */
+    private void registerListCommand() {
+        if (discordApi == null) {
+            return;
+        }
+
+        try {
+            SlashCommand.with("list", "Show online players on the Minecraft server")
+                    .createGlobal(discordApi)
+                    .join();
+
+            discordApi.addSlashCommandCreateListener(event -> {
+                SlashCommandInteraction interaction = event.getSlashCommandInteraction();
+                if (interaction.getCommandName().equals("list")) {
+                    handleSlashListCommand(interaction);
+                }
+            });
+
+            plugin.getLogger().info("[Discord] Registered /list slash command");
+        } catch (Exception e) {
+            plugin.getLogger().log(Level.WARNING, "[Discord] Failed to register /list command", e);
+        }
+    }
+
+    /**
+     * Build a player list embed for Discord
+     */
+    private EmbedBuilder buildPlayerListEmbed() {
+        Collection<? extends Player> players = Bukkit.getOnlinePlayers();
+        int onlinePlayers = players.size();
+        int maxPlayers = Bukkit.getMaxPlayers();
+        String serverName = DiscordConfig.serverName;
+
+        EmbedBuilder embed = new EmbedBuilder()
+                .setTitle("📋 " + serverName)
+                .setColor(Color.GREEN)
+                .setFooter("VonixCore · Player List");
+
+        if (onlinePlayers == 0) {
+            embed.setDescription("No players are currently online.");
+        } else {
+            StringBuilder playerListBuilder = new StringBuilder();
+            int i = 0;
+            for (Player player : players) {
+                if (i > 0) {
+                    playerListBuilder.append("\n");
+                }
+                playerListBuilder.append("• ").append(player.getName());
+                i++;
+            }
+            embed.addField("Players " + onlinePlayers + "/" + maxPlayers, playerListBuilder.toString(), false);
+        }
+
+        return embed;
+    }
+
+    /**
+     * Handle the /list slash command
+     */
+    private void handleSlashListCommand(SlashCommandInteraction interaction) {
+        try {
+            EmbedBuilder embed = buildPlayerListEmbed();
+            interaction.createImmediateResponder()
+                    .addEmbed(embed)
+                    .respond();
+        } catch (Exception e) {
+            plugin.getLogger().log(Level.WARNING, "[Discord] Error handling /list command", e);
+            interaction.createImmediateResponder()
+                    .setContent("❌ An error occurred")
+                    .respond();
+        }
+    }
+
+    /**
+     * Handle the !list text command with an embed
+     */
+    private void handleTextListCommand(org.javacord.api.event.message.MessageCreateEvent event) {
+        try {
+            EmbedBuilder embed = buildPlayerListEmbed();
+            event.getChannel().sendMessage(embed);
+        } catch (Exception e) {
+            plugin.getLogger().log(Level.WARNING, "[Discord] Error handling !list command", e);
+        }
+    }
+
     private void processJavacordMessage(org.javacord.api.event.message.MessageCreateEvent event) {
         if (!event.getMessageAuthor().isRegularUser())
             return; // Ignore bots/webhooks
@@ -206,11 +299,9 @@ public class DiscordManager {
         String content = event.getMessageContent();
         String authorName = event.getMessageAuthor().getDisplayName();
 
-        if (content.equalsIgnoreCase("!list")) {
-            // Handle list command (simplified)
-            int online = Bukkit.getOnlinePlayers().size();
-            int max = Bukkit.getMaxPlayers();
-            event.getChannel().sendMessage("Online: " + online + "/" + max);
+        // Handle !list command with embed
+        if (content.trim().equalsIgnoreCase("!list")) {
+            handleTextListCommand(event);
             return;
         }
 

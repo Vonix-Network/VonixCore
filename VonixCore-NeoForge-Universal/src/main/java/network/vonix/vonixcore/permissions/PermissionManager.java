@@ -318,7 +318,17 @@ public class PermissionManager {
     // === USER MANAGEMENT ===
 
     public PermissionUser getUser(UUID uuid) {
-        return userCache.computeIfAbsent(uuid, this::loadUser);
+        // IMPORTANT: Don't use computeIfAbsent with database I/O - it can cause deadlocks!
+        // The mapping function runs while holding a lock on the ConcurrentHashMap segment.
+        PermissionUser user = userCache.get(uuid);
+        if (user != null) {
+            return user;
+        }
+        // Load outside the lock
+        user = loadUser(uuid);
+        // Use putIfAbsent to handle race conditions safely
+        PermissionUser existing = userCache.putIfAbsent(uuid, user);
+        return existing != null ? existing : user;
     }
 
     private PermissionUser loadUser(UUID uuid) {

@@ -20,6 +20,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -40,6 +41,11 @@ public class XPSyncManager {
     private final String serverName;
     private final Gson gson;
     private ScheduledExecutorService scheduler;
+
+    // High-water mark tracking: stores the maximum XP ever seen per player UUID
+    // This ensures XP never decreases, even when players die or spend XP on
+    // enchanting
+    private static final ConcurrentHashMap<UUID, Integer> highWaterMarkXp = new ConcurrentHashMap<>();
 
     private static final int CONNECT_TIMEOUT = 10000;
     private static final int READ_TIMEOUT = 30000;
@@ -257,6 +263,14 @@ public class XPSyncManager {
 
                     if (xpTotal == 0 && xpLevel > 0) {
                         xpTotal = calculateTotalXP(xpLevel, xpProgress);
+                    }
+
+                    // Use high-water mark: only use current XP if higher than stored max
+                    int storedMax = highWaterMarkXp.getOrDefault(uuid, 0);
+                    if (xpTotal > storedMax) {
+                        highWaterMarkXp.put(uuid, xpTotal);
+                    } else {
+                        xpTotal = storedMax;
                     }
 
                     playerData.addProperty("level", xpLevel);
@@ -604,16 +618,21 @@ public class XPSyncManager {
         return root;
     }
 
+    /**
+     * Get the lifetime total XP for a player using high-water mark tracking.
+     * This ensures XP never decreases even when players die or spend XP.
+     */
     private int getTotalExperience(Player player) {
+        // Calculate current XP from level and progress
         int level = player.getLevel();
-        int totalXP = 0;
+        int currentXP = 0;
 
         if (level >= 32) {
-            totalXP = (int) (4.5 * level * level - 162.5 * level + 2220);
+            currentXP = (int) (4.5 * level * level - 162.5 * level + 2220);
         } else if (level >= 17) {
-            totalXP = (int) (2.5 * level * level - 40.5 * level + 360);
+            currentXP = (int) (2.5 * level * level - 40.5 * level + 360);
         } else {
-            totalXP = level * level + 6 * level;
+            currentXP = level * level + 6 * level;
         }
 
         int xpForNextLevel;
@@ -625,8 +644,18 @@ public class XPSyncManager {
             xpForNextLevel = 2 * level + 7;
         }
 
-        totalXP += Math.round(player.getExp() * xpForNextLevel);
-        return totalXP;
+        currentXP += Math.round(player.getExp() * xpForNextLevel);
+
+        // Use high-water mark: only update if current XP is higher than stored
+        UUID playerUuid = player.getUniqueId();
+        int storedMax = highWaterMarkXp.getOrDefault(playerUuid, 0);
+
+        if (currentXP > storedMax) {
+            highWaterMarkXp.put(playerUuid, currentXP);
+            return currentXP;
+        }
+
+        return storedMax;
     }
 
     private static final int MAX_RETRIES = 3;

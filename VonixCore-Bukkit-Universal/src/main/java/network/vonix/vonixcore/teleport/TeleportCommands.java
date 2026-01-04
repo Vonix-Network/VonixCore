@@ -69,6 +69,20 @@ public class TeleportCommands implements CommandExecutor {
             return true;
         }
 
+        if (command.getName().equalsIgnoreCase("back")) {
+            org.bukkit.Location lastLoc = TeleportManager.getInstance().getLastLocation(player.getUniqueId());
+            if (lastLoc == null) {
+                sender.sendMessage(ChatColor.RED + "[VC] No location to return to.");
+                return true;
+            }
+
+            // Save current location before teleporting (so /back can be used again)
+            TeleportManager.getInstance().saveLastLocation(player);
+            player.teleport(lastLoc);
+            sender.sendMessage(ChatColor.GREEN + "[VC] Returned to previous location.");
+            return true;
+        }
+
         return false;
     }
 }
