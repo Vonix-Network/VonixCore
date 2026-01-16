@@ -50,6 +50,12 @@ public class EssentialsConfig extends BaseConfig {
         setDefault("features.kits_enabled", true);
         setDefault("features.shops_enabled", true);
         setDefault("features.jobs_enabled", true);
+        setDefault("features.rtp_enabled", true);
+
+        // RTP settings
+        setDefault("rtp.cooldown", 600);
+        setDefault("rtp.max_range", 10000);
+        setDefault("rtp.min_range", 500);
 
         // Homes settings
         setDefault("homes.max_homes", 5);
@@ -137,5 +143,22 @@ public class EssentialsConfig extends BaseConfig {
     // Kits
     public int getDefaultKitCooldown() {
         return getInt("kits.default_cooldown", 86400);
+    }
+
+    // RTP
+    public boolean isRtpEnabled() {
+        return getBoolean("features.rtp_enabled", true);
+    }
+
+    public int getRtpCooldown() {
+        return getInt("rtp.cooldown", 600);
+    }
+
+    public int getRtpMaxRange() {
+        return getInt("rtp.max_range", 10000);
+    }
+
+    public int getRtpMinRange() {
+        return getInt("rtp.min_range", 500);
     }
 }

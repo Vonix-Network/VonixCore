@@ -1,13 +1,10 @@
 package network.vonix.vonixcore.config;
 
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
 /**
- * Shops configuration for VonixCore.
+ * Configuration for the Shops module.
+ * Covers: Chest Shops, Sign Shops, GUI Shop, Player Market
  * Stored in config/vonixcore-shops.yml
  */
 public class ShopsConfig extends BaseConfig {
@@ -37,7 +34,7 @@ public class ShopsConfig extends BaseConfig {
     protected String getHeader() {
         return """
                 # VonixCore Shops Configuration
-                # Admin shops, player shops, and sign shops
+                # Chest Shops, Sign Shops, GUI Shop, and Player Market
                 """;
     }
 
@@ -46,48 +43,46 @@ public class ShopsConfig extends BaseConfig {
         // Master toggle
         setDefault("shops.enabled", true);
 
-        // Admin shop settings
-        setDefault("admin_shop.enabled", true);
-        setDefault("admin_shop.title", "Server Shop");
+        // Chest Shops Section
+        setDefault("chest_shops.enabled", true);
+        setDefault("chest_shops.max_per_player", 50);
+        setDefault("chest_shops.tax_rate", 0.05);
+        setDefault("chest_shops.admin_only_create", false);
+        setDefault("chest_shops.allow_buy_type", true);
+        setDefault("chest_shops.allow_sell_type", true);
+        setDefault("chest_shops.display_items", true);
+        setDefault("chest_shops.protect_chests", true);
+        setDefault("chest_shops.require_chest_access", true);
+        setDefault("chest_shops.min_price", 0.01);
+        setDefault("chest_shops.max_price", 1000000000.0);
+        setDefault("chest_shops.allow_free_shops", false);
+        setDefault("chest_shops.find_distance", 45);
+        setDefault("chest_shops.show_out_of_stock", true);
 
-        // Player shop settings
-        setDefault("player_shop.enabled", true);
-        setDefault("player_shop.max_per_player", 10);
-        setDefault("player_shop.creation_cost", 100.0);
-        setDefault("player_shop.tax_rate", 0.05);
+        // Sign Shops Section
+        setDefault("sign_shops.enabled", true);
+        setDefault("sign_shops.max_per_player", 25);
+        setDefault("sign_shops.require_permission", false);
+        setDefault("sign_shops.tax_rate", 0.05);
 
-        // Sign shop settings
-        setDefault("sign_shop.enabled", true);
-        setDefault("sign_shop.header_text", "[Shop]");
+        // GUI Shop Section
+        setDefault("gui_shop.enabled", true);
+        setDefault("gui_shop.menu_title", "§6§lServer Shop");
+        setDefault("gui_shop.sell_all_enabled", true);
+        setDefault("gui_shop.sell_all_tax_rate", 0.0);
 
-        // Default items (admin shop)
-        List<Map<String, Object>> defaultItems = new ArrayList<>();
+        // Player Market Section
+        setDefault("player_market.enabled", true);
+        setDefault("player_market.max_listings", 10);
+        setDefault("player_market.listing_duration_hours", 168);
+        setDefault("player_market.tax_rate", 0.10);
+        setDefault("player_market.min_price", 1.0);
+        setDefault("player_market.max_price", 1000000.0);
+        setDefault("player_market.notify_on_sale", true);
 
-        Map<String, Object> diamondItem = new HashMap<>();
-        diamondItem.put("item", "minecraft:diamond");
-        diamondItem.put("buy_price", 100.0);
-        diamondItem.put("sell_price", 50.0);
-        defaultItems.add(diamondItem);
-
-        Map<String, Object> ironItem = new HashMap<>();
-        ironItem.put("item", "minecraft:iron_ingot");
-        ironItem.put("buy_price", 10.0);
-        ironItem.put("sell_price", 5.0);
-        defaultItems.add(ironItem);
-
-        Map<String, Object> goldItem = new HashMap<>();
-        goldItem.put("item", "minecraft:gold_ingot");
-        goldItem.put("buy_price", 20.0);
-        goldItem.put("sell_price", 10.0);
-        defaultItems.add(goldItem);
-
-        Map<String, Object> breadItem = new HashMap<>();
-        breadItem.put("item", "minecraft:bread");
-        breadItem.put("buy_price", 5.0);
-        breadItem.put("sell_price", 2.0);
-        defaultItems.add(breadItem);
-
-        setDefault("admin_shop.items", defaultItems);
+        // Transaction Logging
+        setDefault("transactions.log_enabled", true);
+        setDefault("transactions.retention_days", 30);
     }
 
     // ============ Getters ============
@@ -96,47 +91,132 @@ public class ShopsConfig extends BaseConfig {
         return getBoolean("shops.enabled", true);
     }
 
-    // Admin shop
-    public boolean isAdminShopEnabled() {
-        return getBoolean("admin_shop.enabled", true);
+    // Chest Shops
+    public boolean isChestShopsEnabled() {
+        return getBoolean("chest_shops.enabled", true);
     }
 
-    public String getAdminShopTitle() {
-        return getString("admin_shop.title", "Server Shop");
+    public int getChestShopsMaxPerPlayer() {
+        return getInt("chest_shops.max_per_player", 50);
     }
 
-    @SuppressWarnings("unchecked")
-    public List<Map<String, Object>> getAdminShopItems() {
-        Object items = get("admin_shop.items", null);
-        if (items instanceof List) {
-            return (List<Map<String, Object>>) items;
-        }
-        return new ArrayList<>();
+    public double getChestShopsTaxRate() {
+        return getDouble("chest_shops.tax_rate", 0.05);
     }
 
-    // Player shop
-    public boolean isPlayerShopEnabled() {
-        return getBoolean("player_shop.enabled", true);
+    public boolean isChestShopsAdminOnlyCreate() {
+        return getBoolean("chest_shops.admin_only_create", false);
     }
 
-    public int getMaxPlayerShops() {
-        return getInt("player_shop.max_per_player", 10);
+    public boolean isChestShopsAllowBuyType() {
+        return getBoolean("chest_shops.allow_buy_type", true);
     }
 
-    public double getPlayerShopCreationCost() {
-        return getDouble("player_shop.creation_cost", 100.0);
+    public boolean isChestShopsAllowSellType() {
+        return getBoolean("chest_shops.allow_sell_type", true);
     }
 
-    public double getPlayerShopTaxRate() {
-        return getDouble("player_shop.tax_rate", 0.05);
+    public boolean isChestShopsDisplayItems() {
+        return getBoolean("chest_shops.display_items", true);
     }
 
-    // Sign shop
-    public boolean isSignShopEnabled() {
-        return getBoolean("sign_shop.enabled", true);
+    public boolean isChestShopsProtectChests() {
+        return getBoolean("chest_shops.protect_chests", true);
     }
 
-    public String getSignShopHeader() {
-        return getString("sign_shop.header_text", "[Shop]");
+    public boolean isChestShopsRequireChestAccess() {
+        return getBoolean("chest_shops.require_chest_access", true);
+    }
+
+    public double getChestShopsMinPrice() {
+        return getDouble("chest_shops.min_price", 0.01);
+    }
+
+    public double getChestShopsMaxPrice() {
+        return getDouble("chest_shops.max_price", 1000000000.0);
+    }
+
+    public boolean isChestShopsAllowFreeShops() {
+        return getBoolean("chest_shops.allow_free_shops", false);
+    }
+
+    public int getChestShopsFindDistance() {
+        return getInt("chest_shops.find_distance", 45);
+    }
+
+    public boolean isChestShopsShowOutOfStock() {
+        return getBoolean("chest_shops.show_out_of_stock", true);
+    }
+
+    // Sign Shops
+    public boolean isSignShopsEnabled() {
+        return getBoolean("sign_shops.enabled", true);
+    }
+
+    public int getSignShopsMaxPerPlayer() {
+        return getInt("sign_shops.max_per_player", 25);
+    }
+
+    public boolean isSignShopsRequirePermission() {
+        return getBoolean("sign_shops.require_permission", false);
+    }
+
+    public double getSignShopsTaxRate() {
+        return getDouble("sign_shops.tax_rate", 0.05);
+    }
+
+    // GUI Shop
+    public boolean isGuiShopEnabled() {
+        return getBoolean("gui_shop.enabled", true);
+    }
+
+    public String getGuiShopMenuTitle() {
+        return getString("gui_shop.menu_title", "§6§lServer Shop");
+    }
+
+    public boolean isGuiShopSellAllEnabled() {
+        return getBoolean("gui_shop.sell_all_enabled", true);
+    }
+
+    public double getGuiShopSellAllTaxRate() {
+        return getDouble("gui_shop.sell_all_tax_rate", 0.0);
+    }
+
+    // Player Market
+    public boolean isPlayerMarketEnabled() {
+        return getBoolean("player_market.enabled", true);
+    }
+
+    public int getPlayerMarketMaxListings() {
+        return getInt("player_market.max_listings", 10);
+    }
+
+    public int getPlayerMarketListingDurationHours() {
+        return getInt("player_market.listing_duration_hours", 168);
+    }
+
+    public double getPlayerMarketTaxRate() {
+        return getDouble("player_market.tax_rate", 0.10);
+    }
+
+    public double getPlayerMarketMinPrice() {
+        return getDouble("player_market.min_price", 1.0);
+    }
+
+    public double getPlayerMarketMaxPrice() {
+        return getDouble("player_market.max_price", 1000000.0);
+    }
+
+    public boolean isPlayerMarketNotifyOnSale() {
+        return getBoolean("player_market.notify_on_sale", true);
+    }
+
+    // Transactions
+    public boolean isTransactionLogEnabled() {
+        return getBoolean("transactions.log_enabled", true);
+    }
+
+    public int getTransactionLogRetentionDays() {
+        return getInt("transactions.retention_days", 30);
     }
 }

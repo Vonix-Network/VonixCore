@@ -2,6 +2,10 @@ package network.vonix.vonixcore.discord;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import net.minecraft.ChatFormatting;
+import net.minecraft.network.chat.ClickEvent;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import network.vonix.vonixcore.VonixCore;
@@ -22,6 +26,7 @@ import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 
 /**
  * Discord integration manager using Javacord + Webhooks.
@@ -39,7 +44,12 @@ public class DiscordManager {
     private Thread messageQueueThread;
     private boolean running = false;
     private String ourWebhookId = null;
+    private String eventWebhookId = null;
     private DiscordApi discordApi = null;
+    private LinkedAccountsManager linkedAccountsManager = null;
+    private PlayerPreferences playerPreferences = null;
+
+    private static final Pattern DISCORD_MARKDOWN_LINK = Pattern.compile("\\[([^\\]]+)]\\((https?://[^)]+)\\)");
 
     private DiscordManager() {
         this.httpClient = new OkHttpClient.Builder()
@@ -72,32 +82,35 @@ public class DiscordManager {
             return;
         }
 
-        String webhookUrl = DiscordConfig.getInstance().getWebhookUrl();
-        if (webhookUrl != null && !webhookUrl.isEmpty() && !webhookUrl.contains("YOUR_WEBHOOK_URL")) {
-            if (!webhookUrl.startsWith("http://") && !webhookUrl.startsWith("https://")) {
-                VonixCore.LOGGER.error("[Discord] Invalid webhook URL format: '{}'", webhookUrl);
-                return;
-            }
-        }
-
-        VonixCore.LOGGER.info("[Discord] Starting Discord integration...");
+        VonixCore.LOGGER.info("[Discord] Starting Discord integration (Javacord + Webhooks)...");
 
         extractWebhookId();
+
+        // Initialize player preferences
+        try {
+            playerPreferences = new PlayerPreferences(VonixCore.getInstance().getConfigPath());
+            VonixCore.LOGGER.info("[Discord] Player preferences system initialized");
+        } catch (Exception e) {
+            VonixCore.LOGGER.error("[Discord] Failed to initialize player preferences", e);
+        }
+
         running = true;
         startMessageQueueThread();
 
-        try {
-            initializeJavacord(token);
-        } catch (Exception e) {
-            VonixCore.LOGGER.error("[Discord] Failed to initialize Discord", e);
-            running = false;
-            return;
-        }
+        // Initialize Javacord
+        initializeJavacord(token);
 
+        // Send startup embed
         String serverName = DiscordConfig.getInstance().getServerName();
         sendStartupEmbed(serverName);
 
         VonixCore.LOGGER.info("[Discord] Discord integration initialized successfully!");
+        if (ourWebhookId != null) {
+            VonixCore.LOGGER.info("[Discord] Chat Webhook ID: {}", ourWebhookId);
+        }
+        if (eventWebhookId != null) {
+            VonixCore.LOGGER.info("[Discord] Event Webhook ID: {}", eventWebhookId);
+        }
     }
 
     public void shutdown() {
@@ -120,8 +133,9 @@ public class DiscordManager {
         if (discordApi != null) {
             try {
                 discordApi.disconnect().get(5, TimeUnit.SECONDS);
+                VonixCore.LOGGER.info("[Discord] Javacord disconnected");
             } catch (Exception e) {
-                VonixCore.LOGGER.warn("[Discord] Javacord disconnect timeout");
+                VonixCore.LOGGER.warn("[Discord] Javacord disconnect timeout: {}", e.getMessage());
             } finally {
                 discordApi = null;
             }
@@ -131,8 +145,10 @@ public class DiscordManager {
             try {
                 httpClient.dispatcher().executorService().shutdown();
                 httpClient.connectionPool().evictAll();
-            } catch (Exception e) {
-                // Ignore
+                httpClient.dispatcher().executorService().awaitTermination(3, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                httpClient.dispatcher().executorService().shutdownNow();
+                Thread.currentThread().interrupt();
             }
         }
 
@@ -143,24 +159,90 @@ public class DiscordManager {
         return running;
     }
 
-    private void extractWebhookId() {
-        String webhookUrl = DiscordConfig.getInstance().getWebhookUrl();
-        ourWebhookId = DiscordConfig.getInstance().getWebhookId();
-        
-        if ((ourWebhookId == null || ourWebhookId.isEmpty()) && webhookUrl != null) {
-            try {
-                String[] parts = webhookUrl.split("/");
-                for (int i = 0; i < parts.length - 1; i++) {
-                    if ("webhooks".equals(parts[i]) && i + 1 < parts.length) {
-                        ourWebhookId = parts[i + 1];
-                        break;
-                    }
-                }
-            } catch (Exception e) {
-                VonixCore.LOGGER.error("[Discord] Error extracting webhook ID", e);
-            }
+    // ========= Account Linking =========
+
+    public String generateLinkCode(ServerPlayer player) {
+        if (linkedAccountsManager == null || !DiscordConfig.getInstance().isEnableAccountLinking()) {
+            return null;
+        }
+        return linkedAccountsManager.generateLinkCode(player.getUUID(), player.getName().getString());
+    }
+
+    public boolean unlinkAccount(UUID uuid) {
+        if (linkedAccountsManager == null || !DiscordConfig.getInstance().isEnableAccountLinking()) {
+            return false;
+        }
+        return linkedAccountsManager.unlinkMinecraft(uuid);
+    }
+
+    // ========= Player Preferences =========
+
+    public boolean hasServerMessagesFiltered(UUID playerUuid) {
+        if (playerPreferences == null) {
+            return false;
+        }
+        return playerPreferences.hasServerMessagesFiltered(playerUuid);
+    }
+
+    public void setServerMessagesFiltered(UUID playerUuid, boolean filtered) {
+        if (playerPreferences != null) {
+            playerPreferences.setServerMessagesFiltered(playerUuid, filtered);
         }
     }
+
+    public boolean hasEventsFiltered(UUID playerUuid) {
+        if (playerPreferences == null) {
+            return false;
+        }
+        return playerPreferences.hasEventsFiltered(playerUuid);
+    }
+
+    public void setEventsFiltered(UUID playerUuid, boolean filtered) {
+        if (playerPreferences != null) {
+            playerPreferences.setEventsFiltered(playerUuid, filtered);
+        }
+    }
+
+    // ========= Webhook ID Extraction =========
+
+    private void extractWebhookId() {
+        ourWebhookId = extractWebhookIdFromConfig(
+                DiscordConfig.getInstance().getWebhookId(),
+                DiscordConfig.getInstance().getWebhookUrl(),
+                "chat");
+        eventWebhookId = extractWebhookIdFromConfig(
+                "",
+                DiscordConfig.getInstance().getEventWebhookUrl(),
+                "event");
+    }
+
+    private String extractWebhookIdFromConfig(String manualId, String webhookUrl, String type) {
+        if (manualId != null && !manualId.isEmpty()) {
+            return manualId;
+        }
+
+        if (webhookUrl != null && !webhookUrl.isEmpty() && !webhookUrl.contains("YOUR_WEBHOOK_URL")) {
+            return extractIdFromWebhookUrl(webhookUrl);
+        }
+
+        return null;
+    }
+
+    private String extractIdFromWebhookUrl(String webhookUrl) {
+        try {
+            String[] parts = webhookUrl.split("/");
+            for (int i = 0; i < parts.length - 1; i++) {
+                if ("webhooks".equals(parts[i]) && i + 1 < parts.length) {
+                    return parts[i + 1];
+                }
+            }
+        } catch (Exception e) {
+            VonixCore.LOGGER.error("[Discord] Error extracting webhook ID", e);
+        }
+        return null;
+    }
+
+    // ========= Javacord Initialization =========
 
     private void initializeJavacord(String botToken) {
         try {
@@ -196,13 +278,46 @@ public class DiscordManager {
             VonixCore.LOGGER.info("[Discord] Connected as: {}", discordApi.getYourself().getName());
 
             long channelIdLong = Long.parseLong(channelId);
+            String eventChannelIdStr = DiscordConfig.getInstance().getEventChannelId();
+            Long eventChannelIdLong = null;
+
+            if (eventChannelIdStr != null && !eventChannelIdStr.isEmpty()) {
+                try {
+                    eventChannelIdLong = Long.parseLong(eventChannelIdStr);
+                } catch (NumberFormatException e) {
+                    // Ignore
+                }
+            }
+
+            final Long finalEventChannelId = eventChannelIdLong;
             discordApi.addMessageCreateListener(event -> {
-                if (event.getChannel().getId() == channelIdLong) {
+                long msgChannelId = event.getChannel().getId();
+                VonixCore.LOGGER.debug("[Discord] Received message in channel {}, listening for {} / {}", 
+                        msgChannelId, channelIdLong, finalEventChannelId);
+                if (msgChannelId == channelIdLong ||
+                        (finalEventChannelId != null && msgChannelId == finalEventChannelId)) {
+                    VonixCore.LOGGER.debug("[Discord] Processing message from: {}", 
+                            event.getMessageAuthor().getDisplayName());
                     processJavacordMessage(event);
                 }
             });
 
+            VonixCore.LOGGER.info("[Discord] Listening for messages in channel: {}", channelId);
+            if (DiscordConfig.getInstance().isEnableAccountLinking()) {
+                try {
+                    linkedAccountsManager = new LinkedAccountsManager(VonixCore.getInstance().getConfigPath());
+                    VonixCore.LOGGER.info("[Discord] Account linking initialized ({} accounts)",
+                            linkedAccountsManager.getLinkedCount());
+                } catch (Exception e) {
+                    VonixCore.LOGGER.error("[Discord] Failed to initialize account linking", e);
+                }
+            }
+
             registerListCommandAsync();
+            if (DiscordConfig.getInstance().isEnableAccountLinking() && linkedAccountsManager != null) {
+                registerLinkCommandsAsync();
+            }
+
             updateBotStatus();
 
         } catch (Exception e) {
@@ -217,22 +332,34 @@ public class DiscordManager {
             String content = event.getMessageContent();
             String authorName = event.getMessageAuthor().getDisplayName();
 
+            // Handle !list command
             if (content.trim().equalsIgnoreCase("!list")) {
                 handleTextListCommand(event);
                 return;
             }
 
+            // Filter our own webhooks
             if (isWebhook) {
                 String authorId = String.valueOf(event.getMessageAuthor().getId());
-                if (ourWebhookId != null && ourWebhookId.equals(authorId)) {
+                if ((ourWebhookId != null && ourWebhookId.equals(authorId)) ||
+                        (eventWebhookId != null && eventWebhookId.equals(authorId))) {
                     return;
                 }
             }
 
+            // Filter other webhooks if configured
             if (DiscordConfig.getInstance().isIgnoreWebhooks() && isWebhook) {
-                return;
+                if (DiscordConfig.getInstance().isFilterByPrefix()) {
+                    String ourPrefix = DiscordConfig.getInstance().getServerPrefix();
+                    if (authorName.contains(ourPrefix)) {
+                        return;
+                    }
+                } else {
+                    return;
+                }
             }
 
+            // Filter bots
             if (DiscordConfig.getInstance().isIgnoreBots() && isBot && !isWebhook) {
                 return;
             }
@@ -241,14 +368,31 @@ public class DiscordManager {
                 return;
             }
 
+            // Strip duplicate username prefix from message content
+            // This handles webhooks that include "Username: " in the message
+            String cleanedContent = content;
+            if (content.startsWith(authorName + ": ")) {
+                cleanedContent = content.substring(authorName.length() + 2);
+            } else if (content.startsWith(authorName + " ")) {
+                cleanedContent = content.substring(authorName.length() + 1);
+            }
+
             String formattedMessage = DiscordConfig.getInstance().getDiscordToMinecraftFormat()
                     .replace("{username}", authorName)
-                    .replace("{message}", content);
+                    .replace("{message}", cleanedContent);
 
             if (server != null) {
-                net.minecraft.network.chat.Component component = net.minecraft.network.chat.Component.literal(formattedMessage);
-                server.getPlayerList().getPlayers().forEach(player -> {
-                    player.sendSystemMessage(component);
+                Component component = toMinecraftComponentWithLinks(formattedMessage);
+                boolean isFilterableMessage = isBot || isWebhook;
+
+                // Execute on server main thread for thread safety
+                server.execute(() -> {
+                    for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+                        if (isFilterableMessage && hasServerMessagesFiltered(player.getUUID())) {
+                            continue;
+                        }
+                        player.sendSystemMessage(component);
+                    }
                 });
             }
         } catch (Exception e) {
@@ -274,7 +418,9 @@ public class DiscordManager {
     }
 
     public void sendMinecraftMessage(String username, String message) {
-        if (!running) return;
+        if (!running) {
+            return;
+        }
 
         String webhookUrl = DiscordConfig.getInstance().getWebhookUrl();
         if (webhookUrl == null || webhookUrl.isEmpty() || webhookUrl.contains("YOUR_WEBHOOK_URL")) {
@@ -311,95 +457,115 @@ public class DiscordManager {
         }
     }
 
+    public void sendSystemMessage(String message) {
+        if (!running || message == null || message.isEmpty()) {
+            return;
+        }
+
+        if (message.startsWith("💀")) {
+            sendEventEmbed(embed -> {
+                embed.addProperty("title", "Player Died");
+                embed.addProperty("description", message);
+                embed.addProperty("color", 0xF04747);
+                JsonObject footer = new JsonObject();
+                footer.addProperty("text", "VonixCore · Death");
+                embed.add("footer", footer);
+            });
+        } else {
+            sendMinecraftMessage("Server", message);
+        }
+    }
+
+    // ========= Event Embeds =========
+
+    private String getEventWebhookUrl() {
+        String eventWebhookUrl = DiscordConfig.getInstance().getEventWebhookUrl();
+        if (eventWebhookUrl != null && !eventWebhookUrl.isEmpty() && !eventWebhookUrl.contains("YOUR_WEBHOOK_URL")) {
+            return eventWebhookUrl;
+        }
+        return DiscordConfig.getInstance().getWebhookUrl();
+    }
+
     public void sendStartupEmbed(String serverName) {
-        sendEventEmbed("Server Online", "The server is now online.", 0x43B581, serverName);
+        sendEventEmbed(EmbedFactory.createServerStatusEmbed(
+                "Server Online",
+                "The server is now online.",
+                0x43B581,
+                serverName,
+                "VonixCore · Startup"));
     }
 
     public void sendShutdownEmbed(String serverName) {
-        sendEventEmbed("Server Shutting Down", "The server is shutting down...", 0xF04747, serverName);
+        sendEventEmbed(EmbedFactory.createServerStatusEmbed(
+                "Server Shutting Down",
+                "The server is shutting down...",
+                0xF04747,
+                serverName,
+                "VonixCore · Shutdown"));
     }
 
-    private void sendJoinEmbed(String username) {
-        String serverName = DiscordConfig.getInstance().getServerName();
-        sendPlayerEventEmbed("Player Joined", username, 0x5865F2, serverName);
-    }
-
-    private void sendLeaveEmbed(String username) {
-        String serverName = DiscordConfig.getInstance().getServerName();
-        sendPlayerEventEmbed("Player Left", username, 0x99AAB5, serverName);
-    }
-
-    private void sendEventEmbed(String title, String description, int color, String serverName) {
-        String webhookUrl = DiscordConfig.getInstance().getWebhookUrl();
-        if (webhookUrl == null || webhookUrl.isEmpty() || webhookUrl.contains("YOUR_WEBHOOK_URL")) {
-            return;
+    private String getPlayerAvatarUrl(String username) {
+        String avatarUrl = DiscordConfig.getInstance().getAvatarUrl();
+        if (avatarUrl == null || avatarUrl.isEmpty()) {
+            return null;
         }
 
-        JsonObject payload = new JsonObject();
-        String prefix = DiscordConfig.getInstance().getServerPrefix();
-        String formattedUsername = DiscordConfig.getInstance().getWebhookUsernameFormat()
-                .replace("{prefix}", prefix)
-                .replace("{username}", serverName);
-        payload.addProperty("username", formattedUsername);
-
-        JsonObject embed = new JsonObject();
-        embed.addProperty("title", title);
-        embed.addProperty("description", description);
-        embed.addProperty("color", color);
-
-        JsonArray embeds = new JsonArray();
-        embeds.add(embed);
-        payload.add("embeds", embeds);
-
-        sendWebhookPayload(webhookUrl, payload);
-    }
-
-    private void sendPlayerEventEmbed(String title, String username, int color, String serverName) {
-        String webhookUrl = DiscordConfig.getInstance().getWebhookUrl();
-        if (webhookUrl == null || webhookUrl.isEmpty() || webhookUrl.contains("YOUR_WEBHOOK_URL")) {
-            return;
-        }
-
-        JsonObject payload = new JsonObject();
-        String prefix = DiscordConfig.getInstance().getServerPrefix();
-        String formattedServerName = DiscordConfig.getInstance().getWebhookUsernameFormat()
-                .replace("{prefix}", prefix)
-                .replace("{username}", serverName);
-        payload.addProperty("username", formattedServerName);
-
-        JsonObject embed = new JsonObject();
-        embed.addProperty("title", title);
-        embed.addProperty("description", "**" + username + "**");
-        embed.addProperty("color", color);
-
-        JsonArray embeds = new JsonArray();
-        embeds.add(embed);
-        payload.add("embeds", embeds);
-
-        sendWebhookPayload(webhookUrl, payload);
-    }
-
-    private void sendWebhookPayload(String webhookUrl, JsonObject payload) {
-        if (!webhookUrl.startsWith("http://") && !webhookUrl.startsWith("https://")) {
-            return;
-        }
-
-        RequestBody body = RequestBody.create(
-                payload.toString(),
-                MediaType.parse("application/json"));
-
-        Request request = new Request.Builder()
-                .url(webhookUrl)
-                .post(body)
-                .build();
-
-        try (Response response = httpClient.newCall(request).execute()) {
-            if (!response.isSuccessful() && DiscordConfig.getInstance().isDebugLogging()) {
-                VonixCore.LOGGER.error("[Discord] Failed to send webhook: {}", response.code());
+        if (server != null) {
+            ServerPlayer player = server.getPlayerList().getPlayerByName(username);
+            if (player != null) {
+                String uuid = player.getUUID().toString().replace("-", "");
+                return avatarUrl
+                        .replace("{uuid}", uuid)
+                        .replace("{username}", username);
             }
-        } catch (IOException e) {
-            VonixCore.LOGGER.error("[Discord] Error sending webhook", e);
         }
+
+        return avatarUrl.replace("{username}", username);
+    }
+
+    public void sendJoinEmbed(String username) {
+        if (!DiscordConfig.getInstance().isSendJoin()) {
+            return;
+        }
+        String serverName = DiscordConfig.getInstance().getServerName();
+        String thumbnailUrl = getPlayerAvatarUrl(username);
+        sendEventEmbed(EmbedFactory.createPlayerEventEmbed(
+                "Player Joined",
+                "A player joined the server.",
+                0x5865F2,
+                username,
+                serverName,
+                "VonixCore · Join",
+                thumbnailUrl));
+    }
+
+    public void sendLeaveEmbed(String username) {
+        if (!DiscordConfig.getInstance().isSendLeave()) {
+            return;
+        }
+        String serverName = DiscordConfig.getInstance().getServerName();
+        String thumbnailUrl = getPlayerAvatarUrl(username);
+        sendEventEmbed(EmbedFactory.createPlayerEventEmbed(
+                "Player Left",
+                "A player left the server.",
+                0x99AAB5,
+                username,
+                serverName,
+                "VonixCore · Leave",
+                thumbnailUrl));
+    }
+
+    public void sendAdvancementEmbed(String username, String advancementTitle, String advancementDescription,
+            String type) {
+        if (!DiscordConfig.getInstance().isSendAdvancement()) {
+            return;
+        }
+        sendEventEmbed(EmbedFactory.createAdvancementEmbed(
+                "🏆",
+                0xFAA61A,
+                username,
+                advancementTitle,
+                advancementDescription));
     }
 
     public void updateBotStatus() {
@@ -408,7 +574,9 @@ public class DiscordManager {
         }
 
         try {
-            if (server == null) return;
+            if (server == null) {
+                return;
+            }
 
             int onlinePlayers = server.getPlayerList().getPlayerCount();
             int maxPlayers = server.getPlayerList().getMaxPlayers();
@@ -423,8 +591,12 @@ public class DiscordManager {
         }
     }
 
+    // ========= Slash Commands =========
+
     private void registerListCommandAsync() {
-        if (discordApi == null) return;
+        if (discordApi == null) {
+            return;
+        }
 
         discordApi.addSlashCommandCreateListener(event -> {
             SlashCommandInteraction interaction = event.getSlashCommandInteraction();
@@ -438,8 +610,37 @@ public class DiscordManager {
                 .whenComplete((cmd, error) -> {
                     if (error != null) {
                         VonixCore.LOGGER.error("[Discord] Failed to register /list command: {}", error.getMessage());
+                    } else {
+                        VonixCore.LOGGER.debug("[Discord] /list command registered");
                     }
                 });
+    }
+
+    private EmbedBuilder buildPlayerListEmbed() {
+        List<ServerPlayer> players = server.getPlayerList().getPlayers();
+        int onlinePlayers = players.size();
+        int maxPlayers = server.getPlayerList().getMaxPlayers();
+
+        String serverName = DiscordConfig.getInstance().getServerName();
+
+        EmbedBuilder embed = new EmbedBuilder()
+                .setTitle("📋 " + serverName)
+                .setColor(Color.GREEN)
+                .setFooter("VonixCore · Player List");
+
+        if (onlinePlayers == 0) {
+            embed.setDescription("No players are currently online.");
+        } else {
+            StringBuilder playerListBuilder = new StringBuilder();
+            for (int i = 0; i < players.size(); i++) {
+                if (i > 0)
+                    playerListBuilder.append("\n");
+                playerListBuilder.append("• ").append(players.get(i).getName().getString());
+            }
+            embed.addField("Players " + onlinePlayers + "/" + maxPlayers, playerListBuilder.toString(), false);
+        }
+
+        return embed;
     }
 
     private void handleListCommand(SlashCommandInteraction interaction) {
@@ -451,28 +652,7 @@ public class DiscordManager {
                 return;
             }
 
-            List<ServerPlayer> players = server.getPlayerList().getPlayers();
-            int onlinePlayers = players.size();
-            int maxPlayers = server.getPlayerList().getMaxPlayers();
-
-            String serverName = DiscordConfig.getInstance().getServerName();
-
-            EmbedBuilder embed = new EmbedBuilder()
-                    .setTitle("📋 " + serverName)
-                    .setColor(Color.GREEN)
-                    .setFooter("VonixCore · Player List");
-
-            if (onlinePlayers == 0) {
-                embed.setDescription("No players are currently online.");
-            } else {
-                StringBuilder playerList = new StringBuilder();
-                for (int i = 0; i < players.size(); i++) {
-                    if (i > 0) playerList.append("\n");
-                    playerList.append("• ").append(players.get(i).getName().getString());
-                }
-                embed.addField("Players " + onlinePlayers + "/" + maxPlayers, playerList.toString(), false);
-            }
-
+            EmbedBuilder embed = buildPlayerListEmbed();
             interaction.createImmediateResponder()
                     .addEmbed(embed)
                     .respond();
@@ -486,50 +666,193 @@ public class DiscordManager {
 
     private void handleTextListCommand(org.javacord.api.event.message.MessageCreateEvent event) {
         try {
-            if (server == null) return;
-
-            List<ServerPlayer> players = server.getPlayerList().getPlayers();
-            int onlinePlayers = players.size();
-            int maxPlayers = server.getPlayerList().getMaxPlayers();
-
-            String serverName = DiscordConfig.getInstance().getServerName();
-
-            EmbedBuilder embed = new EmbedBuilder()
-                    .setTitle("📋 " + serverName)
-                    .setColor(Color.GREEN)
-                    .setFooter("VonixCore · Player List");
-
-            if (onlinePlayers == 0) {
-                embed.setDescription("No players are currently online.");
-            } else {
-                StringBuilder playerList = new StringBuilder();
-                for (int i = 0; i < players.size(); i++) {
-                    if (i > 0) playerList.append("\n");
-                    playerList.append("• ").append(players.get(i).getName().getString());
-                }
-                embed.addField("Players " + onlinePlayers + "/" + maxPlayers, playerList.toString(), false);
+            if (server == null) {
+                return;
             }
-
+            EmbedBuilder embed = buildPlayerListEmbed();
             event.getChannel().sendMessage(embed);
         } catch (Exception e) {
             VonixCore.LOGGER.error("[Discord] Error handling !list command", e);
         }
     }
 
+    private void registerLinkCommandsAsync() {
+        if (discordApi == null || linkedAccountsManager == null) {
+            return;
+        }
+
+        discordApi.addSlashCommandCreateListener(event -> {
+            SlashCommandInteraction interaction = event.getSlashCommandInteraction();
+
+            if (interaction.getCommandName().equals("link")) {
+                String code = interaction.getArgumentStringValueByName("code").orElse("");
+                String discordId = String.valueOf(interaction.getUser().getId());
+                String discordUsername = interaction.getUser().getName();
+
+                LinkedAccountsManager.LinkResult result = linkedAccountsManager.verifyAndLink(code, discordId,
+                        discordUsername);
+
+                interaction.createImmediateResponder()
+                        .setContent((result.success() ? "✅ " : "❌ ") + result.message())
+                        .respond();
+            } else if (interaction.getCommandName().equals("unlink")) {
+                String discordId = String.valueOf(interaction.getUser().getId());
+                boolean success = linkedAccountsManager.unlinkDiscord(discordId);
+
+                interaction.createImmediateResponder()
+                        .setContent(success ? "✅ Your Minecraft account has been unlinked."
+                                : "❌ You don't have a linked Minecraft account.")
+                        .respond();
+            }
+        });
+
+        SlashCommand.with("link", "Link your Minecraft account to Discord",
+                java.util.Arrays.asList(
+                        org.javacord.api.interaction.SlashCommandOption.create(
+                                org.javacord.api.interaction.SlashCommandOptionType.STRING,
+                                "code",
+                                "The 6-digit code from /vonix discord link in-game",
+                                true)))
+                .createGlobal(discordApi)
+                .whenComplete((cmd, error) -> {
+                    if (error != null) {
+                        VonixCore.LOGGER.error("[Discord] Failed to register /link command: {}", error.getMessage());
+                    }
+                });
+
+        SlashCommand.with("unlink", "Unlink your Discord account from Minecraft")
+                .createGlobal(discordApi)
+                .whenComplete((cmd, error) -> {
+                    if (error != null) {
+                        VonixCore.LOGGER.error("[Discord] Failed to register /unlink command: {}", error.getMessage());
+                    }
+                });
+    }
+
+    // ========= Webhook Sending =========
+
+    private void sendEventEmbed(java.util.function.Consumer<JsonObject> customize) {
+        String webhookUrl = getEventWebhookUrl();
+        sendWebhookEmbedToUrl(webhookUrl, customize);
+    }
+
+    private void sendWebhookEmbedToUrl(String webhookUrl, java.util.function.Consumer<JsonObject> customize) {
+        if (webhookUrl == null || webhookUrl.isEmpty() || webhookUrl.contains("YOUR_WEBHOOK_URL")) {
+            return;
+        }
+
+        // Execute entire embed send asynchronously to avoid blocking main thread
+        VonixCore.executeAsync(() -> {
+            JsonObject payload = new JsonObject();
+
+            String prefix = DiscordConfig.getInstance().getServerPrefix();
+            String serverName = DiscordConfig.getInstance().getServerName();
+            String baseUsername = serverName == null ? "Server" : serverName;
+            String formattedUsername = DiscordConfig.getInstance().getWebhookUsernameFormat()
+                    .replace("{prefix}", prefix)
+                    .replace("{username}", baseUsername);
+
+            payload.addProperty("username", formattedUsername);
+
+            String avatarUrl = DiscordConfig.getInstance().getServerAvatarUrl();
+            if (avatarUrl != null && !avatarUrl.isEmpty()) {
+                payload.addProperty("avatar_url", avatarUrl);
+            }
+
+            JsonObject embed = new JsonObject();
+            customize.accept(embed);
+
+            JsonArray embeds = new JsonArray();
+            embeds.add(embed);
+            payload.add("embeds", embeds);
+
+            RequestBody body = RequestBody.create(
+                    payload.toString(),
+                    MediaType.parse("application/json"));
+
+            Request request = new Request.Builder()
+                    .url(webhookUrl)
+                    .post(body)
+                    .build();
+
+            try (Response response = httpClient.newCall(request).execute()) {
+                if (!response.isSuccessful() && DiscordConfig.getInstance().isDebugLogging()) {
+                    VonixCore.LOGGER.error("[Discord] Failed to send embed: {}", response.code());
+                }
+            } catch (IOException e) {
+                VonixCore.LOGGER.error("[Discord] Error sending embed", e);
+            }
+        });
+    }
+
+    private Component toMinecraftComponentWithLinks(String text) {
+        if (text == null || text.isEmpty()) {
+            return Component.empty();
+        }
+
+        var matcher = DISCORD_MARKDOWN_LINK.matcher(text);
+        MutableComponent result = Component.empty();
+        int lastEnd = 0;
+        boolean hasLink = false;
+
+        while (matcher.find()) {
+            int start = matcher.start();
+            int end = matcher.end();
+
+            if (start > lastEnd) {
+                String before = text.substring(lastEnd, start);
+                if (!before.isEmpty()) {
+                    result.append(Component.literal(before));
+                }
+            }
+
+            String label = matcher.group(1);
+            String url = matcher.group(2);
+
+            Component linkComponent = Component
+                    .literal(label)
+                    .withStyle(style -> style
+                            .withClickEvent(new ClickEvent(ClickEvent.Action.OPEN_URL, url))
+                            .withUnderlined(true)
+                            .withColor(ChatFormatting.AQUA));
+
+            result.append(linkComponent);
+            lastEnd = end;
+            hasLink = true;
+        }
+
+        if (lastEnd < text.length()) {
+            String tail = text.substring(lastEnd);
+            if (!tail.isEmpty()) {
+                result.append(Component.literal(tail));
+            }
+        }
+
+        if (!hasLink) {
+            return Component.literal(text);
+        }
+
+        return result;
+    }
+
     private void startMessageQueueThread() {
         messageQueueThread = new Thread(() -> {
-            while (running) {
+            while (running && !Thread.currentThread().isInterrupted()) {
                 try {
-                    WebhookMessage message = messageQueue.poll(1, TimeUnit.SECONDS);
-                    if (message != null) {
-                        sendWebhookMessage(message);
-                        Thread.sleep(DiscordConfig.getInstance().getRateLimitDelay());
+                    WebhookMessage webhookMessage = messageQueue.poll(1, TimeUnit.SECONDS);
+                    if (webhookMessage != null) {
+                        sendWebhookMessage(webhookMessage);
+
+                        int delay = DiscordConfig.getInstance().getRateLimitDelay();
+                        if (delay > 0) {
+                            Thread.sleep(delay);
+                        }
                     }
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     break;
                 } catch (Exception e) {
-                    VonixCore.LOGGER.error("[Discord] Error in message queue thread", e);
+                    VonixCore.LOGGER.error("[Discord] Error processing message queue", e);
                 }
             }
         }, "VonixCore-Discord-Queue");
@@ -537,16 +860,44 @@ public class DiscordManager {
         messageQueueThread.start();
     }
 
-    private void sendWebhookMessage(WebhookMessage message) {
-        JsonObject payload = new JsonObject();
-        payload.addProperty("content", message.content);
-        payload.addProperty("username", message.username);
-        if (message.avatarUrl != null) {
-            payload.addProperty("avatar_url", message.avatarUrl);
+    private void sendWebhookMessage(WebhookMessage webhookMessage) {
+        JsonObject json = new JsonObject();
+        json.addProperty("content", webhookMessage.content);
+        json.addProperty("username", webhookMessage.username);
+
+        if (webhookMessage.avatarUrl != null) {
+            json.addProperty("avatar_url", webhookMessage.avatarUrl);
         }
 
-        sendWebhookPayload(message.webhookUrl, payload);
+        RequestBody body = RequestBody.create(
+                json.toString(),
+                MediaType.parse("application/json"));
+
+        Request request = new Request.Builder()
+                .url(webhookMessage.webhookUrl)
+                .post(body)
+                .build();
+
+        try (Response response = httpClient.newCall(request).execute()) {
+            if (!response.isSuccessful() && DiscordConfig.getInstance().isDebugLogging()) {
+                VonixCore.LOGGER.error("[Discord] Failed to send message: {}", response.code());
+            }
+        } catch (IOException e) {
+            VonixCore.LOGGER.error("[Discord] Error sending message", e);
+        }
     }
 
-    private record WebhookMessage(String webhookUrl, String content, String username, String avatarUrl) {}
+    private static class WebhookMessage {
+        final String webhookUrl;
+        final String content;
+        final String username;
+        final String avatarUrl;
+
+        WebhookMessage(String webhookUrl, String content, String username, String avatarUrl) {
+            this.webhookUrl = webhookUrl;
+            this.content = content;
+            this.username = username;
+            this.avatarUrl = avatarUrl;
+        }
+    }
 }

@@ -3,7 +3,7 @@ package network.vonix.vonixcore.config;
 import java.nio.file.Path;
 
 /**
- * XPSync configuration for VonixCore.
+ * XP Sync configuration for VonixCore.
  * Stored in config/vonixcore-xpsync.yml
  */
 public class XPSyncConfig extends BaseConfig {
@@ -32,8 +32,11 @@ public class XPSyncConfig extends BaseConfig {
     @Override
     protected String getHeader() {
         return """
-                # VonixCore XPSync Configuration
-                # Synchronize player XP to external API
+                # VonixCore XP Sync Configuration
+                # Synchronize player XP and stats to an external API
+                #
+                # This feature is designed for the Vonix Network website
+                # but can work with any compatible API endpoint
                 """;
     }
 
@@ -43,15 +46,21 @@ public class XPSyncConfig extends BaseConfig {
         setDefault("xpsync.enabled", false);
 
         // API settings
-        setDefault("api.url", "https://your-api.com/xp");
-        setDefault("api.key", "YOUR_API_KEY_HERE");
-        setDefault("api.timeout_ms", 5000);
+        setDefault("api.endpoint", "https://vonix.network/api/minecraft/sync/xp");
+        setDefault("api.api_key", "YOUR_API_KEY_HERE");
+        setDefault("api.server_name", "Server-1");
+        setDefault("api.sync_interval", 300);
 
-        // Sync settings
-        setDefault("sync.interval_seconds", 60);
-        setDefault("sync.on_level_up", true);
-        setDefault("sync.on_death", true);
-        setDefault("sync.min_xp_change", 10);
+        // Data options
+        setDefault("data.track_playtime", true);
+        setDefault("data.track_health", true);
+        setDefault("data.track_hunger", false);
+        setDefault("data.track_position", false);
+
+        // Advanced
+        setDefault("advanced.verbose_logging", false);
+        setDefault("advanced.connection_timeout", 10000);
+        setDefault("advanced.max_retries", 3);
     }
 
     // ============ Getters ============
@@ -61,32 +70,49 @@ public class XPSyncConfig extends BaseConfig {
     }
 
     // API
-    public String getApiUrl() {
-        return getString("api.url", "https://your-api.com/xp");
+    public String getApiEndpoint() {
+        return getString("api.endpoint", "https://vonix.network/api/minecraft/sync/xp");
     }
 
     public String getApiKey() {
-        return getString("api.key", "YOUR_API_KEY_HERE");
+        return getString("api.api_key", "YOUR_API_KEY_HERE");
     }
 
-    public int getApiTimeout() {
-        return getInt("api.timeout_ms", 5000);
+    public String getServerName() {
+        return getString("api.server_name", "Server-1");
     }
 
-    // Sync
     public int getSyncInterval() {
-        return getInt("sync.interval_seconds", 60);
+        return getInt("api.sync_interval", 300);
     }
 
-    public boolean isSyncOnLevelUp() {
-        return getBoolean("sync.on_level_up", true);
+    // Data
+    public boolean isTrackPlaytime() {
+        return getBoolean("data.track_playtime", true);
     }
 
-    public boolean isSyncOnDeath() {
-        return getBoolean("sync.on_death", true);
+    public boolean isTrackHealth() {
+        return getBoolean("data.track_health", true);
     }
 
-    public int getMinXpChange() {
-        return getInt("sync.min_xp_change", 10);
+    public boolean isTrackHunger() {
+        return getBoolean("data.track_hunger", false);
+    }
+
+    public boolean isTrackPosition() {
+        return getBoolean("data.track_position", false);
+    }
+
+    // Advanced
+    public boolean isVerboseLogging() {
+        return getBoolean("advanced.verbose_logging", false);
+    }
+
+    public int getConnectionTimeout() {
+        return getInt("advanced.connection_timeout", 10000);
+    }
+
+    public int getMaxRetries() {
+        return getInt("advanced.max_retries", 3);
     }
 }

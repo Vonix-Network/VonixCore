@@ -153,10 +153,19 @@ public class VonixCore implements ModInitializer {
         ServerLifecycleEvents.SERVER_STOPPING.register(this::onServerStopping);
 
         // Register event listeners
-        BlockEventListener.register();
-        EntityEventListener.register();
+        // Only register protection listeners if protection module is enabled
+        if (ProtectionConfig.getInstance().isEnabled()) {
+            BlockEventListener.register();
+            EntityEventListener.register();
+        }
         PlayerEventListener.register();
         EssentialsEventHandler.register();
+        
+        // Register Discord event listeners (join/leave/death/advancements)
+        network.vonix.vonixcore.discord.DiscordEventHandler.register();
+        
+        // Register shop event listeners (chest shops, sign shops)
+        network.vonix.vonixcore.economy.shop.ShopEventListener.register();
 
         LOGGER.info("[{}] Mod initialized, waiting for server start...", MOD_NAME);
     }

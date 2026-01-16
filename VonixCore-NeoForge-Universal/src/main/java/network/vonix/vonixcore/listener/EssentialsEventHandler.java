@@ -70,7 +70,7 @@ public class EssentialsEventHandler {
     /**
      * Format chat messages with prefix/suffix.
      */
-    @SubscribeEvent
+    @SubscribeEvent(priority = net.neoforged.bus.api.EventPriority.LOWEST)
     public static void onChatFormat(ServerChatEvent event) {
         if (!EssentialsConfig.CONFIG.enabled.get()) {
             return;

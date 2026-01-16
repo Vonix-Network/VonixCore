@@ -23,6 +23,12 @@ public class EssentialsConfig {
         public final ModConfigSpec.BooleanValue kitsEnabled;
         public final ModConfigSpec.BooleanValue shopsEnabled;
         public final ModConfigSpec.BooleanValue jobsEnabled;
+        public final ModConfigSpec.BooleanValue rtpEnabled;
+
+        // RTP settings
+        public final ModConfigSpec.IntValue rtpCooldown;
+        public final ModConfigSpec.IntValue rtpMaxRange;
+        public final ModConfigSpec.IntValue rtpMinRange;
 
         // Homes settings
         public final ModConfigSpec.IntValue maxHomes;
@@ -84,6 +90,9 @@ public class EssentialsConfig {
                 jobsEnabled = builder.comment("Enable jobs system (earn money by playing)")
                                 .define("jobs_enabled", true);
 
+                rtpEnabled = builder.comment("Enable random teleport command (/rtp)")
+                                .define("rtp_enabled", true);
+
                 builder.pop().comment(
                                 "Homes Settings",
                                 "Configure the player homes feature")
@@ -140,6 +149,24 @@ public class EssentialsConfig {
                                 "Default cooldown for kits in seconds",
                                 "Individual kits can override this")
                                 .defineInRange("default_cooldown", 86400, 0, 604800);
+
+                builder.pop().comment(
+                                "RTP Settings",
+                                "Configure the random teleport feature")
+                                .push("rtp");
+
+                rtpCooldown = builder.comment(
+                                "Cooldown between /rtp uses in seconds",
+                                "Set to 0 to disable cooldown")
+                                .defineInRange("cooldown", 600, 0, 86400);
+
+                rtpMaxRange = builder.comment(
+                                "Maximum distance from spawn for random teleport")
+                                .defineInRange("max_range", 10000, 100, 100000);
+
+                rtpMinRange = builder.comment(
+                                "Minimum distance from spawn for random teleport")
+                                .defineInRange("min_range", 500, 0, 50000);
 
                 builder.pop();
         }

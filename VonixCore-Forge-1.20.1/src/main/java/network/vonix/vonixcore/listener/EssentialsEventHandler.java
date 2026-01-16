@@ -70,7 +70,7 @@ public class EssentialsEventHandler {
     /**
      * Format chat messages with prefix/suffix.
      */
-    @SubscribeEvent
+    @SubscribeEvent(priority = net.minecraftforge.eventbus.api.EventPriority.LOWEST)
     public static void onChatFormat(ServerChatEvent event) {
         if (!EssentialsConfig.CONFIG.enabled.get()) {
             return;
@@ -82,8 +82,17 @@ public class EssentialsEventHandler {
         // Format the message with prefix/suffix
         Component formatted = ChatFormatter.formatChatMessage(player, rawMessage);
 
-        // Replace the message
-        event.setMessage(formatted);
+        // Cancel the original event to prevent default rendering (which adds the double
+        // name)
+        event.setCanceled(true);
+
+        // Manually broadcast the formatted message to all players (tellraw style)
+        for (ServerPlayer p : player.getServer().getPlayerList().getPlayers()) {
+            p.sendSystemMessage(formatted);
+        }
+
+        // Log to console
+        player.getServer().sendSystemMessage(formatted);
     }
 
     /**

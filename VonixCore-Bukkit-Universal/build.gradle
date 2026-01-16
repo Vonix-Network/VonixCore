@@ -4,7 +4,7 @@ plugins {
 }
 
 group = 'network.vonix'
-version = '1.0.0-UNIVERSAL'
+version = '1.0.1-UNIVERSAL'
 
 repositories {
     mavenCentral()

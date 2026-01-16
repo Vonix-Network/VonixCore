@@ -387,9 +387,18 @@ public class DiscordManager {
                 return;
             }
 
+            // Strip duplicate username prefix from message content
+            // This handles webhooks that include "Username: " in the message
+            String cleanedContent = content;
+            if (content.startsWith(authorName + ": ")) {
+                cleanedContent = content.substring(authorName.length() + 2);
+            } else if (content.startsWith(authorName + " ")) {
+                cleanedContent = content.substring(authorName.length() + 1);
+            }
+
             String formattedMessage = DiscordConfig.CONFIG.discordToMinecraftFormat.get()
                     .replace("{username}", authorName)
-                    .replace("{message}", content);
+                    .replace("{message}", cleanedContent);
 
             if (server != null) {
                 Component component = toMinecraftComponentWithLinks(formattedMessage);
@@ -748,45 +757,48 @@ public class DiscordManager {
             return;
         }
 
-        JsonObject payload = new JsonObject();
+        // Execute entire embed send asynchronously to avoid blocking main thread
+        VonixCore.executeAsync(() -> {
+            JsonObject payload = new JsonObject();
 
-        String prefix = DiscordConfig.CONFIG.serverPrefix.get();
-        String serverName = DiscordConfig.CONFIG.serverName.get();
-        String baseUsername = serverName == null ? "Server" : serverName;
-        String formattedUsername = DiscordConfig.CONFIG.webhookUsernameFormat.get()
-                .replace("{prefix}", prefix)
-                .replace("{username}", baseUsername);
+            String prefix = DiscordConfig.CONFIG.serverPrefix.get();
+            String serverName = DiscordConfig.CONFIG.serverName.get();
+            String baseUsername = serverName == null ? "Server" : serverName;
+            String formattedUsername = DiscordConfig.CONFIG.webhookUsernameFormat.get()
+                    .replace("{prefix}", prefix)
+                    .replace("{username}", baseUsername);
 
-        payload.addProperty("username", formattedUsername);
+            payload.addProperty("username", formattedUsername);
 
-        String avatarUrl = DiscordConfig.CONFIG.serverAvatarUrl.get();
-        if (avatarUrl != null && !avatarUrl.isEmpty()) {
-            payload.addProperty("avatar_url", avatarUrl);
-        }
-
-        JsonObject embed = new JsonObject();
-        customize.accept(embed);
-
-        JsonArray embeds = new JsonArray();
-        embeds.add(embed);
-        payload.add("embeds", embeds);
-
-        RequestBody body = RequestBody.create(
-                payload.toString(),
-                MediaType.parse("application/json"));
-
-        Request request = new Request.Builder()
-                .url(webhookUrl)
-                .post(body)
-                .build();
-
-        try (Response response = httpClient.newCall(request).execute()) {
-            if (!response.isSuccessful() && DiscordConfig.CONFIG.debugLogging.get()) {
-                VonixCore.LOGGER.error("[Discord] Failed to send embed: {}", response.code());
+            String avatarUrl = DiscordConfig.CONFIG.serverAvatarUrl.get();
+            if (avatarUrl != null && !avatarUrl.isEmpty()) {
+                payload.addProperty("avatar_url", avatarUrl);
             }
-        } catch (IOException e) {
-            VonixCore.LOGGER.error("[Discord] Error sending embed", e);
-        }
+
+            JsonObject embed = new JsonObject();
+            customize.accept(embed);
+
+            JsonArray embeds = new JsonArray();
+            embeds.add(embed);
+            payload.add("embeds", embeds);
+
+            RequestBody body = RequestBody.create(
+                    payload.toString(),
+                    MediaType.parse("application/json"));
+
+            Request request = new Request.Builder()
+                    .url(webhookUrl)
+                    .post(body)
+                    .build();
+
+            try (Response response = httpClient.newCall(request).execute()) {
+                if (!response.isSuccessful() && DiscordConfig.CONFIG.debugLogging.get()) {
+                    VonixCore.LOGGER.error("[Discord] Failed to send embed: {}", response.code());
+                }
+            } catch (IOException e) {
+                VonixCore.LOGGER.error("[Discord] Error sending embed", e);
+            }
+        });
     }
 
     private Component toMinecraftComponentWithLinks(String text) {

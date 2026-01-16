@@ -32,6 +32,7 @@ public class UtilityCommands {
     private static final Map<UUID, Long> firstJoin = new ConcurrentHashMap<>();
     private static final Map<UUID, UUID> lastMessaged = new ConcurrentHashMap<>();
     private static final Map<UUID, Set<UUID>> ignoreList = new ConcurrentHashMap<>();
+    private static final Map<UUID, Long> rtpCooldowns = new ConcurrentHashMap<>();
 
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         // Admin teleport commands
@@ -310,19 +311,32 @@ public class UtilityCommands {
             return 0;
         }
 
-        ServerLevel level = player.serverLevel();
-        player.sendSystemMessage(Component.literal("§eSearching for a safe location..."));
-
-        BlockPos safePos = findSafeRtpLocation(level, player.blockPosition());
-        if (safePos == null) {
-            player.sendSystemMessage(Component.literal("§cCould not find safe location after 100 attempts!"));
+        // Check if RTP is enabled
+        if (!network.vonix.vonixcore.config.EssentialsConfig.CONFIG.rtpEnabled.get()) {
+            player.sendSystemMessage(Component.literal("§cRandom teleport is disabled on this server."));
             return 0;
         }
 
-        player.teleportTo(level, safePos.getX() + 0.5, safePos.getY(), safePos.getZ() + 0.5,
-                player.getYRot(), player.getXRot());
-        player.sendSystemMessage(Component.literal(String.format("§aTeleported to §eX: %d, Y: %d, Z: %d",
-                safePos.getX(), safePos.getY(), safePos.getZ())));
+        // Check cooldown
+        int cooldownSeconds = network.vonix.vonixcore.config.EssentialsConfig.CONFIG.rtpCooldown.get();
+        if (cooldownSeconds > 0) {
+            UUID uuid = player.getUUID();
+            Long lastUse = rtpCooldowns.get(uuid);
+            long now = System.currentTimeMillis();
+            if (lastUse != null) {
+                long elapsed = (now - lastUse) / 1000;
+                long remaining = cooldownSeconds - elapsed;
+                if (remaining > 0) {
+                    player.sendSystemMessage(Component
+                            .literal("§cYou must wait §e" + remaining + "§c seconds before using /rtp again."));
+                    return 0;
+                }
+            }
+            rtpCooldowns.put(uuid, now);
+        }
+
+        // Use async RTP manager to prevent server freezes
+        network.vonix.vonixcore.teleport.AsyncRtpManager.randomTeleport(player);
         return 1;
     }
 

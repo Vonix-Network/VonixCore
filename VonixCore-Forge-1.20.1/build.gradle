@@ -333,6 +333,8 @@ reobf {
 
 // Build task should produce the shadowJar
 build.dependsOn shadowJar
+// Ensure the shadow jar is reobfuscated
+shadowJar.finalizedBy 'reobfShadowJar'
 
 // However if you are in a multi-project build, dev time needs unobfed jar files, so you can delay the obfuscation until publishing by doing:
 // tasks.named('publish').configure {

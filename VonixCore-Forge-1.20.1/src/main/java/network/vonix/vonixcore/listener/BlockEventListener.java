@@ -29,7 +29,7 @@ public class BlockEventListener {
      */
     @SubscribeEvent
     public static void onBlockBreak(BlockEvent.BreakEvent event) {
-        if (!ProtectionConfig.CONFIG.logBlockBreak.get()) {
+        if (!ProtectionConfig.CONFIG.enabled.get() || !ProtectionConfig.CONFIG.logBlockBreak.get()) {
             return;
         }
 
@@ -58,7 +58,7 @@ public class BlockEventListener {
      */
     @SubscribeEvent
     public static void onBlockPlace(BlockEvent.EntityPlaceEvent event) {
-        if (!ProtectionConfig.CONFIG.logBlockPlace.get()) {
+        if (!ProtectionConfig.CONFIG.enabled.get() || !ProtectionConfig.CONFIG.logBlockPlace.get()) {
             return;
         }
 
@@ -94,7 +94,7 @@ public class BlockEventListener {
      */
     @SubscribeEvent
     public static void onExplosion(ExplosionEvent.Detonate event) {
-        if (!ProtectionConfig.CONFIG.logBlockExplode.get()) {
+        if (!ProtectionConfig.CONFIG.enabled.get() || !ProtectionConfig.CONFIG.logBlockExplode.get()) {
             return;
         }
 

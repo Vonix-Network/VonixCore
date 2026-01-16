@@ -3,7 +3,7 @@ package network.vonix.vonixcore.config;
 import java.nio.file.Path;
 
 /**
- * Protection (block logging) configuration for VonixCore.
+ * Protection/Logging configuration for VonixCore.
  * Stored in config/vonixcore-protection.yml
  */
 public class ProtectionConfig extends BaseConfig {
@@ -33,7 +33,7 @@ public class ProtectionConfig extends BaseConfig {
     protected String getHeader() {
         return """
                 # VonixCore Protection Configuration
-                # Block logging and rollback features (CoreProtect-like)
+                # Block logging and rollback features (similar to CoreProtect)
                 """;
     }
 
@@ -42,26 +42,23 @@ public class ProtectionConfig extends BaseConfig {
         // Master toggle
         setDefault("protection.enabled", true);
 
-        // Logging toggles
-        setDefault("logging.log_block_break", true);
-        setDefault("logging.log_block_place", true);
-        setDefault("logging.log_container_access", true);
-        setDefault("logging.log_entity_kills", true);
-        setDefault("logging.log_sign_text", true);
-        setDefault("logging.log_explosions", true);
-        setDefault("logging.log_fire", true);
-        setDefault("logging.log_water_flow", false);
-        setDefault("logging.log_lava_flow", false);
+        // Logging toggles (matching Forge)
+        setDefault("logging.block_break", true);
+        setDefault("logging.block_place", true);
+        setDefault("logging.block_explode", true);
+        setDefault("logging.container_transactions", true);
+        setDefault("logging.entity_kills", true);
+        setDefault("logging.entity_spawn", false);
+        setDefault("logging.player_interactions", true);
+        setDefault("logging.chat", false);
+        setDefault("logging.commands", false);
+        setDefault("logging.signs", true);
 
-        // Rollback settings
-        setDefault("rollback.max_radius", 50);
-        setDefault("rollback.max_time_days", 30);
-        setDefault("rollback.require_confirm", true);
-
-        // Performance
-        setDefault("performance.async_lookups", true);
-        setDefault("performance.batch_writes", true);
-        setDefault("performance.cache_size", 10000);
+        // Rollback settings (matching Forge)
+        setDefault("rollback.default_radius", 10);
+        setDefault("rollback.max_radius", 100);
+        setDefault("rollback.default_time", 259200);
+        setDefault("rollback.max_lookup_results", 1000);
     }
 
     // ============ Getters ============
@@ -72,64 +69,68 @@ public class ProtectionConfig extends BaseConfig {
 
     // Logging
     public boolean isLogBlockBreak() {
-        return getBoolean("logging.log_block_break", true);
+        return getBoolean("logging.block_break", true);
     }
 
     public boolean isLogBlockPlace() {
-        return getBoolean("logging.log_block_place", true);
+        return getBoolean("logging.block_place", true);
     }
 
-    public boolean isLogContainerAccess() {
-        return getBoolean("logging.log_container_access", true);
+    public boolean isLogBlockExplode() {
+        return getBoolean("logging.block_explode", true);
+    }
+
+    public boolean isLogContainerTransactions() {
+        return getBoolean("logging.container_transactions", true);
     }
 
     public boolean isLogEntityKills() {
-        return getBoolean("logging.log_entity_kills", true);
+        return getBoolean("logging.entity_kills", true);
     }
 
-    public boolean isLogSignText() {
-        return getBoolean("logging.log_sign_text", true);
+    public boolean isLogEntitySpawn() {
+        return getBoolean("logging.entity_spawn", false);
     }
 
-    public boolean isLogExplosions() {
-        return getBoolean("logging.log_explosions", true);
+    public boolean isLogPlayerInteractions() {
+        return getBoolean("logging.player_interactions", true);
     }
 
-    public boolean isLogFire() {
-        return getBoolean("logging.log_fire", true);
+    public boolean isLogChat() {
+        return getBoolean("logging.chat", false);
     }
 
-    public boolean isLogWaterFlow() {
-        return getBoolean("logging.log_water_flow", false);
+    public boolean isLogCommands() {
+        return getBoolean("logging.commands", false);
     }
 
-    public boolean isLogLavaFlow() {
-        return getBoolean("logging.log_lava_flow", false);
+    public boolean isLogSigns() {
+        return getBoolean("logging.signs", true);
     }
 
     // Rollback
+    public int getDefaultRadius() {
+        return getInt("rollback.default_radius", 10);
+    }
+
     public int getMaxRadius() {
-        return getInt("rollback.max_radius", 50);
+        return getInt("rollback.max_radius", 100);
     }
 
+    public int getDefaultTime() {
+        return getInt("rollback.default_time", 259200);
+    }
+
+    public int getMaxLookupResults() {
+        return getInt("rollback.max_lookup_results", 1000);
+    }
+
+    // Backward compatibility aliases
     public int getMaxTimeDays() {
-        return getInt("rollback.max_time_days", 30);
+        return getDefaultTime() / 86400; // Convert seconds to days
     }
 
-    public boolean isRequireConfirm() {
-        return getBoolean("rollback.require_confirm", true);
-    }
-
-    // Performance
-    public boolean isAsyncLookups() {
-        return getBoolean("performance.async_lookups", true);
-    }
-
-    public boolean isBatchWrites() {
-        return getBoolean("performance.batch_writes", true);
-    }
-
-    public int getCacheSize() {
-        return getInt("performance.cache_size", 10000);
+    public boolean isLogContainerAccess() {
+        return isLogContainerTransactions();
     }
 }
