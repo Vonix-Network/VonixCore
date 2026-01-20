@@ -489,4 +489,30 @@ public class ShopEventListener {
             ShopGUIManager.getInstance().onPlayerCloseMenu(player.getUUID());
         }
     }
+
+    /**
+     * Respawn shop holograms when chunks are loaded
+     */
+    @SubscribeEvent
+    public static void onChunkLoad(net.neoforged.neoforge.event.level.ChunkEvent.Load event) {
+        if (event.getLevel().isClientSide())
+            return;
+        if (!EssentialsConfig.CONFIG.shopsEnabled.get())
+            return;
+        // Skip if mod or database not yet initialized (happens during world generation)
+        if (VonixCore.getInstance() == null || VonixCore.getInstance().getDatabase() == null)
+            return;
+
+        if (event.getLevel() instanceof ServerLevel level) {
+            var chunk = event.getChunk();
+            // Schedule on next tick to avoid issues during chunk load
+            level.getServer().execute(() -> {
+                // Double-check database is still available
+                if (VonixCore.getInstance() == null || VonixCore.getInstance().getDatabase() == null)
+                    return;
+                DisplayEntityManager.getInstance().respawnDisplaysInChunk(
+                        level, chunk.getPos().x, chunk.getPos().z);
+            });
+        }
+    }
 }

@@ -268,6 +268,28 @@ public class ShopGUIManager {
                 player.sendSystemMessage(Component.literal("§aPurchased " + listing.quantity() + "x " + listing.itemId()
                         + " for " + symbol + String.format("%.2f", listing.price())));
 
+                // Log transaction
+                if (network.vonix.vonixcore.config.ShopsConfig.CONFIG.transactionLogEnabled.get()) {
+                    double taxRate = network.vonix.vonixcore.config.ShopsConfig.CONFIG.playerMarketTaxRate.get();
+                    double tax = listing.price() * taxRate;
+                    network.vonix.vonixcore.economy.TransactionLog.getInstance().logMarketPurchase(
+                            player.getUUID(), listing.seller(), listing.price(), tax,
+                            listing.itemId(), listing.quantity());
+                }
+
+                // Notify seller if online and configured
+                if (network.vonix.vonixcore.config.ShopsConfig.CONFIG.playerMarketNotifyOnSale.get()) {
+                    var server = player.getServer();
+                    if (server != null) {
+                        ServerPlayer seller = server.getPlayerList().getPlayer(listing.seller());
+                        if (seller != null) {
+                            seller.sendSystemMessage(Component.literal("§a[Market] §eYour " + listing.quantity() + "x "
+                                    + listing.itemId() + " sold for " + symbol + String.format("%.2f", listing.price())
+                                    + "!"));
+                        }
+                    }
+                }
+
                 // Refresh the GUI
                 ShopSession session = activeSessions.get(player.getUUID());
                 if (session != null && session.menu instanceof ShopMenu shopMenu) {

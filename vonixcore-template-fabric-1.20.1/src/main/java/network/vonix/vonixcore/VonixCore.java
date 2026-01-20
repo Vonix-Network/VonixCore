@@ -160,10 +160,10 @@ public class VonixCore implements ModInitializer {
         }
         PlayerEventListener.register();
         EssentialsEventHandler.register();
-        
+
         // Register Discord event listeners (join/leave/death/advancements)
         network.vonix.vonixcore.discord.DiscordEventHandler.register();
-        
+
         // Register shop event listeners (chest shops, sign shops)
         network.vonix.vonixcore.economy.shop.ShopEventListener.register();
 

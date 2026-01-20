@@ -35,6 +35,8 @@ public class ShopCommands {
         dispatcher.register(Commands.literal("chestshop")
                 .then(Commands.literal("create")
                         .executes(ShopCommands::chestShopCreate))
+                .then(Commands.literal("cancel")
+                        .executes(ShopCommands::chestShopCancel))
                 .then(Commands.literal("remove")
                         .executes(ShopCommands::chestShopRemove))
                 .then(Commands.literal("info")
@@ -85,6 +87,20 @@ public class ShopCommands {
         player.sendSystemMessage(Component.literal("§6[Shop] §eRight-click a chest to create your shop."));
         player.sendSystemMessage(Component.literal("§7Type §c/chestshop cancel §7to cancel."));
 
+        return 1;
+    }
+
+    private static int chestShopCancel(CommandContext<CommandSourceStack> ctx) {
+        ServerPlayer player = ctx.getSource().getPlayer();
+        if (player == null)
+            return 0;
+
+        if (ShopManager.getInstance().isCreatingShop(player.getUUID())) {
+            ShopManager.getInstance().cancelShopCreation(player.getUUID());
+            player.sendSystemMessage(Component.literal("§6[Shop] §cShop creation cancelled."));
+        } else {
+            player.sendSystemMessage(Component.literal("§c[Shop] You're not creating a shop."));
+        }
         return 1;
     }
 

@@ -15,6 +15,7 @@ import net.minecraftforge.event.ServerChatEvent;
 import net.minecraftforge.event.entity.player.PlayerContainerEvent;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 import net.minecraftforge.event.level.BlockEvent;
+import net.minecraftforge.event.level.ChunkEvent;
 import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -119,24 +120,40 @@ public class ShopEventListener {
             }
 
             double price = shop.buyPrice();
-            double balance = eco.getBalance(player.getUUID());
+            String world = player.level().dimension().location().toString();
 
-            if (balance < price) {
+            // Calculate tax
+            double taxRate = network.vonix.vonixcore.config.ShopsConfig.CONFIG.chestShopsTaxRate.get();
+            double taxAmount = price * taxRate;
+            double totalPrice = price + taxAmount;
+
+            double balance = eco.getBalance(player.getUUID());
+            if (balance < totalPrice) {
                 player.sendSystemMessage(
-                        Component.literal("§cInsufficient funds! Need " + symbol + String.format("%.2f", price)));
+                        Component.literal("§cInsufficient funds! Need " + symbol + String.format("%.2f", totalPrice)));
                 return;
             }
 
-            // Process buy
-            if (eco.withdraw(player.getUUID(), price)) {
-                eco.deposit(shop.owner(), price);
+            // Process buy with tax
+            if (eco.withdraw(player.getUUID(), totalPrice)) {
+                eco.deposit(shop.owner(), price); // Owner gets price without tax
                 var leftover = ItemUtils.giveItems(player, shop.itemId(), 1);
                 if (!leftover.isEmpty()) {
                     player.drop(leftover, false);
                 }
-                // TODO: Decrease stock in database
+                ShopManager.getInstance().updateStock(world, pos, -1);
+
+                // Log transaction
+                if (network.vonix.vonixcore.config.ShopsConfig.CONFIG.transactionLogEnabled.get()) {
+                    network.vonix.vonixcore.economy.TransactionLog.getInstance().logShopBuy(
+                            player.getUUID(), shop.owner(), price, taxAmount,
+                            0, shop.itemId(), 1, world, pos.getX(), pos.getY(), pos.getZ());
+                }
+
+                String taxInfo = taxAmount > 0.001 ? String.format(" §7(+%s%.2f tax)", symbol, taxAmount) : "";
                 player.sendSystemMessage(Component
-                        .literal("§aPurchased 1x " + shop.itemId() + " for " + symbol + String.format("%.2f", price)));
+                        .literal("§aPurchased 1x " + shop.itemId() + " for " + symbol + String.format("%.2f", price)
+                                + taxInfo));
             }
 
         } else if (isSneaking && shop.sellPrice() != null && shop.sellPrice() > 0) {
@@ -149,6 +166,12 @@ public class ShopEventListener {
             }
 
             double price = shop.sellPrice();
+            String world = player.level().dimension().location().toString();
+
+            // Calculate tax (deducted from seller's earnings)
+            double taxRate = network.vonix.vonixcore.config.ShopsConfig.CONFIG.chestShopsTaxRate.get();
+            double taxAmount = price * taxRate;
+            double sellerReceives = price - taxAmount;
 
             // Check if shop owner can afford
             double ownerBalance = eco.getBalance(shop.owner());
@@ -157,13 +180,23 @@ public class ShopEventListener {
                 return;
             }
 
-            // Process sell
+            // Process sell with tax
             if (ItemUtils.removeItems(player, shop.itemId(), 1)) {
                 eco.withdraw(shop.owner(), price);
-                eco.deposit(player.getUUID(), price);
-                // TODO: Increase stock in database
+                eco.deposit(player.getUUID(), sellerReceives); // Seller gets amount minus tax
+                ShopManager.getInstance().updateStock(world, pos, 1);
+
+                // Log transaction
+                if (network.vonix.vonixcore.config.ShopsConfig.CONFIG.transactionLogEnabled.get()) {
+                    network.vonix.vonixcore.economy.TransactionLog.getInstance().logShopSell(
+                            player.getUUID(), shop.owner(), price, taxAmount,
+                            0, shop.itemId(), 1, world, pos.getX(), pos.getY(), pos.getZ());
+                }
+
+                String taxInfo = taxAmount > 0.001 ? String.format(" §7(-%s%.2f tax)", symbol, taxAmount) : "";
                 player.sendSystemMessage(Component
-                        .literal("§aSold 1x " + shop.itemId() + " for " + symbol + String.format("%.2f", price)));
+                        .literal("§aSold 1x " + shop.itemId() + " for " + symbol + String.format("%.2f", sellerReceives)
+                                + taxInfo));
             }
         } else {
             // Show shop info
@@ -468,6 +501,32 @@ public class ShopEventListener {
     public static void onContainerClose(PlayerContainerEvent.Close event) {
         if (event.getEntity() instanceof ServerPlayer player) {
             ShopGUIManager.getInstance().onPlayerCloseMenu(player.getUUID());
+        }
+    }
+
+    /**
+     * Respawn shop holograms when chunks are loaded
+     */
+    @SubscribeEvent
+    public static void onChunkLoad(ChunkEvent.Load event) {
+        if (event.getLevel().isClientSide())
+            return;
+        if (!EssentialsConfig.CONFIG.shopsEnabled.get())
+            return;
+        // Skip if mod or database not yet initialized (happens during world generation)
+        if (VonixCore.getInstance() == null || VonixCore.getInstance().getDatabase() == null)
+            return;
+
+        if (event.getLevel() instanceof ServerLevel level) {
+            var chunk = event.getChunk();
+            // Schedule on next tick to avoid issues during chunk load
+            level.getServer().execute(() -> {
+                // Double-check database is still available
+                if (VonixCore.getInstance() == null || VonixCore.getInstance().getDatabase() == null)
+                    return;
+                DisplayEntityManager.getInstance().respawnDisplaysInChunk(
+                        level, chunk.getPos().x, chunk.getPos().z);
+            });
         }
     }
 }

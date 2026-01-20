@@ -217,6 +217,75 @@ public class ShopManager {
         }
     }
 
+    /**
+     * Update shop stock level.
+     * 
+     * @param delta Positive to add stock, negative to remove stock
+     * @return true if successful
+     */
+    public boolean updateStock(String world, BlockPos pos, int delta) {
+        String key = shopKey(world, pos);
+        try (Connection conn = VonixCore.getInstance().getDatabase().getConnection()) {
+            // Update in database
+            PreparedStatement stmt = conn.prepareStatement(
+                    "UPDATE vc_chest_shops SET stock = stock + ? WHERE world = ? AND x = ? AND y = ? AND z = ?");
+            stmt.setInt(1, delta);
+            stmt.setString(2, world);
+            stmt.setInt(3, pos.getX());
+            stmt.setInt(4, pos.getY());
+            stmt.setInt(5, pos.getZ());
+            boolean updated = stmt.executeUpdate() > 0;
+
+            // Update cache if present
+            if (updated && shopCache.containsKey(key)) {
+                ChestShop old = shopCache.get(key);
+                shopCache.put(key, new ChestShop(old.owner(), old.itemId(), old.buyPrice(), old.sellPrice(),
+                        Math.max(0, old.stock() + delta)));
+            }
+            return updated;
+        } catch (SQLException e) {
+            VonixCore.LOGGER.error("[VonixCore] Failed to update shop stock: {}", e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Get all shops in a specific chunk.
+     * Used for respawning holograms on chunk load.
+     */
+    public List<ChestShopLocation> getShopsInChunk(String world, int chunkX, int chunkZ) {
+        List<ChestShopLocation> shops = new ArrayList<>();
+        int minX = chunkX * 16;
+        int maxX = minX + 15;
+        int minZ = chunkZ * 16;
+        int maxZ = minZ + 15;
+
+        try (Connection conn = VonixCore.getInstance().getDatabase().getConnection()) {
+            PreparedStatement stmt = conn.prepareStatement(
+                    "SELECT x, y, z, item_id FROM vc_chest_shops WHERE world = ? AND x >= ? AND x <= ? AND z >= ? AND z <= ?");
+            stmt.setString(1, world);
+            stmt.setInt(2, minX);
+            stmt.setInt(3, maxX);
+            stmt.setInt(4, minZ);
+            stmt.setInt(5, maxZ);
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) {
+                shops.add(new ChestShopLocation(
+                        new BlockPos(rs.getInt("x"), rs.getInt("y"), rs.getInt("z")),
+                        rs.getString("item_id")));
+            }
+        } catch (SQLException e) {
+            VonixCore.LOGGER.error("[VonixCore] Failed to get shops in chunk: {}", e.getMessage());
+        }
+        return shops;
+    }
+
+    /**
+     * Data class for shop location info.
+     */
+    public record ChestShopLocation(BlockPos pos, String itemId) {
+    }
+
     // ===== ADMIN SHOP =====
 
     /**

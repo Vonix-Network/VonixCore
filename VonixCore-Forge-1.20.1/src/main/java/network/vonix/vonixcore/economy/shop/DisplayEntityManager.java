@@ -134,8 +134,32 @@ public class DisplayEntityManager {
      * Respawn all displays in a chunk (called on chunk load)
      */
     public void respawnDisplaysInChunk(ServerLevel level, int chunkX, int chunkZ) {
-        VonixCore.LOGGER.debug("[Shop] Chunk loaded: {},{}", chunkX, chunkZ);
-        // TODO: Query database for shops in this chunk and respawn displays
+        String world = level.dimension().location().toString();
+
+        // Query database for shops in this chunk
+        var shops = network.vonix.vonixcore.economy.ShopManager.getInstance().getShopsInChunk(world, chunkX, chunkZ);
+
+        if (shops.isEmpty()) {
+            return;
+        }
+
+        VonixCore.LOGGER.debug("[Shop] Respawning {} display(s) in chunk {},{}", shops.size(), chunkX, chunkZ);
+
+        // Respawn each shop's display
+        for (var shopLoc : shops) {
+            String key = locationKey(level, shopLoc.pos());
+
+            // Skip if already tracked (might have been loaded via entity load)
+            if (displayEntities.containsKey(key)) {
+                continue;
+            }
+
+            // Create display item from item ID
+            ItemStack displayItem = ItemUtils.createItemFromId(shopLoc.itemId());
+            if (!displayItem.isEmpty()) {
+                spawnDisplay(level, shopLoc.pos(), displayItem);
+            }
+        }
     }
 
     /**
