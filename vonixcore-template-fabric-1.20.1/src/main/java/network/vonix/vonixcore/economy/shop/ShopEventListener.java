@@ -1,5 +1,7 @@
 package network.vonix.vonixcore.economy.shop;
 
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerChunkEvents;
+
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.fabricmc.fabric.api.message.v1.ServerMessageEvents;
 import net.minecraft.core.BlockPos;
@@ -27,6 +29,26 @@ import network.vonix.vonixcore.economy.ShopManager;
 public class ShopEventListener {
 
     public static void register() {
+        // Chunk load event for respawning holograms
+        ServerChunkEvents.CHUNK_LOAD.register((level, chunk) -> {
+            if (level.isClientSide())
+                return;
+            if (!EssentialsConfig.getInstance().isShopsEnabled())
+                return;
+
+            // Skip if mod or database not yet initialized (happens during world generation)
+            if (VonixCore.getInstance() == null || VonixCore.getInstance().getDatabase() == null)
+                return;
+
+            // Schedule on next tick to avoid issues during chunk load
+            level.getServer().execute(() -> {
+                // Double-check database is still available
+                if (VonixCore.getInstance() == null || VonixCore.getInstance().getDatabase() == null)
+                    return;
+                DisplayEntityManager.getInstance().respawnDisplaysInChunk(
+                        level, chunk.getPos().x, chunk.getPos().z);
+            });
+        });
         // Right-click block events
         UseBlockCallback.EVENT.register((player, world, hand, hitResult) -> {
             if (world.isClientSide())
@@ -82,7 +104,8 @@ public class ShopEventListener {
             return InteractionResult.PASS;
         });
 
-        // Chat input for shop creation - handled in EssentialsEventHandler ALLOW_CHAT_MESSAGE
+        // Chat input for shop creation - handled in EssentialsEventHandler
+        // ALLOW_CHAT_MESSAGE
         // We register a secondary handler for shop creation chat input
         ServerMessageEvents.ALLOW_CHAT_MESSAGE.register((message, sender, params) -> {
             if (!EssentialsConfig.getInstance().isShopsEnabled())
@@ -175,7 +198,8 @@ public class ShopEventListener {
                         }
                         if (creation.sellPrice != null) {
                             sender.sendSystemMessage(
-                                    Component.literal("§7Sell: §c" + symbol + String.format("%.2f", creation.sellPrice)));
+                                    Component.literal(
+                                            "§7Sell: §c" + symbol + String.format("%.2f", creation.sellPrice)));
                         }
                     } else {
                         sender.sendSystemMessage(Component.literal("§cFailed to create shop!"));
