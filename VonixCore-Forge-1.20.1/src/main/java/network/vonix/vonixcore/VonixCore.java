@@ -139,6 +139,15 @@ public class VonixCore {
             return; // Cannot continue without database
         }
 
+        // Force initialize TeleportManager to catch class loading errors early
+        try {
+            LOGGER.info("[{}] Initializing TeleportManager...", MOD_NAME);
+            network.vonix.vonixcore.teleport.TeleportManager.getInstance();
+            LOGGER.info("[{}] TeleportManager initialized", MOD_NAME);
+        } catch (Throwable t) {
+            LOGGER.error("[{}] Failed to initialize TeleportManager!", MOD_NAME, t);
+        }
+
         // Initialize Protection module
         if (ProtectionConfig.CONFIG.enabled.get()) {
             try {
