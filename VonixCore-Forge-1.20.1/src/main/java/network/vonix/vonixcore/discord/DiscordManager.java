@@ -5,7 +5,10 @@ import com.google.gson.JsonObject;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.chat.Style;
+import net.minecraft.network.chat.TextColor;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import network.vonix.vonixcore.VonixCore;
@@ -394,20 +397,69 @@ public class DiscordManager {
                 cleanedContent = content.substring(authorName.length() + 1);
             }
 
-            String formattedMessage = DiscordConfig.CONFIG.discordToMinecraftFormat.get()
-                    .replace("{username}", authorName)
-                    .replace("{message}", cleanedContent);
+            String formattedMessage;
+            if (isWebhook) {
+                // Special formatting for cross-server messages (webhooks)
+                // 1. Remove [Discord] tag
+                // 2. Colorize [Server] prefix to light green if present
+                String displayName = authorName;
+                if (displayName.startsWith("[") && displayName.contains("]")) {
+                    int endBracket = displayName.indexOf("]");
+                    String serverPrefix = displayName.substring(0, endBracket + 1);
+                    String name = displayName.substring(endBracket + 1).trim();
+                    displayName = "§a" + serverPrefix + " §f" + name;
+                }
+
+                // Use a cleaner format for webhooks
+                formattedMessage = displayName + "§7: §f" + cleanedContent;
+            } else {
+                // Standard Discord user message
+                formattedMessage = DiscordConfig.CONFIG.discordToMinecraftFormat.get()
+                        .replace("{username}", authorName)
+                        .replace("{message}", cleanedContent);
+            }
 
             if (server != null) {
-                Component component = toMinecraftComponentWithLinks(formattedMessage);
-                boolean isFilterableMessage = isBot || isWebhook;
+                MutableComponent finalComponent = Component.empty();
 
-                server.getPlayerList().getPlayers().forEach(player -> {
-                    if (isFilterableMessage && hasServerMessagesFiltered(player.getUUID())) {
-                        return;
+                if (isWebhook) {
+                    // Webhook logic (already established) using the pre-calculated formattedMessage
+                    finalComponent.append(toMinecraftComponentWithLinks(formattedMessage));
+                } else {
+                    // Standard Discord message: Make [Discord] clickable
+                    String inviteUrl = DiscordConfig.CONFIG.inviteUrl.get();
+                    String rawFormat = DiscordConfig.CONFIG.discordToMinecraftFormat.get()
+                            .replace("{username}", authorName)
+                            .replace("{message}", cleanedContent);
+
+                    if (rawFormat.contains("[Discord]") && inviteUrl != null && !inviteUrl.isEmpty()) {
+                        String[] parts = rawFormat.split("\\[Discord\\]", 2);
+
+                        // Part before [Discord]
+                        if (parts.length > 0 && !parts[0].isEmpty()) {
+                            finalComponent.append(toMinecraftComponentWithLinks(parts[0]));
+                        }
+
+                        // Clickable [Discord]
+                        finalComponent.append(Component.literal("[Discord]")
+                                .setStyle(Style.EMPTY
+                                        .withColor(TextColor.parseColor("aqua")) // §b
+                                        .withClickEvent(new ClickEvent(ClickEvent.Action.OPEN_URL, inviteUrl))
+                                        .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
+                                                Component.literal("Click to join our Discord!")))));
+
+                        // Part after [Discord]
+                        if (parts.length > 1 && !parts[1].isEmpty()) {
+                            finalComponent.append(toMinecraftComponentWithLinks(parts[1]));
+                        }
+                    } else {
+                        // Fallback if no tag or no invite URL
+                        finalComponent.append(toMinecraftComponentWithLinks(rawFormat));
                     }
-                    player.sendSystemMessage(component);
-                });
+                }
+
+                // Broadcast
+                server.getPlayerList().broadcastSystemMessage(finalComponent, false);
             }
         } catch (Exception e) {
             VonixCore.LOGGER.error("[Discord] Error processing message", e);

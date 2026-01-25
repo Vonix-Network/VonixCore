@@ -264,9 +264,11 @@ public class PermissionManager {
         if (user == null)
             return "";
 
-        // User-specific prefix takes priority
         if (user.getPrefix() != null && !user.getPrefix().isEmpty()) {
             return user.getPrefix();
+        } else {
+            // Debug log
+            // VonixCore.LOGGER.info("User {} has no personal prefix", uuid);
         }
 
         // Get from highest weight group
