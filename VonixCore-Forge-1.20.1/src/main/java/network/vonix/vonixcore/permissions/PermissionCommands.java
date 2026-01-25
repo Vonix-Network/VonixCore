@@ -290,6 +290,11 @@ public class PermissionCommands {
                 ServerPlayer target = EntityArgument.getPlayer(ctx, "player");
                 String prefix = StringArgumentType.getString(ctx, "prefix").replace("&", "§");
                 PermissionManager pm = PermissionManager.getInstance();
+                if (pm.isUsingLuckPerms()) {
+                        ctx.getSource().sendFailure(Component
+                                        .literal("§cLuckPerms is active - use /lp user <user> meta setprefix ..."));
+                        return 0;
+                }
 
                 PermissionUser user = pm.getUser(target.getUUID());
                 user.setUsername(target.getName().getString());
@@ -307,6 +312,11 @@ public class PermissionCommands {
                 ServerPlayer target = EntityArgument.getPlayer(ctx, "player");
                 String suffix = StringArgumentType.getString(ctx, "suffix").replace("&", "§");
                 PermissionManager pm = PermissionManager.getInstance();
+                if (pm.isUsingLuckPerms()) {
+                        ctx.getSource().sendFailure(Component
+                                        .literal("§cLuckPerms is active - use /lp user <user> meta setsuffix ..."));
+                        return 0;
+                }
 
                 PermissionUser user = pm.getUser(target.getUUID());
                 user.setUsername(target.getName().getString());
@@ -322,9 +332,15 @@ public class PermissionCommands {
 
         private static int userClearPrefix(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
                 ServerPlayer target = EntityArgument.getPlayer(ctx, "player");
-                PermissionUser user = PermissionManager.getInstance().getUser(target.getUUID());
+                PermissionManager pm = PermissionManager.getInstance();
+                if (pm.isUsingLuckPerms()) {
+                        ctx.getSource().sendFailure(Component
+                                        .literal("§cLuckPerms is active - use /lp user <user> meta clear ..."));
+                        return 0;
+                }
+                PermissionUser user = pm.getUser(target.getUUID());
                 user.setPrefix("");
-                PermissionManager.getInstance().saveUser(user);
+                pm.saveUser(user);
                 ctx.getSource().sendSuccess(
                                 () -> Component.literal("§aCleared prefix for §e" + target.getName().getString()),
                                 true);
@@ -333,9 +349,15 @@ public class PermissionCommands {
 
         private static int userClearSuffix(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
                 ServerPlayer target = EntityArgument.getPlayer(ctx, "player");
-                PermissionUser user = PermissionManager.getInstance().getUser(target.getUUID());
+                PermissionManager pm = PermissionManager.getInstance();
+                if (pm.isUsingLuckPerms()) {
+                        ctx.getSource().sendFailure(Component
+                                        .literal("§cLuckPerms is active - use /lp user <user> meta clear ..."));
+                        return 0;
+                }
+                PermissionUser user = pm.getUser(target.getUUID());
                 user.setSuffix("");
-                PermissionManager.getInstance().saveUser(user);
+                pm.saveUser(user);
                 ctx.getSource().sendSuccess(
                                 () -> Component.literal("§aCleared suffix for §e" + target.getName().getString()),
                                 true);
@@ -371,6 +393,12 @@ public class PermissionCommands {
                 String groupName = StringArgumentType.getString(ctx, "group");
                 PermissionManager pm = PermissionManager.getInstance();
 
+                if (pm.isUsingLuckPerms()) {
+                        ctx.getSource().sendFailure(
+                                        Component.literal("§cLuckPerms is active - use /lp creategroup ..."));
+                        return 0;
+                }
+
                 if (pm.getGroup(groupName) != null) {
                         ctx.getSource().sendFailure(Component.literal("§cGroup already exists"));
                         return 0;
@@ -383,11 +411,19 @@ public class PermissionCommands {
 
         private static int groupDelete(CommandContext<CommandSourceStack> ctx) {
                 String groupName = StringArgumentType.getString(ctx, "group");
+                PermissionManager pm = PermissionManager.getInstance();
+
+                if (pm.isUsingLuckPerms()) {
+                        ctx.getSource().sendFailure(
+                                        Component.literal("§cLuckPerms is active - use /lp deletegroup ..."));
+                        return 0;
+                }
+
                 if (groupName.equalsIgnoreCase("default")) {
                         ctx.getSource().sendFailure(Component.literal("§cCannot delete default group"));
                         return 0;
                 }
-                PermissionManager.getInstance().deleteGroup(groupName);
+                pm.deleteGroup(groupName);
                 ctx.getSource().sendSuccess(() -> Component.literal("§aDeleted group §e" + groupName), true);
                 return 1;
         }
@@ -396,8 +432,14 @@ public class PermissionCommands {
                 String groupName = StringArgumentType.getString(ctx, "group");
                 String permission = StringArgumentType.getString(ctx, "permission");
                 boolean value = BoolArgumentType.getBool(ctx, "value");
-                PermissionGroup group = PermissionManager.getInstance().getGroup(groupName);
+                PermissionManager pm = PermissionManager.getInstance();
 
+                if (pm.isUsingLuckPerms()) {
+                        ctx.getSource().sendFailure(Component.literal("§cLuckPerms is active - use /lp group ..."));
+                        return 0;
+                }
+
+                PermissionGroup group = pm.getGroup(groupName);
                 if (group == null) {
                         ctx.getSource().sendFailure(Component.literal("§cGroup does not exist"));
                         return 0;
@@ -413,8 +455,14 @@ public class PermissionCommands {
         private static int groupUnsetPermission(CommandContext<CommandSourceStack> ctx) {
                 String groupName = StringArgumentType.getString(ctx, "group");
                 String permission = StringArgumentType.getString(ctx, "permission");
-                PermissionGroup group = PermissionManager.getInstance().getGroup(groupName);
+                PermissionManager pm = PermissionManager.getInstance();
 
+                if (pm.isUsingLuckPerms()) {
+                        ctx.getSource().sendFailure(Component.literal("§cLuckPerms is active - use /lp group ..."));
+                        return 0;
+                }
+
+                PermissionGroup group = pm.getGroup(groupName);
                 if (group == null) {
                         ctx.getSource().sendFailure(Component.literal("§cGroup does not exist"));
                         return 0;
@@ -430,7 +478,15 @@ public class PermissionCommands {
         private static int groupSetPrefix(CommandContext<CommandSourceStack> ctx) {
                 String groupName = StringArgumentType.getString(ctx, "group");
                 String prefix = StringArgumentType.getString(ctx, "prefix").replace("&", "§");
-                PermissionGroup group = PermissionManager.getInstance().getGroup(groupName);
+                PermissionManager pm = PermissionManager.getInstance();
+
+                if (pm.isUsingLuckPerms()) {
+                        ctx.getSource().sendFailure(Component
+                                        .literal("§cLuckPerms is active - use /lp group <group> meta setprefix ..."));
+                        return 0;
+                }
+
+                PermissionGroup group = pm.getGroup(groupName);
                 if (group == null)
                         return 0;
                 group.setPrefix(prefix);
@@ -443,7 +499,15 @@ public class PermissionCommands {
         private static int groupSetSuffix(CommandContext<CommandSourceStack> ctx) {
                 String groupName = StringArgumentType.getString(ctx, "group");
                 String suffix = StringArgumentType.getString(ctx, "suffix").replace("&", "§");
-                PermissionGroup group = PermissionManager.getInstance().getGroup(groupName);
+                PermissionManager pm = PermissionManager.getInstance();
+
+                if (pm.isUsingLuckPerms()) {
+                        ctx.getSource().sendFailure(Component
+                                        .literal("§cLuckPerms is active - use /lp group <group> meta setsuffix ..."));
+                        return 0;
+                }
+
+                PermissionGroup group = pm.getGroup(groupName);
                 if (group == null)
                         return 0;
                 group.setSuffix(suffix);
@@ -456,7 +520,14 @@ public class PermissionCommands {
         private static int groupSetWeight(CommandContext<CommandSourceStack> ctx) {
                 String groupName = StringArgumentType.getString(ctx, "group");
                 int weight = IntegerArgumentType.getInteger(ctx, "weight");
-                PermissionGroup group = PermissionManager.getInstance().getGroup(groupName);
+                PermissionManager pm = PermissionManager.getInstance();
+
+                if (pm.isUsingLuckPerms()) {
+                        ctx.getSource().sendFailure(Component.literal("§cLuckPerms is active - use /lp group ..."));
+                        return 0;
+                }
+
+                PermissionGroup group = pm.getGroup(groupName);
                 if (group == null)
                         return 0;
                 group.setWeight(weight);
@@ -469,7 +540,14 @@ public class PermissionCommands {
         private static int groupSetDisplayName(CommandContext<CommandSourceStack> ctx) {
                 String groupName = StringArgumentType.getString(ctx, "group");
                 String name = StringArgumentType.getString(ctx, "name").replace("&", "§");
-                PermissionGroup group = PermissionManager.getInstance().getGroup(groupName);
+                PermissionManager pm = PermissionManager.getInstance();
+
+                if (pm.isUsingLuckPerms()) {
+                        ctx.getSource().sendFailure(Component.literal("§cLuckPerms is active - use /lp group ..."));
+                        return 0;
+                }
+
+                PermissionGroup group = pm.getGroup(groupName);
                 if (group == null)
                         return 0;
                 group.setDisplayName(name);

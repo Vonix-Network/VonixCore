@@ -376,12 +376,27 @@ public class DiscordManager {
                 // Check for embeds (often used for cross-server events)
                 if (!event.getMessage().getEmbeds().isEmpty()) {
                     org.javacord.api.entity.message.embed.Embed embed = event.getMessage().getEmbeds().get(0);
+
+                    StringBuilder embedContent = new StringBuilder();
+
+                    // Add Author if present (usually "PlayerName" or "ServerName")
+                    if (embed.getAuthor().isPresent()) {
+                        embedContent.append(embed.getAuthor().get().getName()).append(" ");
+                    }
+
+                    // Add Title if present
+                    if (embed.getTitle().isPresent()) {
+                        embedContent.append(embed.getTitle().get()).append(" ");
+                    }
+
+                    // Add Description
                     if (embed.getDescription().isPresent()) {
-                        content = embed.getDescription().get();
-                    } else if (embed.getTitle().isPresent()) {
-                        content = embed.getTitle().get();
-                    } else {
-                        return; // Empty content and empty useful embed data
+                        embedContent.append(embed.getDescription().get());
+                    }
+
+                    content = embedContent.toString().trim();
+                    if (content.isEmpty()) {
+                        return;
                     }
                 } else {
                     return;
@@ -402,16 +417,19 @@ public class DiscordManager {
                 // Special formatting for cross-server messages (webhooks)
                 // 1. Remove [Discord] tag
                 // 2. Colorize [Server] prefix to light green if present
+                // 3. Remove redundant "Server" name from display name
                 String displayName = authorName;
                 if (displayName.startsWith("[") && displayName.contains("]")) {
                     int endBracket = displayName.indexOf("]");
                     String serverPrefix = displayName.substring(0, endBracket + 1);
-                    String name = displayName.substring(endBracket + 1).trim();
-                    displayName = "§a" + serverPrefix + " §f" + name;
+                    // Just use the prefix, ignore the rest of the name (e.g. "Otherworld Server")
+                    // The "Who" (Player Name) should be in the content now (via Embed Author
+                    // parsing above)
+                    displayName = "§a" + serverPrefix;
                 }
 
                 // Use a cleaner format for webhooks
-                formattedMessage = displayName + "§7: §f" + cleanedContent;
+                formattedMessage = displayName + " §f" + cleanedContent;
             } else {
                 // Standard Discord user message
                 formattedMessage = DiscordConfig.CONFIG.discordToMinecraftFormat.get()
