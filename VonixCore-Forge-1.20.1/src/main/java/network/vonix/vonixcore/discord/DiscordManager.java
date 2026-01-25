@@ -410,21 +410,39 @@ public class DiscordManager {
                         embedContent.append(embed.getAuthor().get().getName()).append(" ");
                     }
 
-                    // Add Title if present - but skip if it's just a generic "Player Joined" etc.
+                    // Add Title if present - but skip if it's just a generic event header
                     if (embed.getTitle().isPresent()) {
                         String title = embed.getTitle().get();
-                        if (!title.equalsIgnoreCase("Player Joined") &&
-                                !title.equalsIgnoreCase("Player Left") &&
-                                !title.equalsIgnoreCase("Advancement Made") &&
-                                !title.equalsIgnoreCase("Player Died")) {
+                        String strippedTitle = title.replaceAll("[^a-zA-Z ]", "").trim();
+                        if (!strippedTitle.equalsIgnoreCase("Player Joined") &&
+                                !strippedTitle.equalsIgnoreCase("Player Left") &&
+                                !strippedTitle.equalsIgnoreCase("Advancement Made") &&
+                                !strippedTitle.equalsIgnoreCase("Player Died")) {
                             embedContent.append(title).append(" ");
                         }
                     }
 
-                    // Add Description
-                    if (embed.getDescription().isPresent()) {
-                        embedContent.append(embed.getDescription().get());
+                    // Add Description with smart replacement
+                    String description = embed.getDescription().orElse("");
+
+                    // Parse Fields (where names are often hidden)
+                    for (org.javacord.api.entity.message.embed.EmbedField field : embed.getFields()) {
+                        String fieldName = field.getName();
+                        String fieldValue = field.getValue();
+
+                        if (fieldName.equalsIgnoreCase("Player") || fieldName.equalsIgnoreCase("User")) {
+                            // Replace "A player" or "a player" with the actual name
+                            if (description.toLowerCase().contains("a player")) {
+                                description = description.replaceAll("(?i)A player", fieldValue);
+                            } else if (!description.contains(fieldValue)) {
+                                embedContent.append(fieldValue).append(" ");
+                            }
+                        } else if (!fieldName.equalsIgnoreCase("Server") && !fieldName.equalsIgnoreCase("Message")) {
+                            embedContent.append("[").append(fieldName).append(": ").append(fieldValue).append("] ");
+                        }
                     }
+
+                    embedContent.append(description);
 
                     content = embedContent.toString().trim();
                     if (content.isEmpty()) {
