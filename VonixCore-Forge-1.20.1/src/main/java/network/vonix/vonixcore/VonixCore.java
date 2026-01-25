@@ -273,7 +273,7 @@ public class VonixCore {
                 }
                 DiscordManager.getInstance().shutdown();
                 LOGGER.debug("[{}] Discord shutdown complete", MOD_NAME);
-            } catch (Exception e) {
+            } catch (Throwable e) {
                 LOGGER.error("[{}] Error during Discord shutdown", MOD_NAME, e);
             }
         }
@@ -284,7 +284,7 @@ public class VonixCore {
                 xpSyncManager.stop();
                 xpSyncManager = null;
                 LOGGER.debug("[{}] XPSync shutdown complete", MOD_NAME);
-            } catch (Exception e) {
+            } catch (Throwable e) {
                 LOGGER.error("[{}] Error during XPSync shutdown", MOD_NAME, e);
             }
         }
@@ -294,7 +294,7 @@ public class VonixCore {
             try {
                 Consumer.getInstance().stop();
                 LOGGER.debug("[{}] Protection consumer shutdown complete", MOD_NAME);
-            } catch (Exception e) {
+            } catch (Throwable e) {
                 LOGGER.error("[{}] Error during Consumer shutdown", MOD_NAME, e);
             }
         }
@@ -305,7 +305,7 @@ public class VonixCore {
             AuthenticationManager.shutdown();
             network.vonix.vonixcore.auth.api.VonixNetworkAPI.shutdown();
             LOGGER.debug("[{}] Auth shutdown complete", MOD_NAME);
-        } catch (Exception e) {
+        } catch (Throwable e) {
             LOGGER.error("[{}] Error during Auth shutdown", MOD_NAME, e);
         }
 
@@ -315,7 +315,7 @@ public class VonixCore {
                 JobsManager.getInstance().shutdown();
                 network.vonix.vonixcore.teleport.TeleportManager.getInstance().clear();
                 LOGGER.debug("[{}] Jobs/Teleport shutdown complete", MOD_NAME);
-            } catch (Exception e) {
+            } catch (Throwable e) {
                 LOGGER.error("[{}] Error during Jobs shutdown", MOD_NAME, e);
             }
         }
@@ -326,9 +326,11 @@ public class VonixCore {
             if (!ASYNC_EXECUTOR.awaitTermination(5, TimeUnit.SECONDS)) {
                 ASYNC_EXECUTOR.shutdownNow();
             }
-        } catch (InterruptedException e) {
+        } catch (Throwable e) {
             ASYNC_EXECUTOR.shutdownNow();
-            Thread.currentThread().interrupt();
+            if (e instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
         }
 
         // Close database last
@@ -337,7 +339,7 @@ public class VonixCore {
                 database.close();
                 database = null;
                 LOGGER.debug("[{}] Database closed", MOD_NAME);
-            } catch (Exception e) {
+            } catch (Throwable e) {
                 LOGGER.error("[{}] Error closing database", MOD_NAME, e);
             }
         }
