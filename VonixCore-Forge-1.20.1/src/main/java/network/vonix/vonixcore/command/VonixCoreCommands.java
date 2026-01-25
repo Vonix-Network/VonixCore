@@ -41,6 +41,8 @@ public class VonixCoreCommands {
         registerKitCommands(dispatcher);
         registerAdminCommands(dispatcher);
         registerUtilityCommands(dispatcher);
+        registerUtilityCommands(dispatcher);
+        network.vonix.vonixcore.permissions.PermissionCommands.register(dispatcher);
         registerVonixCoreCommand(dispatcher);
 
         VonixCore.LOGGER.info("[VonixCore] All commands registered");

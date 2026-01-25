@@ -367,7 +367,19 @@ public class DiscordManager {
             }
 
             if (content.isEmpty()) {
-                return;
+                // Check for embeds (often used for cross-server events)
+                if (!event.getMessage().getEmbeds().isEmpty()) {
+                    org.javacord.api.entity.message.embed.Embed embed = event.getMessage().getEmbeds().get(0);
+                    if (embed.getDescription().isPresent()) {
+                        content = embed.getDescription().get();
+                    } else if (embed.getTitle().isPresent()) {
+                        content = embed.getTitle().get();
+                    } else {
+                        return; // Empty content and empty useful embed data
+                    }
+                } else {
+                    return;
+                }
             }
 
             // Strip duplicate username prefix from message content
