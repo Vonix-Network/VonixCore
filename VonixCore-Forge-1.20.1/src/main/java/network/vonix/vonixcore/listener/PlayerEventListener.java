@@ -26,7 +26,7 @@ public class PlayerEventListener {
     /**
      * Handle chat events.
      */
-    @SubscribeEvent
+    @SubscribeEvent(priority = net.minecraftforge.eventbus.api.EventPriority.HIGHEST)
     public static void onChat(ServerChatEvent event) {
         ServerPlayer player = event.getPlayer();
         String user = player.getName().getString();
@@ -40,6 +40,11 @@ public class PlayerEventListener {
             player.server.getPlayerList().broadcastSystemMessage(formatted, false);
             // Log to console manually since event is canceled
             VonixCore.LOGGER.info("[Chat] " + formatted.getString());
+        }
+
+        // Send to Discord
+        if (network.vonix.vonixcore.config.DiscordConfig.CONFIG.enabled.get()) {
+            network.vonix.vonixcore.discord.DiscordManager.getInstance().sendMinecraftMessage(user, message);
         }
 
         if (ProtectionConfig.CONFIG.logChat.get()) {

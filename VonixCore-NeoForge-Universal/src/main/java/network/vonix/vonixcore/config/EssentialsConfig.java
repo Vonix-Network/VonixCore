@@ -38,7 +38,6 @@ public class EssentialsConfig {
         // TPA settings
         public final ModConfigSpec.IntValue tpaCooldown;
         public final ModConfigSpec.IntValue tpaTimeout;
-        public final ModConfigSpec.IntValue tpaTimeout;
         public final ModConfigSpec.IntValue backTimeout;
         public final ModConfigSpec.IntValue deathBackTimeout;
 
