@@ -121,19 +121,43 @@ public class DiscordManager {
         VonixCore.LOGGER.info("[Discord] Shutting down Discord integration...");
         running = false;
 
-        if (messageQueueThread != null && messageQueueThread.isAlive()) {
+        // 1. Send shutdown embed
+        try {
+            sendShutdownEmbed(DiscordConfig.CONFIG.serverName.get());
+        } catch (Exception e) {
+            VonixCore.LOGGER.error("[Discord] Failed to send shutdown embed", e);
+        }
+
+        // 2. Stop message queue thread
+        if (messageQueueThread != null) {
             messageQueueThread.interrupt();
             try {
                 messageQueueThread.join(2000);
             } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
+                // Ignore
             }
         }
 
+        // 3. Disconnect Javacord
         if (discordApi != null) {
             try {
+                // Remove listeners first to stop processing new events
+                discordApi.getListeners().keySet().forEach(listener -> discordApi.removeListener(listener));
+
+                // Disconnect with timeout
                 discordApi.disconnect().get(5, TimeUnit.SECONDS);
-                VonixCore.LOGGER.info("[Discord] Javacord disconnected");
+
+                // Force shutdown Javacord's internal thread pool
+                // This helps prevent "Central ExecutorService" leaks
+                if (discordApi.getThreadPool() != null) {
+                    try {
+                        discordApi.getThreadPool().getExecutorService().shutdownNow();
+                        discordApi.getThreadPool().getScheduler().shutdownNow();
+                    } catch (Exception e) {
+                        // Ignore if already shutdown
+                    }
+                }
+                VonixCore.LOGGER.info("[Discord] Javacord disconnected and thread pools shut down");
             } catch (Throwable e) {
                 // Catch Throwable to handle NoClassDefFoundError during shutdown
                 VonixCore.LOGGER.debug("[Discord] Javacord disconnect failed (likely shutdown race condition): {}",
@@ -303,7 +327,7 @@ public class DiscordManager {
                 long msgChannelId = event.getChannel().getId();
                 if (msgChannelId == channelIdLong ||
                         (finalEventChannelId != null && msgChannelId == finalEventChannelId)) {
-                    processJavacordMessage(event);
+                    processJavacordMessage(msgChannelId, event);
                 }
             });
 
@@ -333,7 +357,7 @@ public class DiscordManager {
         }
     }
 
-    private void processJavacordMessage(org.javacord.api.event.message.MessageCreateEvent event) {
+    private void processJavacordMessage(long channelId, org.javacord.api.event.message.MessageCreateEvent event) {
         try {
             boolean isBot = event.getMessageAuthor().asUser().map(user -> user.isBot()).orElse(false);
             boolean isWebhook = !event.getMessageAuthor().asUser().isPresent();
@@ -372,21 +396,29 @@ public class DiscordManager {
                 return;
             }
 
+            boolean isEvent = false;
             if (content.isEmpty()) {
                 // Check for embeds (often used for cross-server events)
                 if (!event.getMessage().getEmbeds().isEmpty()) {
                     org.javacord.api.entity.message.embed.Embed embed = event.getMessage().getEmbeds().get(0);
+                    isEvent = true;
 
                     StringBuilder embedContent = new StringBuilder();
 
-                    // Add Author if present (usually "PlayerName" or "ServerName")
+                    // Add Author if present
                     if (embed.getAuthor().isPresent()) {
                         embedContent.append(embed.getAuthor().get().getName()).append(" ");
                     }
 
-                    // Add Title if present
+                    // Add Title if present - but skip if it's just a generic "Player Joined" etc.
                     if (embed.getTitle().isPresent()) {
-                        embedContent.append(embed.getTitle().get()).append(" ");
+                        String title = embed.getTitle().get();
+                        if (!title.equalsIgnoreCase("Player Joined") &&
+                                !title.equalsIgnoreCase("Player Left") &&
+                                !title.equalsIgnoreCase("Advancement Made") &&
+                                !title.equalsIgnoreCase("Player Died")) {
+                            embedContent.append(title).append(" ");
+                        }
                     }
 
                     // Add Description
@@ -404,7 +436,6 @@ public class DiscordManager {
             }
 
             // Strip duplicate username prefix from message content
-            // This handles webhooks that include "Username: " in the message
             String cleanedContent = content;
             if (content.startsWith(authorName + ": ")) {
                 cleanedContent = content.substring(authorName.length() + 2);
@@ -415,21 +446,38 @@ public class DiscordManager {
             String formattedMessage;
             if (isWebhook) {
                 // Special formatting for cross-server messages (webhooks)
-                // 1. Remove [Discord] tag
-                // 2. Colorize [Server] prefix to light green if present
-                // 3. Remove redundant "Server" name from display name
                 String displayName = authorName;
+
+                // Identify channel type
+                String eventChanId = DiscordConfig.CONFIG.eventChannelId.get();
+                boolean isEventChannel = !eventChanId.isEmpty() && String.valueOf(channelId).equals(eventChanId);
+
                 if (displayName.startsWith("[") && displayName.contains("]")) {
                     int endBracket = displayName.indexOf("]");
                     String serverPrefix = displayName.substring(0, endBracket + 1);
-                    // Just use the prefix, ignore the rest of the name (e.g. "Otherworld Server")
-                    // The "Who" (Player Name) should be in the content now (via Embed Author
-                    // parsing above)
-                    displayName = "§a" + serverPrefix;
-                }
+                    String remainingName = displayName.substring(endBracket + 1).trim();
 
-                // Use a cleaner format for webhooks
-                formattedMessage = displayName + " §f" + cleanedContent;
+                    if (isEventChannel || isEvent) {
+                        // Event: Just [Prefix] (Name is in message)
+                        displayName = "§a" + serverPrefix;
+                        formattedMessage = displayName + " §f" + cleanedContent;
+                    } else {
+                        // Chat: [Prefix] Name
+                        // If remainingName is "Otherworld Server", we should probably use a better name
+                        // but let's assume it's the player name if it doesn't contain "Server"
+                        if (remainingName.toLowerCase().contains("server")) {
+                            // If it's just "Server", use the content's implied name or just prefix
+                            displayName = "§a" + serverPrefix;
+                            formattedMessage = displayName + " §f" + cleanedContent;
+                        } else {
+                            displayName = "§a" + serverPrefix + " §f" + remainingName;
+                            formattedMessage = displayName + "§7: §f" + cleanedContent;
+                        }
+                    }
+                } else {
+                    // No prefix found, just use raw name
+                    formattedMessage = "§7[Discord] §f" + authorName + "§7: §f" + cleanedContent;
+                }
             } else {
                 // Standard Discord user message
                 formattedMessage = DiscordConfig.CONFIG.discordToMinecraftFormat.get()
