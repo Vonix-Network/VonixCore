@@ -378,7 +378,7 @@ public class VonixCoreCommands {
                             .getLastLocation(player.getUUID());
 
                     if (loc == null) {
-                        ctx.getSource().sendFailure(Component.literal("§cNo previous location found"));
+                        ctx.getSource().sendFailure(Component.literal("§c[VC] No location to return to."));
                         return 0;
                     }
 
@@ -389,18 +389,31 @@ public class VonixCoreCommands {
                         timeoutSeconds = EssentialsConfig.getInstance().getBackTimeout();
                     }
 
+                    // Check death back delay (cooldown only applies to deaths)
+                    if (loc.isDeath()) {
+                        int delaySeconds = EssentialsConfig.getInstance().getDeathBackDelay();
+                        if (delaySeconds > 0) {
+                            long elapsed = (System.currentTimeMillis() - loc.timestamp()) / 1000;
+                            if (elapsed < delaySeconds) {
+                                ctx.getSource().sendFailure(Component.literal("§c[VC] You must wait " +
+                                        (delaySeconds - elapsed) + "s before returning to your death location."));
+                                return 0;
+                            }
+                        }
+                    }
+
                     if (timeoutSeconds > 0) {
                         long elapsed = (System.currentTimeMillis() - loc.timestamp()) / 1000;
                         if (elapsed > timeoutSeconds) {
                             ctx.getSource().sendFailure(Component
-                                    .literal("§cYour previous location has expired (" + timeoutSeconds + "s timeout)"));
+                                    .literal("§c[VC] Your previous location has expired (" + timeoutSeconds + "s timeout)."));
                             return 0;
                         }
                     }
 
                     ResourceLocation worldId = ResourceLocation.tryParse(loc.world());
                     if (worldId == null) {
-                        ctx.getSource().sendFailure(Component.literal("§cInvalid world"));
+                        ctx.getSource().sendFailure(Component.literal("§c[VC] Invalid world"));
                         return 0;
                     }
 
@@ -408,13 +421,13 @@ public class VonixCoreCommands {
                             net.minecraft.resources.ResourceKey
                                     .create(net.minecraft.core.registries.Registries.DIMENSION, worldId));
                     if (level == null) {
-                        ctx.getSource().sendFailure(Component.literal("§cWorld no longer exists"));
+                        ctx.getSource().sendFailure(Component.literal("§c[VC] World no longer exists"));
                         return 0;
                     }
 
                     TeleportManager.getInstance().teleportPlayer(player, level, loc.x(), loc.y(), loc.z(), loc.yaw(),
                             loc.pitch());
-                    ctx.getSource().sendSuccess(() -> Component.literal("§aTeleported to previous location"), false);
+                    ctx.getSource().sendSuccess(() -> Component.literal("§a[VC] Returned to previous location."), false);
                     return 1;
                 }));
     }

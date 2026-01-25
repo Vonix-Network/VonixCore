@@ -104,10 +104,14 @@ public class UtilityCommands implements CommandExecutor, TabCompleter {
                 sender.sendMessage(ChatColor.RED + "Destination player not found.");
                 return true;
             }
+            // Save location for /back before teleporting
+            network.vonix.vonixcore.teleport.TeleportManager.getInstance().saveLastLocation(target, false);
             target.teleport(dest);
             sender.sendMessage(ChatColor.GREEN + "Teleported " + ChatColor.YELLOW + target.getName() +
                     ChatColor.GREEN + " to " + ChatColor.YELLOW + dest.getName());
         } else {
+            // Save location for /back before teleporting
+            network.vonix.vonixcore.teleport.TeleportManager.getInstance().saveLastLocation(player, false);
             player.teleport(target);
             player.sendMessage(ChatColor.GREEN + "Teleported to " + ChatColor.YELLOW + target.getName());
         }
@@ -134,6 +138,8 @@ public class UtilityCommands implements CommandExecutor, TabCompleter {
             return true;
         }
 
+        // Save location for /back before teleporting
+        network.vonix.vonixcore.teleport.TeleportManager.getInstance().saveLastLocation(target, false);
         target.teleport(player);
         player.sendMessage(
                 ChatColor.GREEN + "Teleported " + ChatColor.YELLOW + target.getName() + ChatColor.GREEN + " to you");
@@ -159,6 +165,8 @@ public class UtilityCommands implements CommandExecutor, TabCompleter {
             double x = Double.parseDouble(args[0]);
             double y = Double.parseDouble(args[1]);
             double z = Double.parseDouble(args[2]);
+            // Save location for /back before teleporting
+            network.vonix.vonixcore.teleport.TeleportManager.getInstance().saveLastLocation(player, false);
             player.teleport(new Location(player.getWorld(), x, y, z));
             player.sendMessage(
                     String.format(ChatColor.GREEN + "Teleported to " + ChatColor.YELLOW + "%.1f, %.1f, %.1f", x, y, z));
@@ -181,6 +189,8 @@ public class UtilityCommands implements CommandExecutor, TabCompleter {
         int count = 0;
         for (Player p : Bukkit.getOnlinePlayers()) {
             if (p != player) {
+                // Save location for /back before teleporting
+                network.vonix.vonixcore.teleport.TeleportManager.getInstance().saveLastLocation(p, false);
                 p.teleport(player);
                 p.sendMessage(ChatColor.GREEN + "You were teleported to " + ChatColor.YELLOW + player.getName());
                 count++;
@@ -205,6 +215,8 @@ public class UtilityCommands implements CommandExecutor, TabCompleter {
             return true;
         }
 
+        // Save current location for /back command before teleporting
+        network.vonix.vonixcore.teleport.TeleportManager.getInstance().saveLastLocation(player, false);
         player.teleport(safe);
         player.sendMessage(String.format(ChatColor.GREEN + "Teleported to " + ChatColor.YELLOW + "X: %d, Y: %d, Z: %d",
                 safe.getBlockX(), safe.getBlockY(), safe.getBlockZ()));

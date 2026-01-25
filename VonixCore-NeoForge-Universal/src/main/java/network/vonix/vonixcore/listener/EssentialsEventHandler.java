@@ -132,8 +132,8 @@ public class EssentialsEventHandler {
         }
 
         if (event.getEntity() instanceof ServerPlayer player) {
-            // Save death location so /back can return to it
-            TeleportManager.getInstance().saveLastLocation(player);
+            // Save death location so /back can return to it (isDeath=true for cooldown)
+            TeleportManager.getInstance().saveLastLocation(player, true);
         }
     }
 }

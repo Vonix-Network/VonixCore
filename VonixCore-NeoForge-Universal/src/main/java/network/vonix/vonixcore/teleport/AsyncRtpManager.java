@@ -314,6 +314,9 @@ public class AsyncRtpManager {
             // Force chunk to FULL status (this is fast since SURFACE is already done)
             level.getChunk(safePos);
 
+            // Save current location for /back command BEFORE teleporting
+            TeleportManager.getInstance().saveLastLocation(player, false);
+
             player.teleportTo(level, safePos.getX() + 0.5, safePos.getY(), safePos.getZ() + 0.5,
                     player.getYRot(), player.getXRot());
             player.sendSystemMessage(Component.literal(String.format(

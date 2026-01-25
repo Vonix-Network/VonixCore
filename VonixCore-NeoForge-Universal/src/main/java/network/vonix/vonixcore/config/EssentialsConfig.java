@@ -40,6 +40,7 @@ public class EssentialsConfig {
         public final ModConfigSpec.IntValue tpaTimeout;
         public final ModConfigSpec.IntValue backTimeout;
         public final ModConfigSpec.IntValue deathBackTimeout;
+        public final ModConfigSpec.IntValue deathBackDelay;
 
         // Economy settings
         public final ModConfigSpec.DoubleValue startingBalance;
@@ -137,6 +138,11 @@ public class EssentialsConfig {
                                 "How long /back locations remain valid after death (seconds)",
                                 "Set to 0 to disable timeout (infinite)")
                                 .defineInRange("death_back_timeout", 60, 0, 86400);
+
+                deathBackDelay = builder.comment(
+                                "Minimum time to wait before using /back after death (seconds)",
+                                "Prevents immediate return to boss fights etc.")
+                                .defineInRange("death_back_delay", 0, 0, 3600);
 
                 builder.pop().comment(
                                 "Economy Settings",

@@ -86,6 +86,19 @@ public class TeleportCommands implements CommandExecutor {
                 timeoutSeconds = EssentialsConfig.backTimeout;
             }
 
+            // Check death back delay
+            if (lastInfo.isDeath()) {
+                int delaySeconds = EssentialsConfig.deathBackDelay;
+                if (delaySeconds > 0) {
+                    long elapsed = (System.currentTimeMillis() - lastInfo.timestamp()) / 1000;
+                    if (elapsed < delaySeconds) {
+                        sender.sendMessage(ChatColor.RED + "[VC] You must wait " + (delaySeconds - elapsed)
+                                + "s before returning to your death location.");
+                        return true;
+                    }
+                }
+            }
+
             if (timeoutSeconds > 0) {
                 long elapsed = (System.currentTimeMillis() - lastInfo.timestamp()) / 1000;
                 if (elapsed > timeoutSeconds) {

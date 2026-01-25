@@ -402,6 +402,19 @@ public class VonixCoreCommands {
             timeoutSeconds = network.vonix.vonixcore.config.EssentialsConfig.CONFIG.backTimeout.get();
         }
 
+        // Check death back delay
+        if (loc.isDeath()) {
+            int delaySeconds = network.vonix.vonixcore.config.EssentialsConfig.CONFIG.deathBackDelay.get();
+            if (delaySeconds > 0) {
+                long elapsed = (System.currentTimeMillis() - loc.timestamp()) / 1000;
+                if (elapsed < delaySeconds) {
+                    ctx.getSource().sendFailure(Component.literal("§c[VC] You must wait " +
+                            formatTime((int) (delaySeconds - elapsed)) + " before returning to your death location."));
+                    return 0;
+                }
+            }
+        }
+
         if (timeoutSeconds > 0) {
             long elapsed = (System.currentTimeMillis() - loc.timestamp()) / 1000;
             if (elapsed > timeoutSeconds) {

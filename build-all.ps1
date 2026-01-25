@@ -21,7 +21,7 @@ Write-ColorOutput Cyan "=========================================="
 Write-Host ""
 
 # Get version from gradle.properties (NeoForge as source of truth)
-$Version = "1.0.0"
+$Version = "1.1.1"
 $PropsFile = Join-Path $PSScriptRoot "VonixCore-NeoForge-Universal\gradle.properties"
 if (Test-Path $PropsFile) {
     $Content = Get-Content $PropsFile
@@ -35,10 +35,14 @@ if (Test-Path $PropsFile) {
 Write-Host "Building version: $Version"
 Write-Host ""
 
+$BuildCount = 0
+$SuccessCount = 0
+
 # Build NeoForge
-Write-ColorOutput Yellow "[1/4] Building NeoForge version..."
+Write-ColorOutput Yellow "[1/6] Building NeoForge version..."
 $NeoForgeDir = Join-Path $PSScriptRoot "VonixCore-NeoForge-Universal"
 if (Test-Path $NeoForgeDir) {
+    $BuildCount++
     Push-Location $NeoForgeDir
     try {
         & ./gradlew build --no-daemon
@@ -48,6 +52,7 @@ if (Test-Path $NeoForgeDir) {
                 $DestName = "VonixCore-NeoForge-$Version.jar"
                 Copy-Item $jar.FullName (Join-Path $OutputDir $DestName)
                 Write-ColorOutput Green "  OK Built: $DestName"
+                $SuccessCount++
             }
         } else {
             Write-ColorOutput Red "  FAIL NeoForge build failed!"
@@ -56,15 +61,16 @@ if (Test-Path $NeoForgeDir) {
         Pop-Location
     }
 } else {
-    Write-ColorOutput Red "  FAIL NeoForge directory not found"
+    Write-ColorOutput Red "  SKIP NeoForge directory not found"
 }
 
 Write-Host ""
 
 # Build Forge 1.20.1
-Write-ColorOutput Yellow "[2/4] Building Forge 1.20.1 version..."
+Write-ColorOutput Yellow "[2/6] Building Forge 1.20.1 version..."
 $Forge1201Dir = Join-Path $PSScriptRoot "VonixCore-Forge-1.20.1"
 if (Test-Path $Forge1201Dir) {
+    $BuildCount++
     Push-Location $Forge1201Dir
     try {
         & ./gradlew build --no-daemon
@@ -74,6 +80,7 @@ if (Test-Path $Forge1201Dir) {
                 $DestName = "VonixCore-Forge-1.20.1-$Version.jar"
                 Copy-Item $jar.FullName (Join-Path $OutputDir $DestName)
                 Write-ColorOutput Green "  OK Built: $DestName"
+                $SuccessCount++
             }
         } else {
             Write-ColorOutput Red "  FAIL Forge 1.20.1 build failed!"
@@ -82,50 +89,110 @@ if (Test-Path $Forge1201Dir) {
         Pop-Location
     }
 } else {
-    Write-ColorOutput Red "  FAIL Forge 1.20.1 directory not found"
+    Write-ColorOutput Red "  SKIP Forge 1.20.1 directory not found"
 }
 
 Write-Host ""
 
-# Build Paper
-Write-ColorOutput Yellow "[3/4] Building Paper version..."
-$PaperDir = Join-Path $PSScriptRoot "VonixCore-Paper-Universal"
-if (Test-Path $PaperDir) {
-    Push-Location $PaperDir
+# Build Forge 1.18.2
+Write-ColorOutput Yellow "[3/6] Building Forge 1.18.2 version..."
+$Forge1182Dir = Join-Path $PSScriptRoot "VonixCore-Template-Forge-1.18.2"
+if (Test-Path $Forge1182Dir) {
+    $BuildCount++
+    Push-Location $Forge1182Dir
     try {
-        & ./gradlew shadowJar --no-daemon
+        & ./gradlew build --no-daemon
         if ($LASTEXITCODE -eq 0) {
-            $JarFiles = Get-ChildItem -Path "build\libs" -Filter "*-all.jar"
+            $JarFiles = Get-ChildItem -Path "build\libs" -Filter "*.jar" | Where-Object { $_.Name -notmatch "sources|javadoc" }
             foreach ($jar in $JarFiles) {
-                $DestName = "VonixCore-Paper-$Version.jar"
+                $DestName = "VonixCore-Forge-1.18.2-$Version.jar"
                 Copy-Item $jar.FullName (Join-Path $OutputDir $DestName)
                 Write-ColorOutput Green "  OK Built: $DestName"
+                $SuccessCount++
             }
         } else {
-            Write-ColorOutput Red "  FAIL Paper build failed!"
+            Write-ColorOutput Red "  FAIL Forge 1.18.2 build failed!"
         }
     } finally {
         Pop-Location
     }
 } else {
-    Write-ColorOutput Red "  FAIL Paper directory not found"
+    Write-ColorOutput Red "  SKIP Forge 1.18.2 directory not found"
+}
+
+Write-Host ""
+
+# Build Fabric 1.20.1
+Write-ColorOutput Yellow "[4/6] Building Fabric 1.20.1 version..."
+$Fabric1201Dir = Join-Path $PSScriptRoot "vonixcore-template-fabric-1.20.1"
+if (Test-Path $Fabric1201Dir) {
+    $BuildCount++
+    Push-Location $Fabric1201Dir
+    try {
+        & ./gradlew build --no-daemon
+        if ($LASTEXITCODE -eq 0) {
+            $JarFiles = Get-ChildItem -Path "build\libs" -Filter "*.jar" | Where-Object { $_.Name -notmatch "sources|javadoc" }
+            foreach ($jar in $JarFiles) {
+                $DestName = "VonixCore-Fabric-1.20.1-$Version.jar"
+                Copy-Item $jar.FullName (Join-Path $OutputDir $DestName)
+                Write-ColorOutput Green "  OK Built: $DestName"
+                $SuccessCount++
+            }
+        } else {
+            Write-ColorOutput Red "  FAIL Fabric 1.20.1 build failed!"
+        }
+    } finally {
+        Pop-Location
+    }
+} else {
+    Write-ColorOutput Red "  SKIP Fabric 1.20.1 directory not found"
+}
+
+Write-Host ""
+
+# Build Fabric 1.21.1
+Write-ColorOutput Yellow "[5/6] Building Fabric 1.21.1 version..."
+$Fabric1211Dir = Join-Path $PSScriptRoot "vonixcore-template-fabric-1.21.1"
+if (Test-Path $Fabric1211Dir) {
+    $BuildCount++
+    Push-Location $Fabric1211Dir
+    try {
+        & ./gradlew build --no-daemon
+        if ($LASTEXITCODE -eq 0) {
+            $JarFiles = Get-ChildItem -Path "build\libs" -Filter "*.jar" | Where-Object { $_.Name -notmatch "sources|javadoc" }
+            foreach ($jar in $JarFiles) {
+                $DestName = "VonixCore-Fabric-1.21.1-$Version.jar"
+                Copy-Item $jar.FullName (Join-Path $OutputDir $DestName)
+                Write-ColorOutput Green "  OK Built: $DestName"
+                $SuccessCount++
+            }
+        } else {
+            Write-ColorOutput Red "  FAIL Fabric 1.21.1 build failed!"
+        }
+    } finally {
+        Pop-Location
+    }
+} else {
+    Write-ColorOutput Red "  SKIP Fabric 1.21.1 directory not found"
 }
 
 Write-Host ""
 
 # Build Bukkit
-Write-ColorOutput Yellow "[4/4] Building Bukkit version..."
+Write-ColorOutput Yellow "[6/6] Building Bukkit version..."
 $BukkitDir = Join-Path $PSScriptRoot "VonixCore-Bukkit-Universal"
 if (Test-Path $BukkitDir) {
+    $BuildCount++
     Push-Location $BukkitDir
     try {
-        & ./gradlew fatJar --no-daemon
+        & ./gradlew shadowJar --no-daemon
         if ($LASTEXITCODE -eq 0) {
-            $JarFiles = Get-ChildItem -Path "build\libs" -Filter "*-all.jar"
+            $JarFiles = Get-ChildItem -Path "build\libs" -Filter "*.jar" | Where-Object { $_.Name -notmatch "sources|javadoc" }
             foreach ($jar in $JarFiles) {
                 $DestName = "VonixCore-Bukkit-$Version.jar"
                 Copy-Item $jar.FullName (Join-Path $OutputDir $DestName)
                 Write-ColorOutput Green "  OK Built: $DestName"
+                $SuccessCount++
             }
         } else {
             Write-ColorOutput Red "  FAIL Bukkit build failed!"
@@ -134,13 +201,15 @@ if (Test-Path $BukkitDir) {
         Pop-Location
     }
 } else {
-    Write-ColorOutput Red "  FAIL Bukkit directory not found"
+    Write-ColorOutput Red "  SKIP Bukkit directory not found"
 }
 
 Write-Host ""
 Write-ColorOutput Cyan "=========================================="
 Write-ColorOutput Cyan "             Build Complete!"
 Write-ColorOutput Cyan "=========================================="
+Write-Host ""
+Write-Host "Builds attempted: $BuildCount, Successful: $SuccessCount"
 Write-Host ""
 Write-Host "Output files in: $OutputDir"
 Write-Host ""

@@ -72,6 +72,7 @@ public class EssentialsConfig extends BaseConfig {
         // Back command settings
         setDefault("teleport.back_timeout", 300);
         setDefault("teleport.death_back_timeout", 60);
+        setDefault("teleport.death_back_delay", 0);
 
         // Economy settings
         setDefault("economy.starting_balance", 250.0);
@@ -145,6 +146,10 @@ public class EssentialsConfig extends BaseConfig {
 
     public int getDeathBackTimeout() {
         return getInt("teleport.death_back_timeout", 60);
+    }
+
+    public int getDeathBackDelay() {
+        return getInt("teleport.death_back_delay", 0);
     }
 
     // Economy

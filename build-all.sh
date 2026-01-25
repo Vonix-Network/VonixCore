@@ -24,7 +24,7 @@ echo -e "${CYAN}==========================================${NC}"
 echo ""
 
 # Get version from gradle.properties
-VERSION="1.0.0"
+VERSION="1.1.1"
 PROPS_FILE="$SCRIPT_DIR/VonixCore-NeoForge-Universal/gradle.properties"
 if [ -f "$PROPS_FILE" ]; then
     VERSION=$(grep "^mod_version=" "$PROPS_FILE" | cut -d'=' -f2 | tr -d '[:space:]')
@@ -32,80 +32,133 @@ fi
 echo "Building version: $VERSION"
 echo ""
 
+BUILD_COUNT=0
+SUCCESS_COUNT=0
+
 # Build NeoForge
-echo -e "${YELLOW}[1/4] Building NeoForge version...${NC}"
+echo -e "${YELLOW}[1/6] Building NeoForge version...${NC}"
 NEOFORGE_DIR="$SCRIPT_DIR/VonixCore-NeoForge-Universal"
 if [ -d "$NEOFORGE_DIR" ]; then
+    ((BUILD_COUNT++)) || true
     cd "$NEOFORGE_DIR"
     if ./gradlew build --no-daemon; then
         find build/libs -name "*.jar" ! -name "*sources*" ! -name "*javadoc*" -exec cp {} "$OUTPUT_DIR/VonixCore-NeoForge-$VERSION.jar" \;
         echo -e "${GREEN}  OK Built: VonixCore-NeoForge-$VERSION.jar${NC}"
+        ((SUCCESS_COUNT++)) || true
     else
         echo -e "${RED}  FAIL NeoForge build failed!${NC}"
     fi
     cd "$SCRIPT_DIR"
 else
-    echo -e "${RED}  FAIL NeoForge directory not found${NC}"
+    echo -e "${RED}  SKIP NeoForge directory not found${NC}"
 fi
 
 echo ""
 
 # Build Forge 1.20.1
-echo -e "${YELLOW}[2/4] Building Forge 1.20.1 version...${NC}"
+echo -e "${YELLOW}[2/6] Building Forge 1.20.1 version...${NC}"
 FORGE_1201_DIR="$SCRIPT_DIR/VonixCore-Forge-1.20.1"
 if [ -d "$FORGE_1201_DIR" ]; then
+    ((BUILD_COUNT++)) || true
     cd "$FORGE_1201_DIR"
     if ./gradlew build --no-daemon; then
         find build/libs -name "*.jar" ! -name "*sources*" ! -name "*javadoc*" -exec cp {} "$OUTPUT_DIR/VonixCore-Forge-1.20.1-$VERSION.jar" \;
         echo -e "${GREEN}  OK Built: VonixCore-Forge-1.20.1-$VERSION.jar${NC}"
+        ((SUCCESS_COUNT++)) || true
     else
         echo -e "${RED}  FAIL Forge 1.20.1 build failed!${NC}"
     fi
     cd "$SCRIPT_DIR"
 else
-    echo -e "${RED}  FAIL Forge 1.20.1 directory not found${NC}"
+    echo -e "${RED}  SKIP Forge 1.20.1 directory not found${NC}"
 fi
 
 echo ""
 
-# Build Paper
-echo -e "${YELLOW}[3/4] Building Paper version...${NC}"
-PAPER_DIR="$SCRIPT_DIR/VonixCore-Paper-Universal"
-if [ -d "$PAPER_DIR" ]; then
-    cd "$PAPER_DIR"
-    if ./gradlew shadowJar --no-daemon; then
-        find build/libs -name "*-all.jar" -exec cp {} "$OUTPUT_DIR/VonixCore-Paper-$VERSION.jar" \;
-        echo -e "${GREEN}  OK Built: VonixCore-Paper-$VERSION.jar${NC}"
+# Build Forge 1.18.2
+echo -e "${YELLOW}[3/6] Building Forge 1.18.2 version...${NC}"
+FORGE_1182_DIR="$SCRIPT_DIR/VonixCore-Template-Forge-1.18.2"
+if [ -d "$FORGE_1182_DIR" ]; then
+    ((BUILD_COUNT++)) || true
+    cd "$FORGE_1182_DIR"
+    if ./gradlew build --no-daemon; then
+        find build/libs -name "*.jar" ! -name "*sources*" ! -name "*javadoc*" -exec cp {} "$OUTPUT_DIR/VonixCore-Forge-1.18.2-$VERSION.jar" \;
+        echo -e "${GREEN}  OK Built: VonixCore-Forge-1.18.2-$VERSION.jar${NC}"
+        ((SUCCESS_COUNT++)) || true
     else
-        echo -e "${RED}  FAIL Paper build failed!${NC}"
+        echo -e "${RED}  FAIL Forge 1.18.2 build failed!${NC}"
     fi
     cd "$SCRIPT_DIR"
 else
-    echo -e "${RED}  FAIL Paper directory not found${NC}"
+    echo -e "${RED}  SKIP Forge 1.18.2 directory not found${NC}"
+fi
+
+echo ""
+
+# Build Fabric 1.20.1
+echo -e "${YELLOW}[4/6] Building Fabric 1.20.1 version...${NC}"
+FABRIC_1201_DIR="$SCRIPT_DIR/vonixcore-template-fabric-1.20.1"
+if [ -d "$FABRIC_1201_DIR" ]; then
+    ((BUILD_COUNT++)) || true
+    cd "$FABRIC_1201_DIR"
+    if ./gradlew build --no-daemon; then
+        find build/libs -name "*.jar" ! -name "*sources*" ! -name "*javadoc*" -exec cp {} "$OUTPUT_DIR/VonixCore-Fabric-1.20.1-$VERSION.jar" \;
+        echo -e "${GREEN}  OK Built: VonixCore-Fabric-1.20.1-$VERSION.jar${NC}"
+        ((SUCCESS_COUNT++)) || true
+    else
+        echo -e "${RED}  FAIL Fabric 1.20.1 build failed!${NC}"
+    fi
+    cd "$SCRIPT_DIR"
+else
+    echo -e "${RED}  SKIP Fabric 1.20.1 directory not found${NC}"
+fi
+
+echo ""
+
+# Build Fabric 1.21.1
+echo -e "${YELLOW}[5/6] Building Fabric 1.21.1 version...${NC}"
+FABRIC_1211_DIR="$SCRIPT_DIR/vonixcore-template-fabric-1.21.1"
+if [ -d "$FABRIC_1211_DIR" ]; then
+    ((BUILD_COUNT++)) || true
+    cd "$FABRIC_1211_DIR"
+    if ./gradlew build --no-daemon; then
+        find build/libs -name "*.jar" ! -name "*sources*" ! -name "*javadoc*" -exec cp {} "$OUTPUT_DIR/VonixCore-Fabric-1.21.1-$VERSION.jar" \;
+        echo -e "${GREEN}  OK Built: VonixCore-Fabric-1.21.1-$VERSION.jar${NC}"
+        ((SUCCESS_COUNT++)) || true
+    else
+        echo -e "${RED}  FAIL Fabric 1.21.1 build failed!${NC}"
+    fi
+    cd "$SCRIPT_DIR"
+else
+    echo -e "${RED}  SKIP Fabric 1.21.1 directory not found${NC}"
 fi
 
 echo ""
 
 # Build Bukkit
-echo -e "${YELLOW}[4/4] Building Bukkit version...${NC}"
+echo -e "${YELLOW}[6/6] Building Bukkit version...${NC}"
 BUKKIT_DIR="$SCRIPT_DIR/VonixCore-Bukkit-Universal"
 if [ -d "$BUKKIT_DIR" ]; then
+    ((BUILD_COUNT++)) || true
     cd "$BUKKIT_DIR"
-    if ./gradlew fatJar --no-daemon; then
-        find build/libs -name "*-all.jar" -exec cp {} "$OUTPUT_DIR/VonixCore-Bukkit-$VERSION.jar" \;
+    if ./gradlew shadowJar --no-daemon; then
+        find build/libs -name "*.jar" ! -name "*sources*" ! -name "*javadoc*" -exec cp {} "$OUTPUT_DIR/VonixCore-Bukkit-$VERSION.jar" \;
         echo -e "${GREEN}  OK Built: VonixCore-Bukkit-$VERSION.jar${NC}"
+        ((SUCCESS_COUNT++)) || true
     else
         echo -e "${RED}  FAIL Bukkit build failed!${NC}"
     fi
     cd "$SCRIPT_DIR"
 else
-    echo -e "${RED}  FAIL Bukkit directory not found${NC}"
+    echo -e "${RED}  SKIP Bukkit directory not found${NC}"
 fi
 
 echo ""
 echo -e "${CYAN}==========================================${NC}"
 echo -e "${CYAN}             Build Complete!${NC}"
 echo -e "${CYAN}==========================================${NC}"
+echo ""
+echo "Builds attempted: $BUILD_COUNT, Successful: $SUCCESS_COUNT"
 echo ""
 echo "Output files in: $OUTPUT_DIR"
 echo ""

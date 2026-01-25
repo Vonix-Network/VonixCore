@@ -245,6 +245,8 @@ public class UtilityCommands {
             ctx.getSource().sendFailure(Component.literal("§cPlayers only"));
             return 0;
         }
+        // Save location for /back before teleporting
+        network.vonix.vonixcore.teleport.TeleportManager.getInstance().saveLastLocation(player, false);
         player.teleportTo(target.serverLevel(), target.getX(), target.getY(), target.getZ(),
                 target.getYRot(), target.getXRot());
         player.sendSystemMessage(Component.literal("§aTeleported to §e" + target.getName().getString()));
@@ -253,6 +255,8 @@ public class UtilityCommands {
 
     private static int teleportPlayerTo(CommandContext<CommandSourceStack> ctx, ServerPlayer target,
             ServerPlayer dest) {
+        // Save location for /back before teleporting
+        network.vonix.vonixcore.teleport.TeleportManager.getInstance().saveLastLocation(target, false);
         target.teleportTo(dest.serverLevel(), dest.getX(), dest.getY(), dest.getZ(),
                 dest.getYRot(), dest.getXRot());
         ctx.getSource().sendSuccess(() -> Component.literal("§aTeleported §e" + target.getName().getString() +
@@ -266,6 +270,8 @@ public class UtilityCommands {
             ctx.getSource().sendFailure(Component.literal("§cPlayers only"));
             return 0;
         }
+        // Save location for /back before teleporting
+        network.vonix.vonixcore.teleport.TeleportManager.getInstance().saveLastLocation(target, false);
         target.teleportTo(player.serverLevel(), player.getX(), player.getY(), player.getZ(),
                 player.getYRot(), player.getXRot());
         player.sendSystemMessage(Component.literal("§aTeleported §e" + target.getName().getString() + "§a to you"));
@@ -281,6 +287,8 @@ public class UtilityCommands {
         int count = 0;
         for (ServerPlayer target : player.server.getPlayerList().getPlayers()) {
             if (target != player) {
+                // Save location for /back before teleporting
+                network.vonix.vonixcore.teleport.TeleportManager.getInstance().saveLastLocation(target, false);
                 target.teleportTo(player.serverLevel(), player.getX(), player.getY(), player.getZ(),
                         player.getYRot(), player.getXRot());
                 target.sendSystemMessage(
@@ -300,6 +308,8 @@ public class UtilityCommands {
         double x = DoubleArgumentType.getDouble(ctx, "x");
         double y = DoubleArgumentType.getDouble(ctx, "y");
         double z = DoubleArgumentType.getDouble(ctx, "z");
+        // Save location for /back before teleporting
+        network.vonix.vonixcore.teleport.TeleportManager.getInstance().saveLastLocation(player, false);
         player.teleportTo(player.serverLevel(), x, y, z, player.getYRot(), player.getXRot());
         player.sendSystemMessage(Component.literal(String.format("§aTeleported to §e%.1f, %.1f, %.1f", x, y, z)));
         return 1;

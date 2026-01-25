@@ -15,15 +15,13 @@ public class EntityEventListener {
 
     /**
      * Register all entity event listeners.
+     * Note: Death location saving with isDeath=true is handled in EssentialsEventHandler
+     * to avoid duplicates. This listener only handles protection logging.
      */
     public static void register() {
-        // Entity death event
+        // Entity death event - only log, don't save location (handled elsewhere)
         ServerLivingEntityEvents.AFTER_DEATH.register((entity, damageSource) -> {
             if (entity instanceof ServerPlayer player) {
-                // Save death location for /back command
-                TeleportManager.getInstance().saveLastLocation(player);
-                VonixCore.LOGGER.debug("[Essentials] Saved death location for {}", player.getName().getString());
-
                 // Log entity kill if protection is enabled
                 if (VonixCore.getInstance().isProtectionEnabled()
                         && ProtectionConfig.getInstance().isLogEntityKills()) {
