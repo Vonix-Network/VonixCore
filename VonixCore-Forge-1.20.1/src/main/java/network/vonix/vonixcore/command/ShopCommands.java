@@ -19,6 +19,7 @@ import network.vonix.vonixcore.VonixCore;
 import network.vonix.vonixcore.economy.EconomyManager;
 import network.vonix.vonixcore.economy.ShopManager;
 import network.vonix.vonixcore.economy.shop.ShopGUIManager;
+import network.vonix.vonixcore.config.EssentialsConfig;
 
 /**
  * Shop commands for the economy system.
@@ -29,6 +30,12 @@ public class ShopCommands {
 
     @SubscribeEvent
     public static void onRegisterCommands(RegisterCommandsEvent event) {
+        // Skip registration if shops are disabled in config
+        if (!EssentialsConfig.CONFIG.shopsEnabled.get()) {
+            VonixCore.LOGGER.info("[VonixCore] Shop commands disabled by config");
+            return;
+        }
+
         CommandDispatcher<CommandSourceStack> dispatcher = event.getDispatcher();
 
         // Chest shop commands

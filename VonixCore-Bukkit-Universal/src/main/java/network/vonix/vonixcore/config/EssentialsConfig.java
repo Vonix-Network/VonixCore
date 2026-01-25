@@ -18,6 +18,8 @@ public class EssentialsConfig {
 
     public static int tpaCooldown;
     public static int tpaTimeout;
+    public static int backTimeout;
+    public static int deathBackTimeout;
 
     public static double startingBalance;
     public static String currencySymbol;
@@ -40,6 +42,8 @@ public class EssentialsConfig {
 
         tpaCooldown = config.getInt("essentials.tpa.cooldown", 30);
         tpaTimeout = config.getInt("essentials.tpa.timeout", 120);
+        backTimeout = config.getInt("essentials.teleport.back_timeout", 300);
+        deathBackTimeout = config.getInt("essentials.teleport.death_back_timeout", 60);
 
         startingBalance = config.getDouble("essentials.economy.starting_balance", 100.0);
         currencySymbol = config.getString("essentials.economy.currency_symbol", "$");

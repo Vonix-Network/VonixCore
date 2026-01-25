@@ -6,10 +6,12 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.ChestBlock;
 import net.minecraft.world.level.block.entity.ChestBlockEntity;
+import net.minecraft.world.level.block.entity.BarrelBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraftforge.event.ServerChatEvent;
 import net.minecraftforge.event.entity.player.PlayerContainerEvent;
@@ -24,11 +26,22 @@ import network.vonix.vonixcore.config.EssentialsConfig;
 import network.vonix.vonixcore.economy.EconomyManager;
 import network.vonix.vonixcore.economy.ShopManager;
 
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+
 /**
  * Event listener for shop interactions (chest shops, sign shops, GUI cleanup)
  */
 @Mod.EventBusSubscriber(modid = VonixCore.MODID)
 public class ShopEventListener {
+
+    // Track which players have a shop chest open for restocking: UUID -> (world,
+    // pos, itemId)
+    private static final Map<UUID, OpenShopChest> openShopChests = new ConcurrentHashMap<>();
+
+    private record OpenShopChest(String world, BlockPos pos, String itemId) {
+    }
 
     @SubscribeEvent(priority = EventPriority.HIGH)
     public static void onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
@@ -61,6 +74,9 @@ public class ShopEventListener {
                     // Just show a reminder on first click (non-sneaking)
                     if (!player.isShiftKeyDown()) {
                         handleOwnerClick(player, pos, shop);
+                    } else {
+                        // Track that owner is opening shop chest for restocking
+                        openShopChests.put(player.getUUID(), new OpenShopChest(world, pos, shop.itemId()));
                     }
                     // Let the chest open normally for restocking
                     return;
@@ -495,12 +511,53 @@ public class ShopEventListener {
     }
 
     /**
-     * Clean up shop sessions when menu closes
+     * Clean up shop sessions when menu closes and sync restocking
      */
     @SubscribeEvent
     public static void onContainerClose(PlayerContainerEvent.Close event) {
         if (event.getEntity() instanceof ServerPlayer player) {
             ShopGUIManager.getInstance().onPlayerCloseMenu(player.getUUID());
+
+            // Check if player was restocking a shop chest
+            OpenShopChest openShop = openShopChests.remove(player.getUUID());
+            if (openShop != null && player.level() instanceof ServerLevel level) {
+                // Sync inventory count to stock
+                BlockPos pos = openShop.pos();
+                var blockEntity = level.getBlockEntity(pos);
+
+                int stockCount = 0;
+                if (blockEntity instanceof ChestBlockEntity chest) {
+                    for (int i = 0; i < chest.getContainerSize(); i++) {
+                        ItemStack stack = chest.getItem(i);
+                        if (!stack.isEmpty()) {
+                            String stackItemId = BuiltInRegistries.ITEM.getKey(stack.getItem()).toString();
+                            if (stackItemId.equals(openShop.itemId())) {
+                                stockCount += stack.getCount();
+                            }
+                        }
+                    }
+                } else if (blockEntity instanceof BarrelBlockEntity barrel) {
+                    for (int i = 0; i < barrel.getContainerSize(); i++) {
+                        ItemStack stack = barrel.getItem(i);
+                        if (!stack.isEmpty()) {
+                            String stackItemId = BuiltInRegistries.ITEM.getKey(stack.getItem()).toString();
+                            if (stackItemId.equals(openShop.itemId())) {
+                                stockCount += stack.getCount();
+                            }
+                        }
+                    }
+                }
+
+                // Get current shop to find old stock
+                ShopManager.ChestShop shop = ShopManager.getInstance().getShopAt(openShop.world(), pos);
+                if (shop != null) {
+                    int delta = stockCount - shop.stock();
+                    if (delta != 0) {
+                        ShopManager.getInstance().updateStock(openShop.world(), pos, delta);
+                        player.sendSystemMessage(Component.literal("§a[Shop] Stock updated: " + stockCount + " items"));
+                    }
+                }
+            }
         }
     }
 
@@ -528,5 +585,31 @@ public class ShopEventListener {
                         level, chunk.getPos().x, chunk.getPos().z);
             });
         }
+    }
+
+    /**
+     * Prevent interaction with shop display entities (hologram dupe prevention)
+     */
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void onEntityInteract(PlayerInteractEvent.EntityInteract event) {
+        if (event.getLevel().isClientSide())
+            return;
+
+        // Check if the entity is a shop display item
+        if (event.getTarget() instanceof ItemEntity itemEntity) {
+            if (itemEntity.getTags().contains("vonix_shop_display")) {
+                // Cancel any interaction with shop display entities
+                event.setCanceled(true);
+            }
+        }
+    }
+
+    /**
+     * Prevent pickup of shop display entities
+     */
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void onItemPickup(net.minecraftforge.event.entity.player.PlayerEvent.ItemPickupEvent event) {
+        // This is called after pickup, but we can log/detect if it happens
+        // The actual prevention is done via setNeverPickUp() and setPickUpDelay()
     }
 }

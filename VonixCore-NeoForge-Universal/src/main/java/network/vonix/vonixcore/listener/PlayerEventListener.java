@@ -6,9 +6,12 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.ServerChatEvent;
 import net.neoforged.neoforge.event.CommandEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
+import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
 import network.vonix.vonixcore.VonixCore;
 import network.vonix.vonixcore.config.ProtectionConfig;
 import network.vonix.vonixcore.consumer.Consumer;
+import network.vonix.vonixcore.config.EssentialsConfig;
+import network.vonix.vonixcore.chat.ChatFormatter;
 import network.vonix.vonixcore.xpsync.XPSyncManager;
 
 import java.sql.Connection;
@@ -26,16 +29,23 @@ public class PlayerEventListener {
      */
     @SubscribeEvent
     public static void onChat(ServerChatEvent event) {
-        if (!ProtectionConfig.CONFIG.logChat.getAsBoolean()) {
-            return;
-        }
-
         ServerPlayer player = event.getPlayer();
         String user = player.getName().getString();
         String message = event.getRawText();
         long time = System.currentTimeMillis() / 1000L;
 
-        Consumer.getInstance().queueEntry(new ChatLogEntry(time, user, message));
+        // Handle chat formatting
+        if (EssentialsConfig.CONFIG.chatFormattingEnabled.get()) {
+            event.setCanceled(true);
+            net.minecraft.network.chat.Component formatted = ChatFormatter.formatChatMessage(player, message);
+            player.server.getPlayerList().broadcastSystemMessage(formatted, false);
+            // Log to console manually since event is canceled
+            VonixCore.LOGGER.info("[Chat] " + formatted.getString());
+        }
+
+        if (ProtectionConfig.CONFIG.logChat.getAsBoolean()) {
+            Consumer.getInstance().queueEntry(new ChatLogEntry(time, user, message));
+        }
     }
 
     /**
@@ -62,6 +72,16 @@ public class PlayerEventListener {
         }
 
         Consumer.getInstance().queueEntry(new CommandLogEntry(time, user, command));
+    }
+
+    /**
+     * Handle player death to save back location.
+     */
+    @SubscribeEvent
+    public static void onPlayerDeath(LivingDeathEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player) {
+            network.vonix.vonixcore.teleport.TeleportManager.getInstance().saveLastLocation(player, true);
+        }
     }
 
     // XP sync on join/leave removed - now using batch sync on intervals only

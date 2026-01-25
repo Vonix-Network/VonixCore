@@ -137,6 +137,7 @@ dependencies {
     implementation('org.javacord:javacord:3.8.0') {
         exclude group: 'org.apache.logging.log4j', module: 'log4j-api'
         exclude group: 'org.slf4j', module: 'slf4j-api'
+        exclude group: 'com.fasterxml.jackson.core'
     }
     jarJar(group: 'org.javacord', name: 'javacord', version: '[3.8.0,4.0.0)')
     
@@ -170,13 +171,13 @@ dependencies {
     
     // Jackson for JSON processing (Javacord transitive dependency)
     implementation 'com.fasterxml.jackson.core:jackson-databind:2.17.0'
-    jarJar(group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: '[2.15.0,3.0.0)')
+    jarJar(group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: '[2.17.0,2.18.0)')
     
     implementation 'com.fasterxml.jackson.core:jackson-core:2.17.0'
-    jarJar(group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: '[2.15.0,3.0.0)')
+    jarJar(group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: '[2.17.0,2.18.0)')
     
     implementation 'com.fasterxml.jackson.core:jackson-annotations:2.17.0'
-    jarJar(group: 'com.fasterxml.jackson.core', name: 'jackson-annotations', version: '[2.15.0,3.0.0)')
+    jarJar(group: 'com.fasterxml.jackson.core', name: 'jackson-annotations', version: '[2.17.0,2.18.0)')
     
     // Javacord transitive dependencies
     implementation 'io.vavr:vavr:0.10.4'

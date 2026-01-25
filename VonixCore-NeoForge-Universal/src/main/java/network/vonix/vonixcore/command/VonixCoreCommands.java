@@ -391,6 +391,23 @@ public class VonixCoreCommands {
             return 0;
         }
 
+        // Check timeout
+        int timeoutSeconds;
+        if (loc.isDeath()) {
+            timeoutSeconds = network.vonix.vonixcore.config.EssentialsConfig.CONFIG.deathBackTimeout.get();
+        } else {
+            timeoutSeconds = network.vonix.vonixcore.config.EssentialsConfig.CONFIG.backTimeout.get();
+        }
+
+        if (timeoutSeconds > 0) {
+            long elapsed = (System.currentTimeMillis() - loc.timestamp()) / 1000;
+            if (elapsed > timeoutSeconds) {
+                player.sendSystemMessage(Component
+                        .literal("§c[VC] Your previous location has expired (" + timeoutSeconds + "s timeout)."));
+                return 0;
+            }
+        }
+
         var server = ctx.getSource().getServer();
         for (var level : server.getAllLevels()) {
             if (level.dimension().location().toString().equals(loc.world())) {

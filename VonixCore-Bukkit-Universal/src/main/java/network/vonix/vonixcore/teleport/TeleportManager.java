@@ -16,7 +16,7 @@ public class TeleportManager {
     private static TeleportManager instance;
 
     private final Map<UUID, TpaRequest> tpaRequests = new ConcurrentHashMap<>();
-    private final Map<UUID, Location> lastLocations = new ConcurrentHashMap<>();
+    private final Map<UUID, TeleportLocation> lastLocations = new ConcurrentHashMap<>();
     private final Map<UUID, Long> cooldowns = new ConcurrentHashMap<>();
 
     public static TeleportManager getInstance() {
@@ -26,11 +26,16 @@ public class TeleportManager {
         return instance;
     }
 
-    public void saveLastLocation(Player player) {
-        lastLocations.put(player.getUniqueId(), player.getLocation());
+    public void saveLastLocation(Player player, boolean isDeath) {
+        lastLocations.put(player.getUniqueId(),
+                new TeleportLocation(player.getLocation(), System.currentTimeMillis(), isDeath));
     }
 
-    public Location getLastLocation(UUID uuid) {
+    public void saveLastLocation(Player player) {
+        saveLastLocation(player, false);
+    }
+
+    public TeleportLocation getLastLocation(UUID uuid) {
         return lastLocations.get(uuid);
     }
 
@@ -152,5 +157,8 @@ public class TeleportManager {
         public boolean isExpired() {
             return System.currentTimeMillis() - timestamp > EXPIRE_MS;
         }
+    }
+
+    public record TeleportLocation(Location location, long timestamp, boolean isDeath) {
     }
 }

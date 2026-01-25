@@ -59,7 +59,7 @@ public class VonixCore {
 
     public static final String MODID = "vonixcore";
     public static final String MOD_NAME = "VonixCore";
-    public static final String VERSION = "1.0.0";
+    public static final String VERSION = "1.0.4";
 
     public static final Logger LOGGER = LogUtils.getLogger();
 

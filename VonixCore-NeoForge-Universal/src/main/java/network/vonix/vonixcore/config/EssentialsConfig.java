@@ -24,6 +24,7 @@ public class EssentialsConfig {
         public final ModConfigSpec.BooleanValue shopsEnabled;
         public final ModConfigSpec.BooleanValue jobsEnabled;
         public final ModConfigSpec.BooleanValue rtpEnabled;
+        public final ModConfigSpec.BooleanValue chatFormattingEnabled;
 
         // RTP settings
         public final ModConfigSpec.IntValue rtpCooldown;
@@ -37,6 +38,9 @@ public class EssentialsConfig {
         // TPA settings
         public final ModConfigSpec.IntValue tpaCooldown;
         public final ModConfigSpec.IntValue tpaTimeout;
+        public final ModConfigSpec.IntValue tpaTimeout;
+        public final ModConfigSpec.IntValue backTimeout;
+        public final ModConfigSpec.IntValue deathBackTimeout;
 
         // Economy settings
         public final ModConfigSpec.DoubleValue startingBalance;
@@ -93,6 +97,9 @@ public class EssentialsConfig {
                 rtpEnabled = builder.comment("Enable random teleport command (/rtp)")
                                 .define("rtp_enabled", true);
 
+                chatFormattingEnabled = builder.comment("Enable custom chat formatting (prefixes, suffixes, nicknames)")
+                                .define("chat_formatting_enabled", true);
+
                 builder.pop().comment(
                                 "Homes Settings",
                                 "Configure the player homes feature")
@@ -121,6 +128,16 @@ public class EssentialsConfig {
                                 "How long TPA requests remain valid (seconds)",
                                 "After this time, the request expires")
                                 .defineInRange("timeout", 120, 30, 600);
+
+                backTimeout = builder.comment(
+                                "How long /back locations remain valid (seconds)",
+                                "Set to 0 to disable timeout (infinite)")
+                                .defineInRange("back_timeout", 300, 0, 86400);
+
+                deathBackTimeout = builder.comment(
+                                "How long /back locations remain valid after death (seconds)",
+                                "Set to 0 to disable timeout (infinite)")
+                                .defineInRange("death_back_timeout", 60, 0, 86400);
 
                 builder.pop().comment(
                                 "Economy Settings",

@@ -34,7 +34,9 @@ public class ChatFormatter {
 
         String prefix = pm.getPrefix(player.getUUID());
         String suffix = pm.getSuffix(player.getUUID());
-        String playerName = player.getName().getString();
+
+        String nickname = network.vonix.vonixcore.command.UtilityCommands.getNickname(player.getUUID());
+        String playerName = nickname != null ? nickname : player.getName().getString();
 
         // Build the full message: [prefix] name [suffix]: message
         MutableComponent result = Component.empty();

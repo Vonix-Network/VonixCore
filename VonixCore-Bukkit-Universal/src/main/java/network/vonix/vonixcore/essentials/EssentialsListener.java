@@ -31,6 +31,6 @@ public class EssentialsListener implements Listener {
             return;
 
         // Save death location for /back command
-        TeleportManager.getInstance().saveLastLocation(event.getEntity());
+        TeleportManager.getInstance().saveLastLocation(event.getEntity(), true);
     }
 }

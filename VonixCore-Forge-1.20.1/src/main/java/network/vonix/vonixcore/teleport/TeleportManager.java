@@ -38,11 +38,17 @@ public class TeleportManager {
     /**
      * Save player's current location for /back command.
      */
-    public void saveLastLocation(ServerPlayer player) {
+    public void saveLastLocation(ServerPlayer player, boolean isDeath) {
         lastLocations.put(player.getUUID(), new TeleportLocation(
                 player.level().dimension().location().toString(),
                 player.getX(), player.getY(), player.getZ(),
-                player.getYRot(), player.getXRot()));
+                player.getYRot(), player.getXRot(),
+                System.currentTimeMillis(),
+                isDeath));
+    }
+
+    public void saveLastLocation(ServerPlayer player) {
+        saveLastLocation(player, false);
     }
 
     /**
@@ -221,6 +227,7 @@ public class TeleportManager {
     /**
      * Teleport location record.
      */
-    public record TeleportLocation(String world, double x, double y, double z, float yaw, float pitch) {
+    public record TeleportLocation(String world, double x, double y, double z, float yaw, float pitch, long timestamp,
+            boolean isDeath) {
     }
 }

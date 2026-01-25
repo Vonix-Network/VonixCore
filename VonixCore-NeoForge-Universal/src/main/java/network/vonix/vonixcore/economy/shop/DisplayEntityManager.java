@@ -53,6 +53,13 @@ public class DisplayEntityManager {
             itemEntity.setNeverPickUp();
             itemEntity.setGlowingTag(true);
 
+            // Make invulnerable to prevent any interaction
+            itemEntity.setInvulnerable(true);
+            itemEntity.setSilent(true);
+
+            // Set pickup delay to max to prevent any pickup attempts
+            itemEntity.setPickUpDelay(Integer.MAX_VALUE);
+
             // Stop any velocity
             itemEntity.setDeltaMovement(0, 0, 0);
 

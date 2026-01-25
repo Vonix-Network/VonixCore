@@ -62,12 +62,12 @@ dependencies {
 		exclude group: 'org.slf4j', module: 'slf4j-api'
 	})
 	
-	// Javacord modules - included transitively via main javacord
-	implementation('org.javacord:javacord-api:3.8.0') {
+	// Javacord modules
+	include implementation('org.javacord:javacord-api:3.8.0') {
 		exclude group: 'org.apache.logging.log4j', module: 'log4j-api'
 		exclude group: 'org.slf4j', module: 'slf4j-api'
 	}
-	implementation('org.javacord:javacord-core:3.8.0') {
+	include implementation('org.javacord:javacord-core:3.8.0') {
 		exclude group: 'org.apache.logging.log4j', module: 'log4j-api'
 		exclude group: 'org.slf4j', module: 'slf4j-api'
 	}

@@ -19,31 +19,32 @@ public class EssentialsEventHandler {
         // Handle chat formatting and broadcasting manually
         // ALLOW_CHAT_MESSAGE lets us cancel the vanilla broadcast (return false)
         ServerMessageEvents.ALLOW_CHAT_MESSAGE.register((message, sender, params) -> {
-            if (!network.vonix.vonixcore.config.EssentialsConfig.getInstance().isEnabled()) {
+            if (!network.vonix.vonixcore.config.EssentialsConfig.getInstance().isEnabled()
+                    || !network.vonix.vonixcore.config.EssentialsConfig.getInstance().isChatFormattingEnabled()) {
                 return true; // Let vanilla handle it
             }
 
             String content = message.signedContent();
-            
+
             // Format the message
             Component formatted = network.vonix.vonixcore.chat.ChatFormatter.formatChatMessage(sender, content);
-            
+
             // Broadcast to all players manually
             sender.getServer().getPlayerList().getPlayers().forEach(p -> {
                 p.sendSystemMessage(formatted);
             });
-            
+
             // Log to console
             sender.getServer().sendSystemMessage(formatted);
-            
+
             // Manually trigger Discord logging since we are cancelling the event
             if (VonixCore.getInstance().isDiscordEnabled()) {
                 VonixCore.executeAsync(() -> {
-                     try {
-                         DiscordManager.getInstance().sendChatMessage(sender, content);
-                     } catch (Exception e) {
-                         VonixCore.LOGGER.error("[Discord] Failed to send chat message: {}", e.getMessage());
-                     }
+                    try {
+                        DiscordManager.getInstance().sendChatMessage(sender, content);
+                    } catch (Exception e) {
+                        VonixCore.LOGGER.error("[Discord] Failed to send chat message: {}", e.getMessage());
+                    }
                 });
             }
 
@@ -54,5 +55,13 @@ public class EssentialsEventHandler {
         ServerMessageEvents.COMMAND_MESSAGE.register((message, source, params) -> {
             // Can log commands here if needed
         });
+
+        // Save back location on death
+        net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents.AFTER_DEATH
+                .register((entity, damageSource) -> {
+                    if (entity instanceof ServerPlayer player) {
+                        network.vonix.vonixcore.teleport.TeleportManager.getInstance().saveLastLocation(player, true);
+                    }
+                });
     }
 }

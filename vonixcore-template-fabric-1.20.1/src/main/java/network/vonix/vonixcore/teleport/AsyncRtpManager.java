@@ -79,12 +79,12 @@ public class AsyncRtpManager {
 
     // ===== PUBLIC API =====
 
-    private static int getMinDistance() {
-        return EssentialsConfig.CONFIG.rtpMinRange.get();
+    public static int getMinRange() {
+        return EssentialsConfig.getInstance().getRtpMinRange();
     }
 
-    private static int getMaxDistance() {
-        return EssentialsConfig.CONFIG.rtpMaxRange.get();
+    public static int getMaxRange() {
+        return EssentialsConfig.getInstance().getRtpMaxRange();
     }
 
     /**
@@ -186,8 +186,8 @@ public class AsyncRtpManager {
                 // Generate random coordinates
                 ThreadLocalRandom random = ThreadLocalRandom.current();
                 double angle = random.nextDouble() * 2 * Math.PI;
-                int minDist = getMinDistance();
-                int maxDist = getMaxDistance();
+                int minDist = getMinRange();
+                int maxDist = getMaxRange();
                 int dist = minDist + random.nextInt(Math.max(1, maxDist - minDist));
                 int x = center.getX() + (int) (Math.cos(angle) * dist);
                 int z = center.getZ() + (int) (Math.sin(angle) * dist);

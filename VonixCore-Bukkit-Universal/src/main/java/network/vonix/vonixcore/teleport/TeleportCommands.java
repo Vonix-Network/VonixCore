@@ -70,15 +70,35 @@ public class TeleportCommands implements CommandExecutor {
         }
 
         if (command.getName().equalsIgnoreCase("back")) {
-            org.bukkit.Location lastLoc = TeleportManager.getInstance().getLastLocation(player.getUniqueId());
-            if (lastLoc == null) {
+            network.vonix.vonixcore.teleport.TeleportManager.TeleportLocation lastInfo = TeleportManager.getInstance()
+                    .getLastLocation(player.getUniqueId());
+
+            if (lastInfo == null || lastInfo.location() == null) {
                 sender.sendMessage(ChatColor.RED + "[VC] No location to return to.");
                 return true;
             }
 
-            // Save current location before teleporting (so /back can be used again)
+            // Check timeout
+            int timeoutSeconds;
+            if (lastInfo.isDeath()) {
+                timeoutSeconds = EssentialsConfig.deathBackTimeout;
+            } else {
+                timeoutSeconds = EssentialsConfig.backTimeout;
+            }
+
+            if (timeoutSeconds > 0) {
+                long elapsed = (System.currentTimeMillis() - lastInfo.timestamp()) / 1000;
+                if (elapsed > timeoutSeconds) {
+                    sender.sendMessage(ChatColor.RED + "[VC] Your previous location has expired (" + timeoutSeconds
+                            + "s timeout).");
+                    return true;
+                }
+            }
+
+            // Save current location before teleporting (so /back can be used again) which
+            // naturally has isDeath=false
             TeleportManager.getInstance().saveLastLocation(player);
-            player.teleport(lastLoc);
+            player.teleport(lastInfo.location());
             sender.sendMessage(ChatColor.GREEN + "[VC] Returned to previous location.");
             return true;
         }

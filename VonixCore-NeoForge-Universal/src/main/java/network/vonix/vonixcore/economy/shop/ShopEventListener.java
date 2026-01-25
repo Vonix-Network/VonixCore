@@ -6,10 +6,12 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.ChestBlock;
 import net.minecraft.world.level.block.entity.ChestBlockEntity;
+import net.minecraft.world.level.block.entity.BarrelBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -17,17 +19,29 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.player.PlayerContainerEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.event.level.BlockEvent;
+import net.neoforged.neoforge.event.level.ChunkEvent;
 import net.neoforged.neoforge.event.ServerChatEvent;
 import network.vonix.vonixcore.VonixCore;
 import network.vonix.vonixcore.config.EssentialsConfig;
 import network.vonix.vonixcore.economy.EconomyManager;
 import network.vonix.vonixcore.economy.ShopManager;
 
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+
 /**
  * Event listener for shop interactions (chest shops, sign shops, GUI cleanup)
  */
 @EventBusSubscriber(modid = VonixCore.MODID)
 public class ShopEventListener {
+
+    // Track which players have a shop chest open for restocking: UUID -> (world,
+    // pos, itemId)
+    private static final Map<UUID, OpenShopChest> openShopChests = new ConcurrentHashMap<>();
+
+    private record OpenShopChest(String world, BlockPos pos, String itemId) {
+    }
 
     @SubscribeEvent(priority = EventPriority.HIGH)
     public static void onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
@@ -60,6 +74,9 @@ public class ShopEventListener {
                     // Just show a reminder on first click (non-sneaking)
                     if (!player.isShiftKeyDown()) {
                         handleOwnerClick(player, pos, shop);
+                    } else {
+                        // Track that owner is opening shop chest for restocking
+                        openShopChests.put(player.getUUID(), new OpenShopChest(world, pos, shop.itemId()));
                     }
                     // Let the chest open normally for restocking
                     return;
@@ -125,25 +142,40 @@ public class ShopEventListener {
             }
 
             double price = shop.buyPrice();
-            double balance = eco.getBalance(player.getUUID());
+            String world = player.level().dimension().location().toString();
 
-            if (balance < price) {
+            // Calculate tax
+            double taxRate = network.vonix.vonixcore.config.ShopsConfig.CONFIG.chestShopsTaxRate.get();
+            double taxAmount = price * taxRate;
+            double totalPrice = price + taxAmount;
+
+            double balance = eco.getBalance(player.getUUID());
+            if (balance < totalPrice) {
                 player.sendSystemMessage(
-                        Component.literal("§cInsufficient funds! Need " + symbol + String.format("%.2f", price)));
+                        Component.literal("§cInsufficient funds! Need " + symbol + String.format("%.2f", totalPrice)));
                 return;
             }
 
             // Process buy: remove item from chest, give to player, transfer money
             if (ItemUtils.removeChestItems(player.level(), pos, shop.itemId(), 1)) {
-                if (eco.withdraw(player.getUUID(), price)) {
-                    eco.deposit(shop.owner(), price);
+                if (eco.withdraw(player.getUUID(), totalPrice)) {
+                    eco.deposit(shop.owner(), price); // Owner gets price without tax
                     var leftover = ItemUtils.giveItems(player, shop.itemId(), 1);
                     if (!leftover.isEmpty()) {
                         player.drop(leftover, false);
                     }
+
+                    // Log transaction
+                    if (network.vonix.vonixcore.config.ShopsConfig.CONFIG.transactionLogEnabled.get()) {
+                        network.vonix.vonixcore.economy.TransactionLog.getInstance().logShopBuy(
+                                player.getUUID(), shop.owner(), price, taxAmount,
+                                0, shop.itemId(), 1, world, pos.getX(), pos.getY(), pos.getZ());
+                    }
+
+                    String taxInfo = taxAmount > 0.001 ? String.format(" §7(+%s%.2f tax)", symbol, taxAmount) : "";
                     player.sendSystemMessage(Component
-                            .literal("§aPurchased 1x " + shop.itemId() + " for " + symbol
-                                    + String.format("%.2f", price)));
+                            .literal("§aPurchased 1x " + shop.itemId() + " for " + symbol + String.format("%.2f", price)
+                                    + taxInfo));
                 } else {
                     // Refund the item to chest if payment failed
                     ItemUtils.addChestItems(player.level(), pos, shop.itemId(), 1);
@@ -162,6 +194,12 @@ public class ShopEventListener {
             }
 
             double price = shop.sellPrice();
+            String world = player.level().dimension().location().toString();
+
+            // Calculate tax (deducted from seller's earnings)
+            double taxRate = network.vonix.vonixcore.config.ShopsConfig.CONFIG.chestShopsTaxRate.get();
+            double taxAmount = price * taxRate;
+            double sellerReceives = price - taxAmount;
 
             // Check if shop owner can afford
             double ownerBalance = eco.getBalance(shop.owner());
@@ -180,9 +218,19 @@ public class ShopEventListener {
                     return;
                 }
                 eco.withdraw(shop.owner(), price);
-                eco.deposit(player.getUUID(), price);
+                eco.deposit(player.getUUID(), sellerReceives); // Seller gets amount minus tax
+
+                // Log transaction
+                if (network.vonix.vonixcore.config.ShopsConfig.CONFIG.transactionLogEnabled.get()) {
+                    network.vonix.vonixcore.economy.TransactionLog.getInstance().logShopSell(
+                            player.getUUID(), shop.owner(), price, taxAmount,
+                            0, shop.itemId(), 1, world, pos.getX(), pos.getY(), pos.getZ());
+                }
+
+                String taxInfo = taxAmount > 0.001 ? String.format(" §7(-%s%.2f tax)", symbol, taxAmount) : "";
                 player.sendSystemMessage(Component
-                        .literal("§aSold 1x " + shop.itemId() + " for " + symbol + String.format("%.2f", price)));
+                        .literal("§aSold 1x " + shop.itemId() + " for " + symbol + String.format("%.2f", sellerReceives)
+                                + taxInfo));
             }
         } else {
             // Show shop info
@@ -481,12 +529,53 @@ public class ShopEventListener {
     }
 
     /**
-     * Clean up shop sessions when menu closes
+     * Clean up shop sessions when menu closes and sync restocking
      */
     @SubscribeEvent
     public static void onContainerClose(PlayerContainerEvent.Close event) {
         if (event.getEntity() instanceof ServerPlayer player) {
             ShopGUIManager.getInstance().onPlayerCloseMenu(player.getUUID());
+
+            // Check if player was restocking a shop chest
+            OpenShopChest openShop = openShopChests.remove(player.getUUID());
+            if (openShop != null && player.level() instanceof ServerLevel level) {
+                // Sync inventory count to stock
+                BlockPos pos = openShop.pos();
+                var blockEntity = level.getBlockEntity(pos);
+
+                int stockCount = 0;
+                if (blockEntity instanceof ChestBlockEntity chest) {
+                    for (int i = 0; i < chest.getContainerSize(); i++) {
+                        ItemStack stack = chest.getItem(i);
+                        if (!stack.isEmpty()) {
+                            String stackItemId = BuiltInRegistries.ITEM.getKey(stack.getItem()).toString();
+                            if (stackItemId.equals(openShop.itemId())) {
+                                stockCount += stack.getCount();
+                            }
+                        }
+                    }
+                } else if (blockEntity instanceof BarrelBlockEntity barrel) {
+                    for (int i = 0; i < barrel.getContainerSize(); i++) {
+                        ItemStack stack = barrel.getItem(i);
+                        if (!stack.isEmpty()) {
+                            String stackItemId = BuiltInRegistries.ITEM.getKey(stack.getItem()).toString();
+                            if (stackItemId.equals(openShop.itemId())) {
+                                stockCount += stack.getCount();
+                            }
+                        }
+                    }
+                }
+
+                // Get current shop to find old stock
+                ShopManager.ChestShop shop = ShopManager.getInstance().getShopAt(openShop.world(), pos);
+                if (shop != null) {
+                    int delta = stockCount - shop.stock();
+                    if (delta != 0) {
+                        ShopManager.getInstance().updateStock(openShop.world(), pos, delta);
+                        player.sendSystemMessage(Component.literal("§a[Shop] Stock updated: " + stockCount + " items"));
+                    }
+                }
+            }
         }
     }
 
@@ -494,7 +583,7 @@ public class ShopEventListener {
      * Respawn shop holograms when chunks are loaded
      */
     @SubscribeEvent
-    public static void onChunkLoad(net.neoforged.neoforge.event.level.ChunkEvent.Load event) {
+    public static void onChunkLoad(ChunkEvent.Load event) {
         if (event.getLevel().isClientSide())
             return;
         if (!EssentialsConfig.CONFIG.shopsEnabled.get())
@@ -513,6 +602,23 @@ public class ShopEventListener {
                 DisplayEntityManager.getInstance().respawnDisplaysInChunk(
                         level, chunk.getPos().x, chunk.getPos().z);
             });
+        }
+    }
+
+    /**
+     * Prevent interaction with shop display entities (hologram dupe prevention)
+     */
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void onEntityInteract(PlayerInteractEvent.EntityInteract event) {
+        if (event.getLevel().isClientSide())
+            return;
+
+        // Check if the entity is a shop display item
+        if (event.getTarget() instanceof ItemEntity itemEntity) {
+            if (itemEntity.getTags().contains("vonix_shop_display")) {
+                // Cancel any interaction with shop display entities
+                event.setCanceled(true);
+            }
         }
     }
 }

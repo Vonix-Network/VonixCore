@@ -386,6 +386,29 @@ public class VonixCoreCommands {
             return 0;
         }
 
+        // Check timeout
+        int timeoutSeconds;
+        if (loc.isDeath()) {
+            timeoutSeconds = network.vonix.vonixcore.config.EssentialsConfig.CONFIG.deathBackTimeout.get();
+        } else {
+            // Regular teleport - check if user wants it disabled (0 default?) or use
+            // general timeout
+            // User said "instead of /back in general cooldown", suggesting they might want
+            // NO timeout for regular.
+            // But let's respect the config value if set. If they set it to 0, it's
+            // disabled.
+            timeoutSeconds = network.vonix.vonixcore.config.EssentialsConfig.CONFIG.backTimeout.get();
+        }
+
+        if (timeoutSeconds > 0) {
+            long elapsed = (System.currentTimeMillis() - loc.timestamp()) / 1000;
+            if (elapsed > timeoutSeconds) {
+                ctx.getSource().sendFailure(
+                        Component.literal("§cYour previous location has expired (" + timeoutSeconds + "s timeout)"));
+                return 0;
+            }
+        }
+
         var server = ctx.getSource().getServer();
         for (var level : server.getAllLevels()) {
             if (level.dimension().location().toString().equals(loc.world())) {
