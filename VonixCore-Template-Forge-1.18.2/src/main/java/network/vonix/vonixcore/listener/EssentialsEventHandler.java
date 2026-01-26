@@ -21,7 +21,7 @@ public class EssentialsEventHandler {
      */
     @SubscribeEvent
     public static void onRegisterCommands(RegisterCommandsEvent event) {
-        if (!EssentialsConfig.CONFIG.enabled.get()) {
+        if (!EssentialsConfig.getInstance().isEnabled()) {
             return;
         }
 
@@ -37,7 +37,7 @@ public class EssentialsEventHandler {
      */
     @SubscribeEvent
     public static void onPlayerDeath(LivingDeathEvent event) {
-        if (!EssentialsConfig.CONFIG.enabled.get()) {
+        if (!EssentialsConfig.getInstance().isEnabled()) {
             return;
         }
 

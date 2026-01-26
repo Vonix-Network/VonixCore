@@ -50,12 +50,16 @@ public class TeleportCommands {
             }
 
             if (TeleportManager.getInstance().sendTpaRequest(player, target, false)) {
-                player.sendMessage(new TextComponent("\u00A7a[VC] TPA request sent to \u00A7e" + target.getName().getString()), player.getUUID());
-                target.sendMessage(new TextComponent("\u00A7e" + player.getName().getString() + 
-                        " \u00A76wants to teleport to you. Type \u00A7a/tpaccept \u00A76or \u00A7c/tpdeny"), player.getUUID());
+                player.sendMessage(
+                        new TextComponent("\u00A7a[VC] TPA request sent to \u00A7e" + target.getName().getString()),
+                        player.getUUID());
+                target.sendMessage(new TextComponent("\u00A7e" + player.getName().getString() +
+                        " \u00A76wants to teleport to you. Type \u00A7a/tpaccept \u00A76or \u00A7c/tpdeny"),
+                        player.getUUID());
                 return 1;
             } else {
-                ctx.getSource().sendFailure(new TextComponent("\u00A7c[VC] That player already has a pending request."));
+                ctx.getSource()
+                        .sendFailure(new TextComponent("\u00A7c[VC] That player already has a pending request."));
                 return 0;
             }
         } catch (Exception e) {
@@ -75,12 +79,17 @@ public class TeleportCommands {
             }
 
             if (TeleportManager.getInstance().sendTpaRequest(player, target, true)) {
-                player.sendMessage(new TextComponent("\u00A7a[VC] TPA here request sent to \u00A7e" + target.getName().getString()), player.getUUID());
-                target.sendMessage(new TextComponent("\u00A7e" + player.getName().getString() + 
-                        " \u00A76wants you to teleport to them. Type \u00A7a/tpaccept \u00A76or \u00A7c/tpdeny"), player.getUUID());
+                player.sendMessage(
+                        new TextComponent(
+                                "\u00A7a[VC] TPA here request sent to \u00A7e" + target.getName().getString()),
+                        player.getUUID());
+                target.sendMessage(new TextComponent("\u00A7e" + player.getName().getString() +
+                        " \u00A76wants you to teleport to them. Type \u00A7a/tpaccept \u00A76or \u00A7c/tpdeny"),
+                        player.getUUID());
                 return 1;
             } else {
-                ctx.getSource().sendFailure(new TextComponent("\u00A7c[VC] That player already has a pending request."));
+                ctx.getSource()
+                        .sendFailure(new TextComponent("\u00A7c[VC] That player already has a pending request."));
                 return 0;
             }
         } catch (Exception e) {
@@ -130,19 +139,20 @@ public class TeleportCommands {
             // Check timeout based on whether it's a death location
             int timeoutSeconds;
             if (loc.isDeath()) {
-                timeoutSeconds = EssentialsConfig.CONFIG.deathBackTimeout.get();
+                timeoutSeconds = EssentialsConfig.getInstance().getDeathBackTimeout();
             } else {
-                timeoutSeconds = EssentialsConfig.CONFIG.backTimeout.get();
+                timeoutSeconds = EssentialsConfig.getInstance().getBackTimeout();
             }
 
             // Check death back delay (cooldown ONLY applies to deaths)
             if (loc.isDeath()) {
-                int delaySeconds = EssentialsConfig.CONFIG.deathBackDelay.get();
+                int delaySeconds = EssentialsConfig.getInstance().getDeathBackDelay();
                 if (delaySeconds > 0) {
                     long elapsed = (System.currentTimeMillis() - loc.timestamp()) / 1000;
                     if (elapsed < delaySeconds) {
                         ctx.getSource().sendFailure(new TextComponent("\u00A7c[VC] You must wait " +
-                                formatTime((int) (delaySeconds - elapsed)) + " before returning to your death location."));
+                                formatTime((int) (delaySeconds - elapsed))
+                                + " before returning to your death location."));
                         return 0;
                     }
                 }
@@ -162,9 +172,10 @@ public class TeleportCommands {
             var server = ctx.getSource().getServer();
             for (var level : server.getAllLevels()) {
                 if (level.dimension().location().toString().equals(loc.world())) {
-                    TeleportManager.getInstance().teleportPlayer(player, level, loc.x(), loc.y(), loc.z(), 
+                    TeleportManager.getInstance().teleportPlayer(player, level, loc.x(), loc.y(), loc.z(),
                             loc.yaw(), loc.pitch());
-                    player.sendMessage(new TextComponent("\u00A7a[VC] Returned to previous location."), player.getUUID());
+                    player.sendMessage(new TextComponent("\u00A7a[VC] Returned to previous location."),
+                            player.getUUID());
                     return 1;
                 }
             }
