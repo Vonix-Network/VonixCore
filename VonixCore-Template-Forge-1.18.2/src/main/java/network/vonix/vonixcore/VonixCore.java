@@ -22,24 +22,48 @@ public class VonixCore {
 
     private static VonixCore instance;
     private Database database;
+    private network.vonix.vonixcore.xpsync.XPSyncManager xpSyncManager;
+    private boolean protectionEnabled = false;
+    private boolean essentialsEnabled = false;
+    private boolean xpsyncEnabled = false;
+    private boolean claimsEnabled = false;
+    private boolean discordEnabled = false;
 
     public VonixCore() {
-        instance = this;
+        try {
+            instance = this;
 
-        // Register config
-        ModLoadingContext.get().registerConfig(ModConfig.Type.SERVER, EssentialsConfig.SPEC,
-                "vonixcore-essentials.toml");
-        ModLoadingContext.get().registerConfig(ModConfig.Type.SERVER, network.vonix.vonixcore.config.XPSyncConfig.SPEC,
-                "vonixcore-xpsync.toml");
-        ModLoadingContext.get().registerConfig(ModConfig.Type.SERVER, network.vonix.vonixcore.config.ClaimsConfig.SPEC,
-                "vonixcore-claims.toml");
-        ModLoadingContext.get().registerConfig(ModConfig.Type.SERVER, network.vonix.vonixcore.config.ShopsConfig.SPEC,
-                "vonixcore-shops.toml");
+            // Register config
+            try {
+                ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, network.vonix.vonixcore.config.DatabaseConfig.SPEC,
+                        "vonixcore-database.toml");
+                ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, network.vonix.vonixcore.config.AuthConfig.SPEC,
+                        "vonixcore-auth.toml");
+                ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, network.vonix.vonixcore.config.DiscordConfig.SPEC,
+                        "vonixcore-discord.toml");
+                ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, network.vonix.vonixcore.config.ProtectionConfig.SPEC,
+                        "vonixcore-protection.toml");
+                ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, EssentialsConfig.SPEC,
+                        "vonixcore-essentials.toml");
+                ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, network.vonix.vonixcore.config.XPSyncConfig.SPEC,
+                        "vonixcore-xpsync.toml");
+                ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, network.vonix.vonixcore.config.ClaimsConfig.SPEC,
+                        "vonixcore-claims.toml");
+                ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, network.vonix.vonixcore.config.ShopsConfig.SPEC,
+                        "vonixcore-shops.toml");
+            } catch (Throwable t) {
+                LOGGER.error("[VonixCore] Failed to register configs", t);
+                throw t;
+            }
 
-        // Register ourselves for server and other game events
-        MinecraftForge.EVENT_BUS.register(this);
+            // Register ourselves for server and other game events
+            MinecraftForge.EVENT_BUS.register(this);
 
-        LOGGER.info("[VonixCore] VonixCore Forge 1.18.2 initialized");
+            LOGGER.info("[VonixCore] VonixCore Forge 1.18.2 initialized");
+        } catch (Throwable t) {
+            LOGGER.error("[VonixCore] Failed during mod construction", t);
+            throw t;
+        }
     }
 
     public static VonixCore getInstance() {
@@ -80,12 +104,6 @@ public class VonixCore {
 
     @net.minecraftforge.eventbus.api.SubscribeEvent
     public void onServerStarting(net.minecraftforge.event.server.ServerStartingEvent event) {
-        // Initialize Configs
-        java.nio.file.Path configDir = getConfigPath();
-        network.vonix.vonixcore.config.DatabaseConfig.init(configDir);
-        network.vonix.vonixcore.config.AuthConfig.init(configDir);
-        network.vonix.vonixcore.config.DiscordConfig.init(configDir);
-
         // Initialize Database
         try {
             database = new network.vonix.vonixcore.database.Database(event.getServer());
@@ -93,12 +111,81 @@ public class VonixCore {
         } catch (java.sql.SQLException e) {
             LOGGER.error("Failed to initialize database", e);
         }
+    }
 
-        // Initialize Managers
-        network.vonix.vonixcore.auth.AuthenticationManager.updateFreezeCache();
-        network.vonix.vonixcore.discord.DiscordManager.getInstance().initialize(event.getServer());
+    @net.minecraftforge.eventbus.api.SubscribeEvent
+    public void onServerStarted(net.minecraftforge.event.server.ServerStartedEvent event) {
+        // Initialize Protection module
+        if (network.vonix.vonixcore.config.ProtectionConfig.CONFIG.enabled.get()) {
+            try {
+                // Consumer handles protection data batching
+                network.vonix.vonixcore.consumer.Consumer.getInstance().start();
 
-        new network.vonix.vonixcore.xpsync.XPSyncManager(event.getServer()).start();
+                // Initialize Managers after configs are loaded
+                network.vonix.vonixcore.auth.AuthenticationManager.updateFreezeCache();
+                protectionEnabled = true;
+                LOGGER.info("[VonixCore] Protection module enabled");
+            } catch (Exception e) {
+                LOGGER.error("[VonixCore] Failed to initialize Protection: {}", e.getMessage());
+            }
+        }
+
+        // Initialize Essentials module
+        if (EssentialsConfig.CONFIG.enabled.get()) {
+            try (java.sql.Connection conn = database.getConnection()) {
+                // Initialize all sub-modules since 1.18.2 config lacks granular toggles
+                network.vonix.vonixcore.homes.HomeManager.getInstance().initializeTable(conn);
+                network.vonix.vonixcore.warps.WarpManager.getInstance().initializeTable(conn);
+                network.vonix.vonixcore.economy.EconomyManager.getInstance().initializeTable(conn);
+                network.vonix.vonixcore.economy.ShopManager.getInstance().initializeTable(conn);
+                network.vonix.vonixcore.admin.AdminManager.getInstance().initializeTable(conn);
+
+                essentialsEnabled = true;
+                LOGGER.info("[VonixCore] Essentials module enabled");
+            } catch (Exception e) {
+                LOGGER.error("[VonixCore] Failed to initialize Essentials: {}", e.getMessage());
+            }
+        }
+
+        // Initialize XPSync module
+        if (network.vonix.vonixcore.config.XPSyncConfig.CONFIG.enabled.get()) {
+            String apiKey = network.vonix.vonixcore.config.XPSyncConfig.CONFIG.apiKey.get();
+            if (apiKey == null || apiKey.isEmpty() || apiKey.equals("YOUR_API_KEY_HERE")) {
+                LOGGER.warn("[VonixCore] XPSync is enabled but API key not configured");
+            } else {
+                try {
+                    xpSyncManager = new network.vonix.vonixcore.xpsync.XPSyncManager(event.getServer());
+                    xpSyncManager.start();
+                    xpsyncEnabled = true;
+                    LOGGER.info("[VonixCore] XPSync module enabled");
+                } catch (Exception e) {
+                    LOGGER.error("[VonixCore] Failed to initialize XPSync: {}", e.getMessage());
+                }
+            }
+        }
+
+        // Initialize Claims module
+        if (network.vonix.vonixcore.config.ClaimsConfig.CONFIG.enabled.get()) {
+            try (java.sql.Connection conn = database.getConnection()) {
+                network.vonix.vonixcore.claims.ClaimsManager.getInstance().initializeTable(conn);
+                network.vonix.vonixcore.claims.ClaimsCommands.register(event.getServer().getCommands().getDispatcher());
+                claimsEnabled = true;
+                LOGGER.info("[VonixCore] Claims module enabled");
+            } catch (Exception e) {
+                LOGGER.error("[VonixCore] Failed to initialize Claims: {}", e.getMessage());
+            }
+        }
+
+        // Initialize Discord module (requires server to be fully started)
+        if (network.vonix.vonixcore.config.DiscordConfig.CONFIG.enabled.get()) {
+            try {
+                network.vonix.vonixcore.discord.DiscordManager.getInstance().initialize(event.getServer());
+                discordEnabled = true;
+                LOGGER.info("[VonixCore] Discord module enabled");
+            } catch (Exception e) {
+                LOGGER.error("[VonixCore] Failed to initialize Discord: {}", e.getMessage());
+            }
+        }
     }
 
     @net.minecraftforge.eventbus.api.SubscribeEvent

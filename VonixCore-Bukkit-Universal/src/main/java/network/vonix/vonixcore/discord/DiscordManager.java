@@ -293,11 +293,36 @@ public class DiscordManager {
     }
 
     private void processJavacordMessage(org.javacord.api.event.message.MessageCreateEvent event) {
-        if (!event.getMessageAuthor().isRegularUser())
-            return; // Ignore bots/webhooks
+        boolean isBot = event.getMessageAuthor().asUser().map(user -> user.isBot()).orElse(false);
+        boolean isWebhook = !event.getMessageAuthor().asUser().isPresent();
 
         String content = event.getMessageContent();
         String authorName = event.getMessageAuthor().getDisplayName();
+
+        // Filter our own webhooks based on username prefix
+        if (isWebhook) {
+            String ourPrefix = DiscordConfig.serverPrefix;
+            if (authorName != null && authorName.startsWith(ourPrefix)) {
+                return;
+            }
+        }
+
+        // Filter other webhooks if configured
+        if (DiscordConfig.ignoreWebhooks && isWebhook) {
+            if (DiscordConfig.filterByPrefix) {
+                String ourPrefix = DiscordConfig.serverPrefix;
+                if (authorName != null && authorName.startsWith(ourPrefix)) {
+                    return;
+                }
+            } else {
+                return;
+            }
+        }
+
+        // Filter bots
+        if (DiscordConfig.ignoreBots && isBot && !isWebhook) {
+            return;
+        }
 
         // Handle !list command with embed
         if (content.trim().equalsIgnoreCase("!list")) {
@@ -305,11 +330,54 @@ public class DiscordManager {
             return;
         }
 
-        String formatted = DiscordConfig.discordToMinecraftFormat
-                .replace("{username}", authorName)
-                .replace("{message}", content);
+        String formatted;
+        if (isWebhook) {
+            // Special formatting for cross-server messages (webhooks)
+            String displayName = authorName;
 
-        Bukkit.broadcast(toAdventureComponent(formatted));
+            if (displayName.startsWith("[") && displayName.contains("]")) {
+                int endBracket = displayName.indexOf("]");
+                String serverPrefix = displayName.substring(0, endBracket + 1);
+                String remainingName = displayName.substring(endBracket + 1).trim();
+
+                if (remainingName.toLowerCase().contains("server")) {
+                    // Event or generic server message: just prefix
+                    displayName = serverPrefix;
+                    formatted = displayName + " " + content;
+                } else {
+                    // Chat: [Prefix] Name
+                    displayName = serverPrefix + " " + remainingName;
+                    formatted = displayName + ": " + content;
+                }
+            } else {
+                // No prefix found, just use raw name
+                formatted = "[Discord] " + authorName + ": " + content;
+            }
+        } else {
+            formatted = DiscordConfig.discordToMinecraftFormat
+                    .replace("{username}", authorName)
+                    .replace("{message}", content);
+        }
+
+        // For webhook messages, we need to parse and color the prefix
+        Component finalComponent;
+        if (isWebhook && formatted.startsWith("[")) {
+            int endBracket = formatted.indexOf("]");
+            if (endBracket > 0) {
+                String prefixPart = formatted.substring(0, endBracket + 1);
+                String rest = formatted.substring(endBracket + 1);
+                
+                // Build component with green prefix and white rest
+                finalComponent = Component.text(prefixPart, NamedTextColor.GREEN)
+                        .append(Component.text(rest, NamedTextColor.WHITE));
+            } else {
+                finalComponent = Component.text(formatted, NamedTextColor.WHITE);
+            }
+        } else {
+            finalComponent = toAdventureComponent(formatted);
+        }
+
+        Bukkit.broadcast(finalComponent);
     }
 
     public void sendMinecraftMessage(String username, String message) {

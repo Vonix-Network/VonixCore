@@ -23,7 +23,10 @@ public class DiscordListener implements Listener {
     public void onChat(AsyncPlayerChatEvent event) {
         if (!DiscordConfig.enabled)
             return;
-        DiscordManager.getInstance().sendMinecraftMessage(event.getPlayer().getName(), event.getMessage());
+        // Add server prefix to username for webhook messages
+        String serverPrefix = DiscordConfig.serverPrefix;
+        String formattedUsername = serverPrefix + event.getPlayer().getName();
+        DiscordManager.getInstance().sendMinecraftMessage(formattedUsername, event.getMessage());
     }
 
     @EventHandler(priority = EventPriority.MONITOR)

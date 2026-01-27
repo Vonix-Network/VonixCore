@@ -1,5 +1,5 @@
 name: VonixCore
-version: '1.1.1'
+version: '1.1.2'
 main: network.vonix.vonixcore.VonixCore
 api-version: '1.20' # Using 1.20 to support 1.20+ features but load on 1.18+ (legacy loading might apply, or we assume 1.20+ for api-version usage. Actually, for 1.18 support we might omit this or use 1.18, but Paper 1.21 suggests 1.21. Let's use 1.20 as a safe middle ground or '1.13' for broad compat if we weren't using new features. Paper 1.21 warns if api-version is too old. I'll stick to 1.20 which covers most modern stuff.)
 authors: [Vonix Network]

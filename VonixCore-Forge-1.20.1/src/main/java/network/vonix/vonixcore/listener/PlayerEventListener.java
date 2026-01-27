@@ -44,7 +44,10 @@ public class PlayerEventListener {
 
         // Send to Discord
         if (network.vonix.vonixcore.config.DiscordConfig.CONFIG.enabled.get()) {
-            network.vonix.vonixcore.discord.DiscordManager.getInstance().sendMinecraftMessage(user, message);
+            // Add server prefix to username for webhook messages
+            String serverPrefix = network.vonix.vonixcore.config.DiscordConfig.CONFIG.serverPrefix.get();
+            String formattedUsername = serverPrefix + user;
+            network.vonix.vonixcore.discord.DiscordManager.getInstance().sendMinecraftMessage(formattedUsername, message);
         }
 
         if (ProtectionConfig.CONFIG.logChat.get()) {

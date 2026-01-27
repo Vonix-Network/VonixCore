@@ -370,11 +370,10 @@ public class DiscordManager {
                 return;
             }
 
-            // Filter our own webhooks
+            // Filter our own webhooks based on username prefix
             if (isWebhook) {
-                String authorId = String.valueOf(event.getMessageAuthor().getId());
-                if ((ourWebhookId != null && ourWebhookId.equals(authorId)) ||
-                        (eventWebhookId != null && eventWebhookId.equals(authorId))) {
+                String ourPrefix = DiscordConfig.CONFIG.serverPrefix.get();
+                if (authorName != null && authorName.startsWith(ourPrefix)) {
                     return;
                 }
             }
@@ -383,7 +382,7 @@ public class DiscordManager {
             if (DiscordConfig.CONFIG.ignoreWebhooks.get() && isWebhook) {
                 if (DiscordConfig.CONFIG.filterByPrefix.get()) {
                     String ourPrefix = DiscordConfig.CONFIG.serverPrefix.get();
-                    if (authorName.contains(ourPrefix)) {
+                    if (authorName != null && authorName.startsWith(ourPrefix)) {
                         return;
                     }
                 } else {

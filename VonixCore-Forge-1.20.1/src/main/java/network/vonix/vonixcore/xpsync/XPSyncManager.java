@@ -434,6 +434,8 @@ public class XPSyncManager {
             playersArray.add(buildPlayerDataFromOnline(player));
         }
         root.add("players", playersArray);
+        // Store count for verification after API response
+        root.addProperty("_playerCount", players.size());
 
         return root;
     }
@@ -536,7 +538,10 @@ public class XPSyncManager {
             String responseBody = readResponse(conn, statusCode);
 
             if (statusCode == 200) {
-                handleSuccessResponse(responseBody);
+                // Extract expected count from payload (stored by buildPayload)
+                int expectedCount = payload.has("_playerCount") ? payload.get("_playerCount").getAsInt()
+                        : (payload.has("players") ? payload.getAsJsonArray("players").size() : 0);
+                handleSuccessResponse(responseBody, expectedCount);
                 return true;
             } else if (statusCode == 401) {
                 VonixCore.LOGGER.error("[XPSync] Authentication failed! Check your API key.");
@@ -574,7 +579,7 @@ public class XPSyncManager {
         }
     }
 
-    private void handleSuccessResponse(String responseBody) {
+    private void handleSuccessResponse(String responseBody, int expectedCount) {
         if (responseBody == null || responseBody.isEmpty())
             return;
 
@@ -582,7 +587,14 @@ public class XPSyncManager {
             JsonObject response = JsonParser.parseString(responseBody).getAsJsonObject();
             if (response.has("success") && response.get("success").getAsBoolean()) {
                 int synced = response.has("syncedCount") ? response.get("syncedCount").getAsInt() : 0;
-                VonixCore.LOGGER.info("[XPSync] Successfully synced {} players", synced);
+                if (synced == expectedCount) {
+                    VonixCore.LOGGER.info("[XPSync] Successfully synced {} players", synced);
+                } else if (synced > 0) {
+                    VonixCore.LOGGER.warn("[XPSync] Partial sync: {} of {} players synced", synced, expectedCount);
+                } else {
+                    VonixCore.LOGGER.warn("[XPSync] API returned success but syncedCount=0 (expected {})",
+                            expectedCount);
+                }
             } else {
                 String error = response.has("error") ? response.get("error").getAsString() : "Unknown";
                 VonixCore.LOGGER.warn("[XPSync] API response: {}", error);

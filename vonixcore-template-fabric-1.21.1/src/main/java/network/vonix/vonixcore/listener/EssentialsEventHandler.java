@@ -4,7 +4,7 @@ import net.fabricmc.fabric.api.message.v1.ServerMessageEvents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import network.vonix.vonixcore.VonixCore;
-import network.vonix.vonixcore.config.DiscordConfig;
+import network.vonix.vonixcore.chat.ChatFormatter;
 import network.vonix.vonixcore.discord.DiscordManager;
 
 /**
@@ -48,7 +48,8 @@ public class EssentialsEventHandler {
             if (VonixCore.getInstance().isDiscordEnabled()) {
                 VonixCore.executeAsync(() -> {
                     try {
-                        DiscordManager.getInstance().sendChatMessage(sender, content);
+                        // Send raw username - sendMinecraftMessage will apply prefix via webhookUsernameFormat
+                        DiscordManager.getInstance().sendMinecraftMessage(sender.getName().getString(), content);
                     } catch (Exception e) {
                         VonixCore.LOGGER.error("[Discord] Failed to send chat message: {}", e.getMessage());
                     }

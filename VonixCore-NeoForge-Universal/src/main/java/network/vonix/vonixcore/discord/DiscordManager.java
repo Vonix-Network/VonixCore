@@ -5,7 +5,9 @@ import com.google.gson.JsonObject;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.chat.Style;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import network.vonix.vonixcore.VonixCore;
@@ -357,11 +359,10 @@ public class DiscordManager {
                 return;
             }
 
-            // Filter our own webhooks
+            // Filter our own webhooks based on username prefix
             if (isWebhook) {
-                String authorId = String.valueOf(event.getMessageAuthor().getId());
-                if ((ourWebhookId != null && ourWebhookId.equals(authorId)) ||
-                        (eventWebhookId != null && eventWebhookId.equals(authorId))) {
+                String ourPrefix = DiscordConfig.CONFIG.serverPrefix.get();
+                if (authorName != null && authorName.startsWith(ourPrefix)) {
                     return;
                 }
             }
@@ -370,7 +371,7 @@ public class DiscordManager {
             if (DiscordConfig.CONFIG.ignoreWebhooks.get() && isWebhook) {
                 if (DiscordConfig.CONFIG.filterByPrefix.get()) {
                     String ourPrefix = DiscordConfig.CONFIG.serverPrefix.get();
-                    if (authorName.contains(ourPrefix)) {
+                    if (authorName != null && authorName.startsWith(ourPrefix)) {
                         return;
                     }
                 } else {
@@ -396,19 +397,81 @@ public class DiscordManager {
                 cleanedContent = content.substring(authorName.length() + 1);
             }
 
-            String formattedMessage = DiscordConfig.CONFIG.discordToMinecraftFormat.get()
-                    .replace("{username}", authorName)
-                    .replace("{message}", cleanedContent);
+            String formattedMessage;
+            if (isWebhook) {
+                // Special formatting for cross-server messages (webhooks)
+                String displayName = authorName;
+
+                if (displayName.startsWith("[") && displayName.contains("]")) {
+                    int endBracket = displayName.indexOf("]");
+                    String serverPrefix = displayName.substring(0, endBracket + 1);
+                    String remainingName = displayName.substring(endBracket + 1).trim();
+
+                    if (remainingName.toLowerCase().contains("server")) {
+                        // Event or generic server message: just prefix
+                        displayName = "§a" + serverPrefix;
+                        formattedMessage = displayName + " §f" + cleanedContent;
+                    } else {
+                        // Chat: [Prefix] Name
+                        displayName = "§a" + serverPrefix + " §f" + remainingName;
+                        formattedMessage = displayName + "§7: §f" + cleanedContent;
+                    }
+                } else {
+                    // No prefix found, just use raw name
+                    formattedMessage = "§7[Discord] §f" + authorName + "§7: §f" + cleanedContent;
+                }
+            } else {
+                // Standard Discord user message
+                formattedMessage = DiscordConfig.CONFIG.discordToMinecraftFormat.get()
+                        .replace("{username}", authorName)
+                        .replace("{message}", cleanedContent);
+            }
 
             if (server != null) {
-                Component component = toMinecraftComponentWithLinks(formattedMessage);
-                boolean isFilterableMessage = isBot || isWebhook;
+                MutableComponent finalComponent = Component.empty();
+
+                if (isWebhook) {
+                    // Webhook logic (already established) using the pre-calculated formattedMessage
+                    finalComponent.append(toMinecraftComponentWithLinks(formattedMessage));
+                } else {
+                    // Standard Discord message: Make [Discord] clickable
+                    String inviteUrl = DiscordConfig.CONFIG.inviteUrl.get();
+                    String rawFormat = DiscordConfig.CONFIG.discordToMinecraftFormat.get()
+                            .replace("{username}", authorName)
+                            .replace("{message}", cleanedContent);
+
+                    if (rawFormat.contains("[Discord]") && inviteUrl != null && !inviteUrl.isEmpty()) {
+                        String[] parts = rawFormat.split("\\[Discord\\]", 2);
+
+                        // Part before [Discord]
+                        if (parts.length > 0 && !parts[0].isEmpty()) {
+                            finalComponent.append(toMinecraftComponentWithLinks(parts[0]));
+                        }
+
+                        // Clickable [Discord]
+                        finalComponent.append(Component.literal("[Discord]")
+                                .setStyle(Style.EMPTY
+                                        .withColor(ChatFormatting.AQUA)
+                                        .withClickEvent(new ClickEvent(ClickEvent.Action.OPEN_URL, inviteUrl))
+                                        .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
+                                                Component.literal("Click to join our Discord!")))));
+
+                        // Part after [Discord]
+                        if (parts.length > 1 && !parts[1].isEmpty()) {
+                            finalComponent.append(toMinecraftComponentWithLinks(parts[1]));
+                        }
+                    } else {
+                        // Fallback if no tag or no invite URL
+                        finalComponent.append(toMinecraftComponentWithLinks(rawFormat));
+                    }
+                }
 
                 server.getPlayerList().getPlayers().forEach(player -> {
+                    boolean isFilterableMessage = isBot || isWebhook;
                     if (isFilterableMessage && hasServerMessagesFiltered(player.getUUID())) {
                         return;
                     }
-                    player.sendSystemMessage(component);
+                    player.sendSystemMessage(finalComponent);
                 });
             }
         } catch (Exception e) {

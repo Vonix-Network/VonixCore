@@ -14,7 +14,8 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Manages teleportation features including TPA, back locations, and safe teleporting.
+ * Manages teleportation features including TPA, back locations, and safe
+ * teleporting.
  */
 public class TeleportManager {
 
@@ -234,4 +235,3 @@ public class TeleportManager {
             boolean isDeath) {
     }
 }
-

@@ -149,6 +149,7 @@ public class XPSyncManager {
                 JsonArray playersArray = new JsonArray();
                 batch.forEach(playersArray::add);
                 payload.add("players", playersArray);
+                payload.addProperty("_playerCount", batch.size());
 
                 VonixCore.LOGGER.info("[XPSync] Syncing batch {}-{} of {} players...", i + 1, end, allPlayers.size());
                 sendToAPI(payload, false);
@@ -185,6 +186,7 @@ public class XPSyncManager {
             JsonArray playersArray = new JsonArray();
             allPlayers.forEach(playersArray::add);
             payload.add("players", playersArray);
+            payload.addProperty("_playerCount", allPlayers.size());
 
             sendToAPI(payload, true);
 
