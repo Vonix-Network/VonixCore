@@ -9,9 +9,11 @@ import net.minecraft.server.level.TicketType;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.ChunkStatus;
+import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.levelgen.Heightmap;
 import network.vonix.vonixcore.config.EssentialsConfig;
 import network.vonix.vonixcore.VonixCore;
@@ -308,25 +310,62 @@ public class AsyncRtpManager {
         ServerChunkCache chunkSource = level.getChunkSource();
 
         try {
-            // Add ticket and ensure FULL chunk status for teleport
-            chunkSource.addRegionTicket(RTP_TICKET, chunkPos, 2, chunkPos);
+            // Add ticket with higher radius to ensure proper chunk loading
+            chunkSource.addRegionTicket(RTP_TICKET, chunkPos, 3, chunkPos);
 
-            // Force chunk to FULL status (this is fast since SURFACE is already done)
-            level.getChunk(safePos);
+            // Force chunk to FULL status with validation
+            ChunkAccess targetChunk = level.getChunk(safePos);
+            if (targetChunk == null || !targetChunk.getStatus().isOrAfter(ChunkStatus.FULL)) {
+                VonixCore.LOGGER.warn("[RTP] Target chunk not fully loaded, attempting force load");
+                // Force generation if needed
+                chunkSource.getChunkFuture(chunkPos.x, chunkPos.z, ChunkStatus.FULL, true)
+                    .orTimeout(10, TimeUnit.SECONDS)
+                    .join();
+            }
+
+            // Validate the location is still safe before teleporting
+            if (!isLocationSafeMainThread(level, safePos)) {
+                player.sendSystemMessage(Component.literal("§cTarget location became unsafe! Please try RTP again."));
+                return;
+            }
 
             // Save current location for /back command BEFORE teleporting
             TeleportManager.getInstance().saveLastLocation(player, false);
 
+            // Perform teleport with safety checks
             player.teleportTo(level, safePos.getX() + 0.5, safePos.getY(), safePos.getZ() + 0.5,
                     player.getYRot(), player.getXRot());
+            
             player.sendSystemMessage(Component.literal(String.format(
                     "§aTeleported to §eX: %d, Y: %d, Z: %d §7(Attempts: %d)",
                     safePos.getX(), safePos.getY(), safePos.getZ(), attempts)));
 
             // Pre-load surrounding chunks async (fire and forget)
             preloadSurroundingChunksAsync(level, safePos);
+        } catch (Exception e) {
+            VonixCore.LOGGER.error("[RTP] Error during teleport: {}", e.getMessage());
+            player.sendSystemMessage(Component.literal("§cTeleport failed! Please try RTP again."));
         } finally {
-            chunkSource.removeRegionTicket(RTP_TICKET, chunkPos, 2, chunkPos);
+            chunkSource.removeRegionTicket(RTP_TICKET, chunkPos, 3, chunkPos);
+        }
+    }
+
+    /**
+     * Final safety check on main thread before teleport.
+     */
+    private static boolean isLocationSafeMainThread(ServerLevel level, BlockPos pos) {
+        try {
+            BlockState groundState = level.getBlockState(pos.below());
+            BlockState spawnState = level.getBlockState(pos);
+            BlockState aboveState = level.getBlockState(pos.above());
+
+            return groundState.isSolid() && 
+                   spawnState.isAir() && 
+                   aboveState.isAir() &&
+                   !DANGEROUS_GROUND_BLOCKS.contains(groundState.getBlock());
+        } catch (Exception e) {
+            VonixCore.LOGGER.warn("[RTP] Safety check failed: {}", e.getMessage());
+            return false;
         }
     }
 
@@ -411,42 +450,90 @@ public class AsyncRtpManager {
 
     private static BlockPos findOverworldSafeYFromChunk(ServerLevel level, ChunkAccess chunk, int x, int z, int localX,
             int localZ) {
-        // Use heightmap from chunk (thread-safe)
-        int surface = chunk.getHeight(Heightmap.Types.MOTION_BLOCKING, localX, localZ);
         int minY = level.getMinBuildHeight();
         int maxY = level.getMaxBuildHeight();
+        
+        // Start at Y=100 as requested and search downward for first solid ground
+        int startY = Math.min(100, maxY - 2);
+        int endY = Math.max(minY + 1, 80); // Don't go below Y=80 for safety
 
-        if (surface <= minY) {
-            // Void biome, search manually
-            for (int y = 64; y <= 256; y++) {
-                BlockPos localCheck = new BlockPos(localX, y, localZ);
-                if (chunk.getBlockState(localCheck).isSolidRender(chunk, localCheck)) {
-                    BlockPos spawn = new BlockPos(x, y + 1, z);
-                    BlockPos localSpawn = new BlockPos(localX, y + 1, localZ);
-                    BlockPos localAbove = new BlockPos(localX, y + 2, localZ);
-                    if (chunk.getBlockState(localSpawn).isAir() && chunk.getBlockState(localAbove).isAir()) {
-                        return spawn;
+        // Enhanced safety check: look for solid ground with proper space
+        for (int y = startY; y >= endY; y--) {
+            BlockPos localCheck = new BlockPos(localX, y, localZ);
+            if (isSafeGroundBlock(chunk, localCheck)) {
+                // Check if there's enough space above (2 air blocks)
+                BlockPos localSpawn = new BlockPos(localX, y + 1, localZ);
+                BlockPos localAbove = new BlockPos(localX, y + 2, localZ);
+                if (isSafeAirSpace(chunk, localSpawn, localAbove)) {
+                    // Additional safety check: not in dangerous blocks and not underground
+                    if (!isDangerousLocation(chunk, localSpawn) && !isUnderground(chunk, localX, y + 1, localZ)) {
+                        return new BlockPos(x, y + 1, z);
                     }
                 }
             }
-            return null;
         }
-
-        int startY = Math.max(minY + 1, surface - 10);
-        int endY = Math.min(maxY - 2, surface + 10);
-
-        for (int y = startY; y <= endY; y++) {
-            BlockPos localCheck = new BlockPos(localX, y, localZ);
-            if (chunk.getBlockState(localCheck).isSolidRender(chunk, localCheck)) {
-                BlockPos spawn = new BlockPos(x, y + 1, z);
-                BlockPos localSpawn = new BlockPos(localX, y + 1, localZ);
-                BlockPos localAbove = new BlockPos(localX, y + 2, localZ);
-                if (chunk.getBlockState(localSpawn).isAir() && chunk.getBlockState(localAbove).isAir()) {
-                    return spawn;
+        
+        // Fallback: if nothing found from Y=100 downward, try limited upward search
+        int surface = chunk.getHeight(Heightmap.Types.MOTION_BLOCKING, localX, localZ);
+        if (surface > startY && surface <= maxY - 2) {
+            int fallbackStart = Math.max(startY + 1, surface - 3);
+            int fallbackEnd = Math.min(maxY - 2, surface + 3);
+            
+            for (int y = fallbackStart; y <= fallbackEnd; y++) {
+                BlockPos localCheck = new BlockPos(localX, y, localZ);
+                if (isSafeGroundBlock(chunk, localCheck)) {
+                    BlockPos localSpawn = new BlockPos(localX, y + 1, localZ);
+                    BlockPos localAbove = new BlockPos(localX, y + 2, localZ);
+                    if (isSafeAirSpace(chunk, localSpawn, localAbove) &&
+                        !isDangerousLocation(chunk, localSpawn)) {
+                        return new BlockPos(x, y + 1, z);
+                    }
                 }
             }
         }
+        
         return null;
+    }
+
+    /**
+     * Check if a block is safe ground for spawning.
+     */
+    private static boolean isSafeGroundBlock(ChunkAccess chunk, BlockPos pos) {
+        BlockState state = chunk.getBlockState(pos);
+        return state.isSolidRender(chunk, pos) && 
+               !state.isAir() && 
+               !DANGEROUS_GROUND_BLOCKS.contains(state.getBlock());
+    }
+
+    /**
+     * Check if there's safe air space for player.
+     */
+    private static boolean isSafeAirSpace(ChunkAccess chunk, BlockPos spawnPos, BlockPos abovePos) {
+        return chunk.getBlockState(spawnPos).isAir() && 
+               chunk.getBlockState(abovePos).isAir();
+    }
+
+    /**
+     * Check if location is underground (cave detection).
+     */
+    private static boolean isUnderground(ChunkAccess chunk, int localX, int y, int localZ) {
+        // Check if there are solid blocks above (indicating underground)
+        for (int checkY = y + 2; checkY <= y + 5; checkY++) {
+            BlockPos checkPos = new BlockPos(localX, checkY, localZ);
+            if (chunk.getBlockState(checkPos).isSolidRender(chunk, checkPos)) {
+                return true; // Underground
+            }
+        }
+        return false; // Open sky above
+    }
+
+    /**
+     * Check if a location has dangerous ground blocks.
+     */
+    private static boolean isDangerousLocation(ChunkAccess chunk, BlockPos localPos) {
+        BlockPos localBelow = new BlockPos(localPos.getX(), localPos.getY() - 1, localPos.getZ());
+        Block belowBlock = chunk.getBlockState(localBelow).getBlock();
+        return DANGEROUS_GROUND_BLOCKS.contains(belowBlock);
     }
 
     /**
