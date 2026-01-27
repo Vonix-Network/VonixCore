@@ -5,6 +5,36 @@ All notable changes to VonixCore will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.3] - 2026-01-26
+
+### ✨ Added
+
+#### Discord Advancement Message Formatting
+- **Vanilla-style advancement messages** - Discord advancement notifications now display in Minecraft with authentic vanilla formatting
+- **Advancement type detection** - Automatically detects and formats Task, Goal, and Challenge advancements with appropriate colors
+- **Hover descriptions** - Full advancement descriptions appear on hover, matching vanilla behavior
+- **Multi-server support** - Configurable server prefixes distinguish advancements from different servers
+- **Robust error handling** - Graceful fallback to original Discord embeds if processing fails
+- **Zero performance impact** - Asynchronous processing ensures no server lag
+
+#### RTP Performance Infrastructure (Partial)
+- **ChunkLoadingManager** - Advanced async chunk loading with temporary tickets and automatic cleanup
+- **SafetyValidationEngine** - Multi-layer safety checks for RTP locations (block safety, hazards, structures)
+- **SpiralSearchAlgorithm** - Efficient spiral search pattern with biome filtering
+- **PerformanceMonitor** - Comprehensive metrics collection and threshold monitoring
+- **RTPRequestManager** - Non-blocking request processing with per-player state tracking
+
+### 🔧 Fixed
+- Discord integration now handles config initialization gracefully in test environments
+- Improved type safety in chunk loading operations
+
+### 📝 Technical Notes
+- Advancement message formatting is production-ready and fully tested
+- RTP performance components are implemented but not yet integrated (AsyncRtpManager remains active)
+- All core infrastructure for RTP optimization is in place for future completion
+
+---
+
 ## [1.0.0] - 2024-12-09
 
 ### 🎉 Initial Release

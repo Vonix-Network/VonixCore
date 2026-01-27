@@ -51,6 +51,12 @@ public class DiscordManager {
     private DiscordApi discordApi = null;
     private LinkedAccountsManager linkedAccountsManager = null;
     private PlayerPreferences playerPreferences = null;
+    private ServerPrefixConfig serverPrefixConfig = null;
+    
+    // Advancement message formatting components
+    private final AdvancementEmbedDetector advancementDetector;
+    private final AdvancementDataExtractor advancementExtractor;
+    private final VanillaComponentBuilder componentBuilder;
 
     private static final Pattern DISCORD_MARKDOWN_LINK = Pattern.compile("\\[([^\\]]+)]\\((https?://[^)]+)\\)");
 
@@ -60,8 +66,22 @@ public class DiscordManager {
                 .writeTimeout(10, TimeUnit.SECONDS)
                 .readTimeout(10, TimeUnit.SECONDS)
                 .build();
-        this.messageQueue = new LinkedBlockingQueue<>(
-                DiscordConfig.CONFIG.messageQueueSize.get());
+        
+        // Use default queue size if config is not available (e.g., in tests)
+        int queueSize = 100; // default
+        try {
+            if (DiscordConfig.CONFIG != null && DiscordConfig.CONFIG.messageQueueSize != null) {
+                queueSize = DiscordConfig.CONFIG.messageQueueSize.get();
+            }
+        } catch (Exception e) {
+            // Config not available, use default
+        }
+        this.messageQueue = new LinkedBlockingQueue<>(queueSize);
+        
+        // Initialize advancement processing components
+        this.advancementDetector = new AdvancementEmbedDetector();
+        this.advancementExtractor = new AdvancementDataExtractor();
+        this.componentBuilder = new VanillaComponentBuilder();
     }
 
     public static DiscordManager getInstance() {
@@ -95,6 +115,21 @@ public class DiscordManager {
             VonixCore.LOGGER.info("[Discord] Player preferences system initialized");
         } catch (Exception e) {
             VonixCore.LOGGER.error("[Discord] Failed to initialize player preferences", e);
+        }
+
+        // Initialize server prefix configuration
+        try {
+            serverPrefixConfig = new ServerPrefixConfig();
+            // Set fallback prefix from existing config
+            String configPrefix = DiscordConfig.CONFIG.serverPrefix.get();
+            if (configPrefix != null && !configPrefix.trim().isEmpty()) {
+                serverPrefixConfig.setFallbackPrefix(configPrefix.trim());
+            }
+            VonixCore.LOGGER.info("[Discord] Server prefix configuration system initialized");
+        } catch (Exception e) {
+            VonixCore.LOGGER.error("[Discord] Failed to initialize server prefix configuration", e);
+            // Create a basic fallback configuration
+            serverPrefixConfig = new ServerPrefixConfig();
         }
 
         running = true;
@@ -294,28 +329,68 @@ public class DiscordManager {
         try {
             String channelId = DiscordConfig.CONFIG.channelId.get();
             if (channelId == null || channelId.equals("YOUR_CHANNEL_ID_HERE")) {
-                VonixCore.LOGGER.warn("[Discord] Channel ID not configured");
+                VonixCore.LOGGER.warn("[Discord] Channel ID not configured - Discord integration will be limited");
                 return;
             }
 
             VonixCore.LOGGER.info("[Discord] Connecting to Discord (async)...");
 
-            // Connect asynchronously to avoid blocking server startup
-            new DiscordApiBuilder()
-                    .setToken(botToken)
-                    .setIntents(Intent.GUILD_MESSAGES, Intent.MESSAGE_CONTENT)
-                    .login()
-                    .orTimeout(15, TimeUnit.SECONDS)
-                    .whenComplete((api, error) -> {
-                        if (error != null) {
-                            VonixCore.LOGGER.error("[Discord] Failed to connect: {}", error.getMessage());
-                            return;
-                        }
-                        discordApi = api;
-                        onJavacordConnected(channelId);
-                    });
-        } catch (Exception e) {
-            VonixCore.LOGGER.error("[Discord] Failed to initialize Javacord", e);
+            // Enhanced error handling for Discord API connection
+            try {
+                new DiscordApiBuilder()
+                        .setToken(botToken)
+                        .setIntents(Intent.GUILD_MESSAGES, Intent.MESSAGE_CONTENT)
+                        .login()
+                        .orTimeout(15, TimeUnit.SECONDS)
+                        .whenComplete((api, error) -> {
+                            if (error != null) {
+                                // Enhanced error logging with more context
+                                VonixCore.LOGGER.error("[Discord] Failed to connect to Discord API. " +
+                                        "Error type: {} | Error message: {} | Token length: {} | " +
+                                        "This will disable Discord message processing but server will continue normally.", 
+                                        error.getClass().getSimpleName(), error.getMessage(), 
+                                        botToken != null ? botToken.length() : 0, error);
+                                
+                                // Ensure discordApi is null to prevent further API calls
+                                discordApi = null;
+                                return;
+                            }
+                            
+                            try {
+                                discordApi = api;
+                                onJavacordConnected(channelId);
+                            } catch (Exception postConnectionError) {
+                                VonixCore.LOGGER.error("[Discord] Error during post-connection setup. " +
+                                        "Error: {} | Channel ID: {} | API status: {} | " +
+                                        "Discord integration may be partially functional.", 
+                                        postConnectionError.getMessage(), channelId, 
+                                        (api != null ? "connected" : "null"), postConnectionError);
+                                
+                                // Don't null the API here as basic connection succeeded
+                                // Just log the error and continue with limited functionality
+                            }
+                        });
+            } catch (Exception builderError) {
+                VonixCore.LOGGER.error("[Discord] Failed to create Discord API builder. " +
+                        "Error: {} | Error type: {} | Token configured: {} | " +
+                        "This indicates a configuration or dependency issue.", 
+                        builderError.getMessage(), builderError.getClass().getSimpleName(),
+                        (botToken != null && !botToken.isEmpty()), builderError);
+                discordApi = null;
+            }
+            
+        } catch (Exception configError) {
+            VonixCore.LOGGER.error("[Discord] Failed to read Discord configuration. " +
+                    "Error: {} | Error type: {} | " +
+                    "Check your Discord configuration settings.", 
+                    configError.getMessage(), configError.getClass().getSimpleName(), configError);
+            discordApi = null;
+        } catch (Throwable criticalError) {
+            // Catch Throwable to handle any critical system errors
+            VonixCore.LOGGER.error("[Discord] Critical error during Javacord initialization. " +
+                    "Error: {} | Error type: {} | " +
+                    "Discord integration will be completely disabled.", 
+                    criticalError.getMessage(), criticalError.getClass().getSimpleName(), criticalError);
             discordApi = null;
         }
     }
@@ -323,56 +398,147 @@ public class DiscordManager {
     /**
      * Called after Javacord successfully connects to Discord.
      * Runs asynchronously to avoid blocking server startup.
+     * Enhanced with comprehensive error handling for all initialization steps.
      */
     private void onJavacordConnected(String channelId) {
         try {
             VonixCore.LOGGER.info("[Discord] Connected as: {}", discordApi.getYourself().getName());
 
-            // Register message listener
-            long channelIdLong = Long.parseLong(channelId);
+            // Enhanced error handling for channel ID parsing
+            long channelIdLong;
+            try {
+                channelIdLong = Long.parseLong(channelId);
+            } catch (NumberFormatException e) {
+                VonixCore.LOGGER.error("[Discord] Invalid channel ID format: '{}'. " +
+                        "Channel ID must be a valid Discord channel ID number. " +
+                        "Message processing will be disabled.", channelId, e);
+                return;
+            }
+
+            // Enhanced error handling for event channel ID parsing
             String eventChannelIdStr = DiscordConfig.CONFIG.eventChannelId.get();
             Long eventChannelIdLong = null;
-
             if (eventChannelIdStr != null && !eventChannelIdStr.isEmpty()) {
                 try {
                     eventChannelIdLong = Long.parseLong(eventChannelIdStr);
                 } catch (NumberFormatException e) {
-                    // Ignore
+                    VonixCore.LOGGER.warn("[Discord] Invalid event channel ID format: '{}'. " +
+                            "Event channel processing will be disabled but main channel will work.", 
+                            eventChannelIdStr, e);
+                    // Continue with null event channel - this is not critical
                 }
             }
 
+            // Enhanced error handling for message listener registration
             final Long finalEventChannelId = eventChannelIdLong;
-            discordApi.addMessageCreateListener(event -> {
-                long msgChannelId = event.getChannel().getId();
-                if (msgChannelId == channelIdLong ||
-                        (finalEventChannelId != null && msgChannelId == finalEventChannelId)) {
-                    processJavacordMessage(msgChannelId, event);
-                }
-            });
+            try {
+                discordApi.addMessageCreateListener(event -> {
+                    // Wrap the entire message processing in try-catch to prevent
+                    // any single message from crashing the listener
+                    try {
+                        long msgChannelId = event.getChannel().getId();
+                        if (msgChannelId == channelIdLong ||
+                                (finalEventChannelId != null && msgChannelId == finalEventChannelId)) {
+                            processJavacordMessage(msgChannelId, event);
+                        }
+                    } catch (Exception messageProcessingError) {
+                        // Enhanced error logging with message context
+                        VonixCore.LOGGER.error("[Discord] Error processing individual message. " +
+                                "Error: {} | Error type: {} | Channel: {} | Author: {} | " +
+                                "Message processing will continue for other messages.", 
+                                messageProcessingError.getMessage(), 
+                                messageProcessingError.getClass().getSimpleName(),
+                                event.getChannel().getId(),
+                                event.getMessageAuthor().getDisplayName(), messageProcessingError);
+                        
+                        // Don't rethrow - this ensures one bad message doesn't break the entire listener
+                    } catch (Throwable criticalMessageError) {
+                        // Catch Throwable for critical errors that might not be Exceptions
+                        VonixCore.LOGGER.error("[Discord] Critical error processing message. " +
+                                "Error: {} | Error type: {} | Channel: {} | " +
+                                "This indicates a serious system issue but processing will continue.", 
+                                criticalMessageError.getMessage(), 
+                                criticalMessageError.getClass().getSimpleName(),
+                                event.getChannel().getId(), criticalMessageError);
+                    }
+                });
+                VonixCore.LOGGER.info("[Discord] Message listener registered successfully for channels: {} and {}", 
+                        channelIdLong, finalEventChannelId);
+            } catch (Exception listenerError) {
+                VonixCore.LOGGER.error("[Discord] Failed to register message listener. " +
+                        "Error: {} | Error type: {} | Main channel: {} | Event channel: {} | " +
+                        "Discord message processing will not work.", 
+                        listenerError.getMessage(), listenerError.getClass().getSimpleName(),
+                        channelIdLong, finalEventChannelId, listenerError);
+                // Continue with other initialization steps even if listener fails
+            }
 
-            // Initialize account linking
+            // Enhanced error handling for account linking initialization
             if (DiscordConfig.CONFIG.enableAccountLinking.get()) {
                 try {
                     linkedAccountsManager = new LinkedAccountsManager(
                             server.getServerDirectory().toPath().resolve("config"));
-                    VonixCore.LOGGER.info("[Discord] Account linking initialized ({} accounts)",
+                    VonixCore.LOGGER.info("[Discord] Account linking initialized successfully ({} accounts)",
                             linkedAccountsManager.getLinkedCount());
-                } catch (Exception e) {
-                    VonixCore.LOGGER.error("[Discord] Failed to initialize account linking", e);
+                } catch (Exception linkingError) {
+                    VonixCore.LOGGER.error("[Discord] Failed to initialize account linking. " +
+                            "Error: {} | Error type: {} | Config path: {} | " +
+                            "Account linking features will be disabled.", 
+                            linkingError.getMessage(), linkingError.getClass().getSimpleName(),
+                            server != null ? server.getServerDirectory().toPath().resolve("config") : "unknown", 
+                            linkingError);
+                    linkedAccountsManager = null; // Ensure it's null so other code can check
                 }
             }
 
-            // Register slash commands ASYNCHRONOUSLY to avoid blocking
-            registerListCommandAsync();
-            if (DiscordConfig.CONFIG.enableAccountLinking.get() && linkedAccountsManager != null) {
-                registerLinkCommandsAsync();
+            // Enhanced error handling for slash command registration
+            try {
+                registerListCommandAsync();
+                VonixCore.LOGGER.debug("[Discord] List command registration initiated");
+            } catch (Exception listCommandError) {
+                VonixCore.LOGGER.error("[Discord] Failed to initiate list command registration. " +
+                        "Error: {} | Error type: {} | " +
+                        "/list command will not be available.", 
+                        listCommandError.getMessage(), listCommandError.getClass().getSimpleName(), 
+                        listCommandError);
             }
 
-            // Set bot status
-            updateBotStatus();
+            if (DiscordConfig.CONFIG.enableAccountLinking.get() && linkedAccountsManager != null) {
+                try {
+                    registerLinkCommandsAsync();
+                    VonixCore.LOGGER.debug("[Discord] Link commands registration initiated");
+                } catch (Exception linkCommandError) {
+                    VonixCore.LOGGER.error("[Discord] Failed to initiate link commands registration. " +
+                            "Error: {} | Error type: {} | " +
+                            "/link and /unlink commands will not be available.", 
+                            linkCommandError.getMessage(), linkCommandError.getClass().getSimpleName(), 
+                            linkCommandError);
+                }
+            }
 
-        } catch (Exception e) {
-            VonixCore.LOGGER.error("[Discord] Error during post-connection setup", e);
+            // Enhanced error handling for bot status update
+            try {
+                updateBotStatus();
+                VonixCore.LOGGER.debug("[Discord] Bot status updated successfully");
+            } catch (Exception statusError) {
+                VonixCore.LOGGER.error("[Discord] Failed to update bot status. " +
+                        "Error: {} | Error type: {} | " +
+                        "Bot status will not show player count but other features will work.", 
+                        statusError.getMessage(), statusError.getClass().getSimpleName(), statusError);
+            }
+
+        } catch (Exception generalError) {
+            VonixCore.LOGGER.error("[Discord] Error during post-connection setup. " +
+                    "Error: {} | Error type: {} | Channel ID: {} | " +
+                    "Some Discord features may not work properly.", 
+                    generalError.getMessage(), generalError.getClass().getSimpleName(), 
+                    channelId, generalError);
+        } catch (Throwable criticalError) {
+            VonixCore.LOGGER.error("[Discord] Critical error during post-connection setup. " +
+                    "Error: {} | Error type: {} | Channel ID: {} | " +
+                    "Discord integration may be severely impacted.", 
+                    criticalError.getMessage(), criticalError.getClass().getSimpleName(), 
+                    channelId, criticalError);
         }
     }
 
@@ -391,7 +557,9 @@ public class DiscordManager {
 
             // Filter our own webhooks based on username prefix
             if (isWebhook) {
-                String ourPrefix = DiscordConfig.CONFIG.serverPrefix.get();
+                // Get server context for prefix determination
+                org.javacord.api.entity.server.Server server = event.getServer().orElse(null);
+                String ourPrefix = getServerPrefix(server);
                 if (authorName != null && authorName.startsWith(ourPrefix)) {
                     return;
                 }
@@ -400,7 +568,9 @@ public class DiscordManager {
             // Filter other webhooks if configured
             if (DiscordConfig.CONFIG.ignoreWebhooks.get() && isWebhook) {
                 if (DiscordConfig.CONFIG.filterByPrefix.get()) {
-                    String ourPrefix = DiscordConfig.CONFIG.serverPrefix.get();
+                    // Get server context for prefix determination
+                    org.javacord.api.entity.server.Server server = event.getServer().orElse(null);
+                    String ourPrefix = getServerPrefix(server);
                     if (authorName != null && authorName.startsWith(ourPrefix)) {
                         return;
                     }
@@ -418,6 +588,15 @@ public class DiscordManager {
             if (content.isEmpty()) {
                 // Check for embeds (often used for cross-server events)
                 if (!event.getMessage().getEmbeds().isEmpty()) {
+                    // First, check for advancement embeds and process them specially
+                    for (org.javacord.api.entity.message.embed.Embed embed : event.getMessage().getEmbeds()) {
+                        if (advancementDetector.isAdvancementEmbed(embed)) {
+                            processAdvancementEmbed(embed, event);
+                            return; // Skip normal embed processing for advancement embeds
+                        }
+                    }
+                    
+                    // Continue with normal embed processing if no advancement embeds found
                     org.javacord.api.entity.message.embed.Embed embed = event.getMessage().getEmbeds().get(0);
                     isEvent = true;
 
@@ -568,6 +747,673 @@ public class DiscordManager {
         }
     }
 
+    /**
+     * Processes advancement embeds by extracting data and converting to vanilla-style components.
+     * This method handles the complete advancement processing pipeline: detection, extraction,
+     * component generation, and chat system integration with comprehensive fallback behavior.
+     * 
+     * @param embed The Discord embed containing advancement information
+     * @param event The message event for context (server, channel, etc.)
+     */
+    private void processAdvancementEmbed(org.javacord.api.entity.message.embed.Embed embed, 
+                                       org.javacord.api.event.message.MessageCreateEvent event) {
+        String contextInfo = buildErrorContext(embed, event);
+        long startTime = System.currentTimeMillis();
+        
+        // Enhanced error logging with comprehensive context
+        if (DiscordConfig.CONFIG.debugLogging.get()) {
+            VonixCore.LOGGER.debug("[Discord] Starting advancement embed processing {}", contextInfo);
+        }
+        
+        try {
+            // Extract advancement data from the embed
+            AdvancementData data = advancementExtractor.extractFromEmbed(embed);
+            
+            // Log successful extraction in debug mode
+            if (DiscordConfig.CONFIG.debugLogging.get()) {
+                VonixCore.LOGGER.debug("[Discord] Successfully extracted advancement data: player='{}', title='{}', type='{}' {}", 
+                        data.getPlayerName(), data.getAdvancementTitle(), data.getType(), contextInfo);
+            }
+            
+            // Determine server prefix for this message
+            org.javacord.api.entity.server.Server discordServer = event.getServer().orElse(null);
+            String serverPrefix = getServerPrefix(discordServer);
+            
+            try {
+                // Generate vanilla-style advancement component
+                MutableComponent advancementComponent = componentBuilder.buildAdvancementMessage(data, serverPrefix);
+                
+                // Log successful component generation in debug mode
+                if (DiscordConfig.CONFIG.debugLogging.get()) {
+                    VonixCore.LOGGER.debug("[Discord] Successfully generated advancement component with prefix '{}' {}", 
+                            serverPrefix, contextInfo);
+                }
+                
+                try {
+                    // Send to Minecraft chat system
+                    if (server != null) {
+                        server.getPlayerList().broadcastSystemMessage(advancementComponent, false);
+                        
+                        long processingTime = System.currentTimeMillis() - startTime;
+                        if (DiscordConfig.CONFIG.debugLogging.get()) {
+                            VonixCore.LOGGER.info("[Discord] Successfully processed advancement embed: {} earned '{}' ({}ms) {}", 
+                                    data.getPlayerName(), data.getAdvancementTitle(), processingTime, contextInfo);
+                        }
+                        return; // Success - exit early
+                    } else {
+                        VonixCore.LOGGER.error("[Discord] Cannot send advancement message - Minecraft server instance is null. " +
+                                "This indicates a critical system state issue. {}", contextInfo);
+                        // Fall through to fallback processing
+                    }
+                } catch (Exception chatError) {
+                    VonixCore.LOGGER.error("[Discord] Failed to send advancement message to chat system. " +
+                            "Error: {} | Player: {} | Advancement: {} | Server: {} {}", 
+                            chatError.getMessage(), data.getPlayerName(), data.getAdvancementTitle(), 
+                            (server != null ? "available" : "null"), contextInfo, chatError);
+                    // Fall through to fallback processing
+                }
+            } catch (Exception componentError) {
+                VonixCore.LOGGER.error("[Discord] Failed to generate advancement component. " +
+                        "Error: {} | Player: {} | Advancement: {} | Type: {} | Prefix: '{}' {}", 
+                        componentError.getMessage(), data.getPlayerName(), data.getAdvancementTitle(), 
+                        data.getType(), serverPrefix, contextInfo, componentError);
+                // Fall through to fallback processing
+            }
+            
+        } catch (ExtractionException e) {
+            VonixCore.LOGGER.error("[Discord] Failed to extract advancement data from embed. " +
+                    "Error: {} | Available fields: {} | Title: {} | Description: {} {}", 
+                    e.getMessage(), embed.getFields().size(), 
+                    embed.getTitle().orElse("none"), embed.getDescription().orElse("none"), contextInfo);
+            // Fall through to fallback processing
+            
+        } catch (Exception e) {
+            VonixCore.LOGGER.error("[Discord] Unexpected error during advancement processing. " +
+                    "Error: {} | Error type: {} | Embed fields: {} {}", 
+                    e.getMessage(), e.getClass().getSimpleName(), embed.getFields().size(), contextInfo, e);
+            // Fall through to fallback processing
+        }
+        
+        // Comprehensive fallback processing - try multiple fallback strategies
+        long fallbackStartTime = System.currentTimeMillis();
+        VonixCore.LOGGER.warn("[Discord] Initiating fallback processing for advancement embed {}", contextInfo);
+        handleAdvancementFallback(embed, event, contextInfo, fallbackStartTime);
+    }
+    
+    /**
+     * Handles fallback processing for advancement embeds when primary processing fails.
+     * Implements multiple fallback strategies with graceful degradation and comprehensive error logging.
+     * 
+     * @param embed The Discord embed that failed to process
+     * @param event The message event for context
+     * @param contextInfo Context information for logging
+     * @param fallbackStartTime The timestamp when fallback processing started
+     */
+    private void handleAdvancementFallback(org.javacord.api.entity.message.embed.Embed embed,
+                                         org.javacord.api.event.message.MessageCreateEvent event,
+                                         String contextInfo,
+                                         long fallbackStartTime) {
+        
+        int strategyAttempted = 0;
+        
+        // Strategy 1: Try to create a basic advancement message from available embed data
+        strategyAttempted++;
+        if (DiscordConfig.CONFIG.debugLogging.get()) {
+            VonixCore.LOGGER.debug("[Discord] Attempting fallback strategy {}: basic advancement message {}", 
+                    strategyAttempted, contextInfo);
+        }
+        
+        try {
+            String playerName = extractPlayerNameFallback(embed);
+            String advancementTitle = extractAdvancementTitleFallback(embed);
+            
+            if (playerName != null && advancementTitle != null) {
+                org.javacord.api.entity.server.Server discordServer = event.getServer().orElse(null);
+                String serverPrefix = getServerPrefix(discordServer);
+                
+                MutableComponent fallbackComponent = componentBuilder.createFallbackComponent(
+                        playerName, advancementTitle, serverPrefix);
+                
+                if (server != null && fallbackComponent != null) {
+                    server.getPlayerList().broadcastSystemMessage(fallbackComponent, false);
+                    long totalTime = System.currentTimeMillis() - fallbackStartTime;
+                    VonixCore.LOGGER.info("[Discord] Successfully used basic fallback processing for advancement embed. " +
+                            "Player: {} | Title: {} | Time: {}ms {}", 
+                            playerName, advancementTitle, totalTime, contextInfo);
+                    return; // Success - exit early
+                } else {
+                    VonixCore.LOGGER.warn("[Discord] Basic fallback failed - server or component is null. " +
+                            "Server: {} | Component: {} {}", 
+                            (server != null ? "available" : "null"), 
+                            (fallbackComponent != null ? "created" : "null"), contextInfo);
+                }
+            } else {
+                VonixCore.LOGGER.warn("[Discord] Basic fallback failed - could not extract required data. " +
+                        "Player: {} | Title: {} {}", 
+                        (playerName != null ? "'" + playerName + "'" : "null"), 
+                        (advancementTitle != null ? "'" + advancementTitle + "'" : "null"), contextInfo);
+            }
+        } catch (Exception fallbackError) {
+            VonixCore.LOGGER.error("[Discord] Basic fallback advancement processing failed. " +
+                    "Error: {} | Error type: {} {}", 
+                    fallbackError.getMessage(), fallbackError.getClass().getSimpleName(), contextInfo, fallbackError);
+        }
+        
+        // Strategy 2: Fall back to original Discord embed display (Requirement 6.3)
+        strategyAttempted++;
+        if (DiscordConfig.CONFIG.debugLogging.get()) {
+            VonixCore.LOGGER.debug("[Discord] Attempting fallback strategy {}: original embed display {}", 
+                    strategyAttempted, contextInfo);
+        }
+        
+        try {
+            MutableComponent originalEmbedComponent = convertEmbedToMinecraftComponent(embed, event);
+            
+            if (server != null && originalEmbedComponent != null) {
+                server.getPlayerList().broadcastSystemMessage(originalEmbedComponent, false);
+                long totalTime = System.currentTimeMillis() - fallbackStartTime;
+                VonixCore.LOGGER.info("[Discord] Successfully fell back to original embed display for advancement. " +
+                        "Time: {}ms | Embed title: {} | Fields: {} {}", 
+                        totalTime, embed.getTitle().orElse("none"), embed.getFields().size(), contextInfo);
+                return; // Success - exit early
+            } else {
+                VonixCore.LOGGER.warn("[Discord] Original embed fallback failed - server or component is null. " +
+                        "Server: {} | Component: {} {}", 
+                        (server != null ? "available" : "null"), 
+                        (originalEmbedComponent != null ? "created" : "null"), contextInfo);
+            }
+        } catch (Exception embedFallbackError) {
+            VonixCore.LOGGER.error("[Discord] Original embed fallback processing failed. " +
+                    "Error: {} | Error type: {} | Embed title: {} | Fields: {} {}", 
+                    embedFallbackError.getMessage(), embedFallbackError.getClass().getSimpleName(),
+                    embed.getTitle().orElse("none"), embed.getFields().size(), contextInfo, embedFallbackError);
+        }
+        
+        // Strategy 3: Last resort - create a minimal error message
+        strategyAttempted++;
+        if (DiscordConfig.CONFIG.debugLogging.get()) {
+            VonixCore.LOGGER.debug("[Discord] Attempting fallback strategy {}: minimal error message {}", 
+                    strategyAttempted, contextInfo);
+        }
+        
+        try {
+            org.javacord.api.entity.server.Server discordServer = event.getServer().orElse(null);
+            String serverPrefix = getServerPrefix(discordServer);
+            
+            MutableComponent errorComponent = createMinimalErrorComponent(serverPrefix, contextInfo);
+            
+            if (server != null && errorComponent != null) {
+                server.getPlayerList().broadcastSystemMessage(errorComponent, false);
+                long totalTime = System.currentTimeMillis() - fallbackStartTime;
+                VonixCore.LOGGER.warn("[Discord] Used minimal error message for advancement embed. " +
+                        "Time: {}ms | Server prefix: '{}' {}", 
+                        totalTime, serverPrefix, contextInfo);
+                return; // Success - exit early
+            } else {
+                VonixCore.LOGGER.error("[Discord] Minimal error message creation failed - server or component is null. " +
+                        "Server: {} | Component: {} {}", 
+                        (server != null ? "available" : "null"), 
+                        (errorComponent != null ? "created" : "null"), contextInfo);
+            }
+        } catch (Exception errorFallbackError) {
+            VonixCore.LOGGER.error("[Discord] Even minimal error message creation failed. " +
+                    "Error: {} | Error type: {} {}", 
+                    errorFallbackError.getMessage(), errorFallbackError.getClass().getSimpleName(), 
+                    contextInfo, errorFallbackError);
+        }
+        
+        // If all fallback strategies fail, log critical error with comprehensive information
+        long totalTime = System.currentTimeMillis() - fallbackStartTime;
+        VonixCore.LOGGER.error("[Discord] CRITICAL: All {} fallback strategies failed for advancement embed. " +
+                "Message will be lost. Time spent: {}ms | System state: server={} | " +
+                "Embed info: title='{}', fields={}, description='{}' {}", 
+                strategyAttempted, totalTime, (server != null ? "available" : "null"),
+                embed.getTitle().orElse("none"), embed.getFields().size(), 
+                embed.getDescription().orElse("none"), contextInfo);
+        
+        // Log system stability information with enhanced monitoring
+        try {
+            Runtime runtime = Runtime.getRuntime();
+            long freeMemory = runtime.freeMemory();
+            long totalMemory = runtime.totalMemory();
+            long maxMemory = runtime.maxMemory();
+            long usedMemory = totalMemory - freeMemory;
+            
+            // Calculate memory usage percentages
+            double usedPercentage = (double) usedMemory / totalMemory * 100;
+            double totalPercentage = (double) totalMemory / maxMemory * 100;
+            
+            VonixCore.LOGGER.error("[Discord] System stability check - Memory: {}MB used ({}%) / {}MB total ({}% of max {}MB) | " +
+                    "Free: {}MB | Threads: {} | Processors: {} {}", 
+                    usedMemory / 1024 / 1024, String.format("%.1f", usedPercentage),
+                    totalMemory / 1024 / 1024, String.format("%.1f", totalPercentage), maxMemory / 1024 / 1024,
+                    freeMemory / 1024 / 1024, Thread.activeCount(), runtime.availableProcessors(), contextInfo);
+            
+            // Check for potential memory issues
+            if (usedPercentage > 90) {
+                VonixCore.LOGGER.warn("[Discord] HIGH MEMORY USAGE WARNING: {}% memory used. This may affect advancement processing stability.", 
+                        String.format("%.1f", usedPercentage));
+            }
+            
+            // Check for thread count issues
+            int threadCount = Thread.activeCount();
+            if (threadCount > 100) {
+                VonixCore.LOGGER.warn("[Discord] HIGH THREAD COUNT WARNING: {} active threads. This may indicate resource leaks.", threadCount);
+            }
+            
+        } catch (Exception memoryCheckError) {
+            VonixCore.LOGGER.error("[Discord] Could not perform system stability check: {} | Error type: {} {}", 
+                    memoryCheckError.getMessage(), memoryCheckError.getClass().getSimpleName(), contextInfo);
+        }
+    }
+    
+    /**
+     * Converts a Discord embed to a Minecraft component using the original embed display logic.
+     * This provides fallback to the original Discord embed format when advancement processing fails.
+     * Enhanced with better error handling and validation to ensure system stability.
+     * 
+     * @param embed The Discord embed to convert
+     * @param event The message event for context
+     * @return A MutableComponent representing the original embed, or null if conversion fails
+     */
+    private MutableComponent convertEmbedToMinecraftComponent(org.javacord.api.entity.message.embed.Embed embed,
+                                                            org.javacord.api.event.message.MessageCreateEvent event) {
+        try {
+            if (embed == null) {
+                VonixCore.LOGGER.warn("[Discord] Cannot convert null embed to Minecraft component");
+                return null;
+            }
+            
+            StringBuilder embedContent = new StringBuilder();
+            
+            // Add Author if present
+            if (embed.getAuthor().isPresent()) {
+                String authorName = embed.getAuthor().get().getName();
+                if (authorName != null && !authorName.trim().isEmpty()) {
+                    embedContent.append(authorName.trim()).append(" ");
+                }
+            }
+            
+            // Add Title if present
+            if (embed.getTitle().isPresent()) {
+                String title = embed.getTitle().get();
+                if (title != null && !title.trim().isEmpty()) {
+                    embedContent.append(title.trim()).append(" ");
+                }
+            }
+            
+            // Add Description
+            String description = embed.getDescription().orElse("");
+            
+            // Parse Fields with enhanced validation
+            for (org.javacord.api.entity.message.embed.EmbedField field : embed.getFields()) {
+                try {
+                    String fieldName = field.getName();
+                    String fieldValue = field.getValue();
+                    
+                    if (fieldName != null && fieldValue != null && 
+                        !fieldName.trim().isEmpty() && !fieldValue.trim().isEmpty()) {
+                        embedContent.append("[").append(fieldName.trim()).append(": ")
+                                   .append(fieldValue.trim()).append("] ");
+                    }
+                } catch (Exception fieldError) {
+                    VonixCore.LOGGER.warn("[Discord] Error processing embed field: {}", fieldError.getMessage());
+                    // Continue processing other fields
+                }
+            }
+            
+            if (description != null && !description.trim().isEmpty()) {
+                embedContent.append(description.trim());
+            }
+            
+            String content = embedContent.toString().trim();
+            if (content.isEmpty()) {
+                VonixCore.LOGGER.warn("[Discord] Embed content is empty after processing - cannot create component");
+                return null;
+            }
+            
+            // Get server prefix and format as webhook message with enhanced error handling
+            org.javacord.api.entity.server.Server discordServer = event.getServer().orElse(null);
+            String serverPrefix = getServerPrefix(discordServer);
+            String authorName = event.getMessageAuthor().getDisplayName();
+            
+            String formattedMessage;
+            if (authorName != null && authorName.startsWith("[") && authorName.contains("]")) {
+                try {
+                    int endBracket = authorName.indexOf("]");
+                    String prefix = authorName.substring(0, endBracket + 1);
+                    formattedMessage = "§a" + prefix + " §f" + content;
+                } catch (Exception prefixError) {
+                    VonixCore.LOGGER.warn("[Discord] Error parsing author prefix, using fallback: {}", prefixError.getMessage());
+                    formattedMessage = "§a[" + serverPrefix + "] §f" + content;
+                }
+            } else {
+                formattedMessage = "§a[" + serverPrefix + "] §f" + content;
+            }
+            
+            Component component = toMinecraftComponentWithLinks(formattedMessage);
+            return component instanceof MutableComponent ? (MutableComponent) component : Component.empty().append(component);
+            
+        } catch (Exception e) {
+            VonixCore.LOGGER.error("[Discord] Error converting embed to Minecraft component. " +
+                    "Error: {} | Error type: {} | Embed title: {} | Fields: {}", 
+                    e.getMessage(), e.getClass().getSimpleName(),
+                    embed != null ? embed.getTitle().orElse("none") : "null",
+                    embed != null ? embed.getFields().size() : "unknown", e);
+            return null;
+        }
+    }
+    
+    /**
+     * Creates a minimal error component when all other fallback strategies fail.
+     * Enhanced with better error handling and more informative messaging.
+     * 
+     * @param serverPrefix The server prefix for context
+     * @param contextInfo Context information for the error
+     * @return A minimal error component, or null if creation fails
+     */
+    private MutableComponent createMinimalErrorComponent(String serverPrefix, String contextInfo) {
+        try {
+            MutableComponent errorComponent = Component.empty();
+            
+            // Add server prefix if available with validation
+            if (serverPrefix != null && !serverPrefix.trim().isEmpty()) {
+                try {
+                    errorComponent.append(Component.literal("[" + serverPrefix.trim() + "] ")
+                            .withStyle(ChatFormatting.GRAY));
+                } catch (Exception prefixError) {
+                    VonixCore.LOGGER.warn("[Discord] Error adding server prefix to minimal error component: {}", 
+                            prefixError.getMessage());
+                    // Continue without prefix
+                }
+            }
+            
+            // Add error message with enhanced information
+            try {
+                errorComponent.append(Component.literal("⚠ An advancement was earned but could not be displayed properly")
+                        .withStyle(ChatFormatting.YELLOW));
+                
+                // Add additional context in debug mode
+                if (DiscordConfig.CONFIG.debugLogging.get()) {
+                    errorComponent.append(Component.literal(" (Check logs for details)")
+                            .withStyle(ChatFormatting.GRAY));
+                }
+            } catch (Exception messageError) {
+                VonixCore.LOGGER.error("[Discord] Error creating error message text: {}", messageError.getMessage());
+                // Try to create a very basic message
+                try {
+                    return Component.literal("⚠ Advancement processing error").withStyle(ChatFormatting.RED);
+                } catch (Exception basicError) {
+                    VonixCore.LOGGER.error("[Discord] Cannot create even basic error message: {}", basicError.getMessage());
+                    return null;
+                }
+            }
+            
+            return errorComponent;
+            
+        } catch (Exception e) {
+            VonixCore.LOGGER.error("[Discord] Failed to create minimal error component. " +
+                    "Error: {} | Error type: {} | Server prefix: '{}' {}", 
+                    e.getMessage(), e.getClass().getSimpleName(), serverPrefix, contextInfo, e);
+            return null;
+        }
+    }
+    
+    /**
+     * Builds context information for error logging to help with debugging.
+     * Enhanced with additional system state information and better error handling.
+     * 
+     * @param embed The Discord embed being processed
+     * @param event The message event for additional context
+     * @return A string containing context information for logging
+     */
+    private String buildErrorContext(org.javacord.api.entity.message.embed.Embed embed,
+                                   org.javacord.api.event.message.MessageCreateEvent event) {
+        try {
+            StringBuilder context = new StringBuilder();
+            context.append("[Context: ");
+            
+            // Add server information with null safety
+            try {
+                if (event.getServer().isPresent()) {
+                    context.append("Server=").append(event.getServer().get().getName()).append(", ");
+                } else {
+                    context.append("Server=DM/Unknown, ");
+                }
+            } catch (Exception serverError) {
+                context.append("Server=Error, ");
+            }
+            
+            // Add channel information with error handling
+            try {
+                context.append("Channel=").append(event.getChannel().getId()).append(", ");
+            } catch (Exception channelError) {
+                context.append("Channel=Error, ");
+            }
+            
+            // Add message author information
+            try {
+                String authorName = event.getMessageAuthor().getDisplayName();
+                context.append("Author=").append(authorName != null ? authorName : "Unknown").append(", ");
+            } catch (Exception authorError) {
+                context.append("Author=Error, ");
+            }
+            
+            // Add embed information with comprehensive error handling
+            if (embed != null) {
+                try {
+                    if (embed.getTitle().isPresent()) {
+                        String title = embed.getTitle().get();
+                        // Truncate very long titles for logging
+                        if (title.length() > 50) {
+                            title = title.substring(0, 47) + "...";
+                        }
+                        context.append("EmbedTitle='").append(title).append("', ");
+                    } else {
+                        context.append("EmbedTitle=None, ");
+                    }
+                } catch (Exception titleError) {
+                    context.append("EmbedTitle=Error, ");
+                }
+                
+                try {
+                    context.append("FieldCount=").append(embed.getFields().size()).append(", ");
+                } catch (Exception fieldError) {
+                    context.append("FieldCount=Error, ");
+                }
+                
+                try {
+                    if (embed.getFooter().isPresent()) {
+                        String footerText = embed.getFooter().get().getText().orElse("No text");
+                        if (footerText.length() > 30) {
+                            footerText = footerText.substring(0, 27) + "...";
+                        }
+                        context.append("Footer='").append(footerText).append("', ");
+                    } else {
+                        context.append("Footer=None, ");
+                    }
+                } catch (Exception footerError) {
+                    context.append("Footer=Error, ");
+                }
+            } else {
+                context.append("Embed=null, ");
+            }
+            
+            // Add timestamp for debugging
+            context.append("Timestamp=").append(System.currentTimeMillis());
+            context.append("]");
+            
+            return context.toString();
+            
+        } catch (Exception e) {
+            // If context building itself fails, return a minimal context with the error
+            return "[Context: Error building context - " + e.getClass().getSimpleName() + ": " + e.getMessage() + "]";
+        }
+    }
+    
+    /**
+     * Attempts to extract player name from embed as fallback when normal extraction fails.
+     * Enhanced with more comprehensive field name matching and better error handling.
+     * 
+     * @param embed The Discord embed to extract from
+     * @return The player name if found, null otherwise
+     */
+    private String extractPlayerNameFallback(org.javacord.api.entity.message.embed.Embed embed) {
+        if (embed == null) {
+            return null;
+        }
+        
+        try {
+            // Try to find player name in embed fields with comprehensive field name matching
+            for (org.javacord.api.entity.message.embed.EmbedField field : embed.getFields()) {
+                try {
+                    String fieldName = field.getName();
+                    if (fieldName != null) {
+                        String lowerFieldName = fieldName.toLowerCase();
+                        // Check for various field names that might contain player information
+                        if (lowerFieldName.contains("player") || lowerFieldName.contains("user") || 
+                            lowerFieldName.contains("name") || lowerFieldName.equals("who")) {
+                            String value = field.getValue();
+                            if (value != null && !value.trim().isEmpty()) {
+                                return value.trim();
+                            }
+                        }
+                    }
+                } catch (Exception fieldError) {
+                    // Continue processing other fields if one fails
+                    continue;
+                }
+            }
+            
+            // Try embed author as fallback
+            if (embed.getAuthor().isPresent()) {
+                try {
+                    String authorName = embed.getAuthor().get().getName();
+                    if (authorName != null && !authorName.trim().isEmpty()) {
+                        return authorName.trim();
+                    }
+                } catch (Exception authorError) {
+                    // Continue to next fallback
+                }
+            }
+            
+            // Try to extract from embed description as last resort
+            if (embed.getDescription().isPresent()) {
+                try {
+                    String description = embed.getDescription().get();
+                    if (description != null && !description.trim().isEmpty()) {
+                        // Look for patterns like "PlayerName has made" or "PlayerName earned"
+                        String[] words = description.split("\\s+");
+                        if (words.length > 0 && !words[0].toLowerCase().equals("a") && 
+                            !words[0].toLowerCase().equals("the") && !words[0].toLowerCase().equals("someone")) {
+                            return words[0].trim();
+                        }
+                    }
+                } catch (Exception descError) {
+                    // Final fallback failed
+                }
+            }
+            
+        } catch (Exception e) {
+            VonixCore.LOGGER.debug("[Discord] Error in player name fallback extraction: {}", e.getMessage());
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Attempts to extract advancement title from embed as fallback when normal extraction fails.
+     * Enhanced with better pattern matching and error handling.
+     * 
+     * @param embed The Discord embed to extract from
+     * @return The advancement title if found, null otherwise
+     */
+    private String extractAdvancementTitleFallback(org.javacord.api.entity.message.embed.Embed embed) {
+        if (embed == null) {
+            return null;
+        }
+        
+        try {
+            // Try to find advancement title in embed fields with comprehensive matching
+            for (org.javacord.api.entity.message.embed.EmbedField field : embed.getFields()) {
+                try {
+                    String fieldName = field.getName();
+                    if (fieldName != null) {
+                        String lowerFieldName = fieldName.toLowerCase();
+                        // Check for various field names that might contain advancement information
+                        if (lowerFieldName.contains("advancement") || lowerFieldName.contains("achievement") || 
+                            lowerFieldName.contains("title") || lowerFieldName.contains("name") ||
+                            lowerFieldName.equals("what") || lowerFieldName.contains("earned")) {
+                            String value = field.getValue();
+                            if (value != null && !value.trim().isEmpty()) {
+                                return value.trim();
+                            }
+                        }
+                    }
+                } catch (Exception fieldError) {
+                    // Continue processing other fields if one fails
+                    continue;
+                }
+            }
+            
+            // Try embed title as fallback (but skip generic titles)
+            if (embed.getTitle().isPresent()) {
+                try {
+                    String title = embed.getTitle().get().trim();
+                    if (!title.isEmpty() && !isGenericAdvancementTitle(title)) {
+                        return title;
+                    }
+                } catch (Exception titleError) {
+                    // Continue to next fallback
+                }
+            }
+            
+            // Try to extract from embed description as last resort
+            if (embed.getDescription().isPresent()) {
+                try {
+                    String description = embed.getDescription().get();
+                    if (description != null && !description.trim().isEmpty()) {
+                        // Look for patterns like "earned [Title]" or "made [Title]"
+                        if (description.contains("[") && description.contains("]")) {
+                            int start = description.indexOf("[");
+                            int end = description.indexOf("]", start);
+                            if (end > start) {
+                                String extracted = description.substring(start + 1, end).trim();
+                                if (!extracted.isEmpty()) {
+                                    return extracted;
+                                }
+                            }
+                        }
+                    }
+                } catch (Exception descError) {
+                    // Final fallback failed
+                }
+            }
+            
+        } catch (Exception e) {
+            VonixCore.LOGGER.debug("[Discord] Error in advancement title fallback extraction: {}", e.getMessage());
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Checks if a title is a generic advancement type title that shouldn't be used
+     * as the actual advancement title.
+     * 
+     * @param title The title to check
+     * @return true if the title is generic, false otherwise
+     */
+    private boolean isGenericAdvancementTitle(String title) {
+        String lowerTitle = title.toLowerCase();
+        return lowerTitle.equals("advancement made") || 
+               lowerTitle.equals("goal reached") || 
+               lowerTitle.equals("challenge complete") ||
+               lowerTitle.equals("advancement") ||
+               lowerTitle.equals("goal") ||
+               lowerTitle.equals("challenge");
+    }
+
     // ========= Minecraft → Discord =========
 
     public void sendMinecraftMessage(String username, String message) {
@@ -580,7 +1426,7 @@ public class DiscordManager {
             return;
         }
 
-        String prefix = DiscordConfig.CONFIG.serverPrefix.get();
+        String prefix = getFallbackServerPrefix();
         String formattedUsername = DiscordConfig.CONFIG.webhookUsernameFormat.get()
                 .replace("{prefix}", prefix)
                 .replace("{username}", username);
@@ -895,49 +1741,140 @@ public class DiscordManager {
 
     private void sendWebhookEmbedToUrl(String webhookUrl, java.util.function.Consumer<JsonObject> customize) {
         if (webhookUrl == null || webhookUrl.isEmpty() || webhookUrl.contains("YOUR_WEBHOOK_URL")) {
+            if (DiscordConfig.CONFIG.debugLogging.get()) {
+                VonixCore.LOGGER.debug("[Discord] Webhook URL not configured or invalid, skipping embed send");
+            }
             return;
         }
 
         // Execute entire embed send asynchronously to avoid blocking main thread
         VonixCore.executeAsync(() -> {
-            JsonObject payload = new JsonObject();
+            try {
+                // Enhanced error handling for JSON payload creation
+                JsonObject payload;
+                try {
+                    payload = new JsonObject();
 
-            String prefix = DiscordConfig.CONFIG.serverPrefix.get();
-            String serverName = DiscordConfig.CONFIG.serverName.get();
-            String baseUsername = serverName == null ? "Server" : serverName;
-            String formattedUsername = DiscordConfig.CONFIG.webhookUsernameFormat.get()
-                    .replace("{prefix}", prefix)
-                    .replace("{username}", baseUsername);
+                    String prefix = getFallbackServerPrefix();
+                    String serverName = DiscordConfig.CONFIG.serverName.get();
+                    String baseUsername = serverName == null ? "Server" : serverName;
+                    String formattedUsername = DiscordConfig.CONFIG.webhookUsernameFormat.get()
+                            .replace("{prefix}", prefix)
+                            .replace("{username}", baseUsername);
 
-            payload.addProperty("username", formattedUsername);
+                    payload.addProperty("username", formattedUsername);
 
-            String avatarUrl = DiscordConfig.CONFIG.serverAvatarUrl.get();
-            if (avatarUrl != null && !avatarUrl.isEmpty()) {
-                payload.addProperty("avatar_url", avatarUrl);
-            }
-
-            JsonObject embed = new JsonObject();
-            customize.accept(embed);
-
-            JsonArray embeds = new JsonArray();
-            embeds.add(embed);
-            payload.add("embeds", embeds);
-
-            RequestBody body = RequestBody.create(
-                    payload.toString(),
-                    MediaType.parse("application/json"));
-
-            Request request = new Request.Builder()
-                    .url(webhookUrl)
-                    .post(body)
-                    .build();
-
-            try (Response response = httpClient.newCall(request).execute()) {
-                if (!response.isSuccessful() && DiscordConfig.CONFIG.debugLogging.get()) {
-                    VonixCore.LOGGER.error("[Discord] Failed to send embed: {}", response.code());
+                    String avatarUrl = DiscordConfig.CONFIG.serverAvatarUrl.get();
+                    if (avatarUrl != null && !avatarUrl.isEmpty()) {
+                        payload.addProperty("avatar_url", avatarUrl);
+                    }
+                } catch (Exception payloadError) {
+                    VonixCore.LOGGER.error("[Discord] Failed to create webhook payload base structure. " +
+                            "Error: {} | Error type: {} | Webhook URL: {} | " +
+                            "Embed will not be sent.", 
+                            payloadError.getMessage(), payloadError.getClass().getSimpleName(),
+                            webhookUrl.length() > 50 ? webhookUrl.substring(0, 50) + "..." : webhookUrl, 
+                            payloadError);
+                    return;
                 }
-            } catch (IOException e) {
-                VonixCore.LOGGER.error("[Discord] Error sending embed", e);
+
+                // Enhanced error handling for embed customization
+                JsonObject embed;
+                try {
+                    embed = new JsonObject();
+                    customize.accept(embed);
+                } catch (Exception customizeError) {
+                    VonixCore.LOGGER.error("[Discord] Failed to customize embed content. " +
+                            "Error: {} | Error type: {} | Webhook URL: {} | " +
+                            "Embed customization failed, will attempt to send basic embed.", 
+                            customizeError.getMessage(), customizeError.getClass().getSimpleName(),
+                            webhookUrl.length() > 50 ? webhookUrl.substring(0, 50) + "..." : webhookUrl, 
+                            customizeError);
+                    
+                    // Create a basic error embed as fallback
+                    embed = new JsonObject();
+                    embed.addProperty("title", "⚠ Embed Processing Error");
+                    embed.addProperty("description", "An error occurred while processing this embed");
+                    embed.addProperty("color", 0xF04747); // Red color for error
+                }
+
+                // Enhanced error handling for embed array creation
+                try {
+                    JsonArray embeds = new JsonArray();
+                    embeds.add(embed);
+                    payload.add("embeds", embeds);
+                } catch (Exception embedArrayError) {
+                    VonixCore.LOGGER.error("[Discord] Failed to create embed array. " +
+                            "Error: {} | Error type: {} | " +
+                            "This indicates a JSON processing issue.", 
+                            embedArrayError.getMessage(), embedArrayError.getClass().getSimpleName(), 
+                            embedArrayError);
+                    return;
+                }
+
+                // Enhanced error handling for HTTP request creation and execution
+                try {
+                    RequestBody body = RequestBody.create(
+                            payload.toString(),
+                            MediaType.parse("application/json"));
+
+                    Request request = new Request.Builder()
+                            .url(webhookUrl)
+                            .post(body)
+                            .build();
+
+                    try (Response response = httpClient.newCall(request).execute()) {
+                        if (!response.isSuccessful()) {
+                            // Enhanced error logging with response details
+                            String responseBody = "";
+                            try {
+                                if (response.body() != null) {
+                                    responseBody = response.body().string();
+                                    if (responseBody.length() > 200) {
+                                        responseBody = responseBody.substring(0, 200) + "...";
+                                    }
+                                }
+                            } catch (Exception bodyReadError) {
+                                responseBody = "Could not read response body: " + bodyReadError.getMessage();
+                            }
+
+                            VonixCore.LOGGER.error("[Discord] Failed to send embed to webhook. " +
+                                    "HTTP Status: {} | Response: {} | Webhook URL: {} | " +
+                                    "This may indicate webhook configuration issues or Discord API problems.", 
+                                    response.code(), responseBody,
+                                    webhookUrl.length() > 50 ? webhookUrl.substring(0, 50) + "..." : webhookUrl);
+                        } else if (DiscordConfig.CONFIG.debugLogging.get()) {
+                            VonixCore.LOGGER.debug("[Discord] Successfully sent embed to webhook (HTTP {})", response.code());
+                        }
+                    }
+                } catch (IOException httpError) {
+                    VonixCore.LOGGER.error("[Discord] Network error sending embed to webhook. " +
+                            "Error: {} | Error type: {} | Webhook URL: {} | " +
+                            "This may indicate network connectivity issues.", 
+                            httpError.getMessage(), httpError.getClass().getSimpleName(),
+                            webhookUrl.length() > 50 ? webhookUrl.substring(0, 50) + "..." : webhookUrl, 
+                            httpError);
+                } catch (Exception requestError) {
+                    VonixCore.LOGGER.error("[Discord] Error creating or executing HTTP request for webhook. " +
+                            "Error: {} | Error type: {} | Webhook URL: {} | " +
+                            "This indicates an HTTP client configuration issue.", 
+                            requestError.getMessage(), requestError.getClass().getSimpleName(),
+                            webhookUrl.length() > 50 ? webhookUrl.substring(0, 50) + "..." : webhookUrl, 
+                            requestError);
+                }
+
+            } catch (Exception generalError) {
+                VonixCore.LOGGER.error("[Discord] Unexpected error during webhook embed sending. " +
+                        "Error: {} | Error type: {} | Webhook URL: {} | " +
+                        "This indicates a system-level issue.", 
+                        generalError.getMessage(), generalError.getClass().getSimpleName(),
+                        webhookUrl != null && webhookUrl.length() > 50 ? webhookUrl.substring(0, 50) + "..." : "null", 
+                        generalError);
+            } catch (Throwable criticalError) {
+                VonixCore.LOGGER.error("[Discord] Critical error during webhook embed sending. " +
+                        "Error: {} | Error type: {} | " +
+                        "This indicates a severe system issue that needs immediate attention.", 
+                        criticalError.getMessage(), criticalError.getClass().getSimpleName(), criticalError);
             }
         });
     }
@@ -994,53 +1931,263 @@ public class DiscordManager {
 
     private void startMessageQueueThread() {
         messageQueueThread = new Thread(() -> {
+            VonixCore.LOGGER.info("[Discord] Message queue thread started");
+            
             while (running && !Thread.currentThread().isInterrupted()) {
                 try {
                     WebhookMessage webhookMessage = messageQueue.poll(1, TimeUnit.SECONDS);
                     if (webhookMessage != null) {
-                        sendWebhookMessage(webhookMessage);
-
-                        int delay = DiscordConfig.CONFIG.rateLimitDelay.get();
-                        if (delay > 0) {
-                            Thread.sleep(delay);
+                        try {
+                            sendWebhookMessage(webhookMessage);
+                            
+                            // Enhanced error handling for rate limiting delay
+                            int delay = DiscordConfig.CONFIG.rateLimitDelay.get();
+                            if (delay > 0) {
+                                try {
+                                    Thread.sleep(delay);
+                                } catch (InterruptedException sleepInterrupted) {
+                                    VonixCore.LOGGER.debug("[Discord] Rate limit delay interrupted, shutting down message queue");
+                                    Thread.currentThread().interrupt();
+                                    break;
+                                }
+                            }
+                        } catch (Exception messageError) {
+                            VonixCore.LOGGER.error("[Discord] Error processing individual webhook message from queue. " +
+                                    "Error: {} | Error type: {} | Content: {} | Username: {} | " +
+                                    "Queue processing will continue with next message.", 
+                                    messageError.getMessage(), messageError.getClass().getSimpleName(),
+                                    webhookMessage.content != null && webhookMessage.content.length() > 50 
+                                        ? webhookMessage.content.substring(0, 50) + "..." 
+                                        : webhookMessage.content,
+                                    webhookMessage.username, messageError);
+                            
+                            // Don't rethrow - continue processing other messages
+                        } catch (Throwable criticalMessageError) {
+                            VonixCore.LOGGER.error("[Discord] Critical error processing webhook message from queue. " +
+                                    "Error: {} | Error type: {} | Content: {} | " +
+                                    "This indicates a severe issue but queue processing will continue.", 
+                                    criticalMessageError.getMessage(), criticalMessageError.getClass().getSimpleName(),
+                                    webhookMessage.content != null && webhookMessage.content.length() > 50 
+                                        ? webhookMessage.content.substring(0, 50) + "..." 
+                                        : webhookMessage.content, criticalMessageError);
                         }
                     }
                 } catch (InterruptedException e) {
+                    VonixCore.LOGGER.info("[Discord] Message queue thread interrupted, shutting down gracefully");
                     Thread.currentThread().interrupt();
                     break;
-                } catch (Exception e) {
-                    VonixCore.LOGGER.error("[Discord] Error processing message queue", e);
+                } catch (Exception queueError) {
+                    VonixCore.LOGGER.error("[Discord] Error in message queue processing loop. " +
+                            "Error: {} | Error type: {} | Queue size: {} | " +
+                            "Queue processing will continue but this indicates a system issue.", 
+                            queueError.getMessage(), queueError.getClass().getSimpleName(),
+                            messageQueue.size(), queueError);
+                    
+                    // Add a small delay to prevent rapid error loops
+                    try {
+                        Thread.sleep(1000);
+                    } catch (InterruptedException delayInterrupted) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    }
+                } catch (Throwable criticalQueueError) {
+                    VonixCore.LOGGER.error("[Discord] Critical error in message queue thread. " +
+                            "Error: {} | Error type: {} | " +
+                            "This is a severe system issue that may require restart.", 
+                            criticalQueueError.getMessage(), criticalQueueError.getClass().getSimpleName(), 
+                            criticalQueueError);
+                    
+                    // For critical errors, add a longer delay and consider stopping
+                    try {
+                        Thread.sleep(5000);
+                    } catch (InterruptedException delayInterrupted) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    }
                 }
             }
+            
+            VonixCore.LOGGER.info("[Discord] Message queue thread stopped. Final queue size: {}", messageQueue.size());
+            
+            // Log any remaining messages in the queue for debugging
+            if (!messageQueue.isEmpty() && DiscordConfig.CONFIG.debugLogging.get()) {
+                VonixCore.LOGGER.debug("[Discord] {} messages remaining in queue at shutdown", messageQueue.size());
+            }
         }, "VonixCore-Discord-Queue");
-        messageQueueThread.setDaemon(true);
-        messageQueueThread.start();
+        
+        // Enhanced error handling for thread configuration
+        try {
+            messageQueueThread.setDaemon(true);
+            messageQueueThread.setUncaughtExceptionHandler((thread, exception) -> {
+                VonixCore.LOGGER.error("[Discord] Uncaught exception in message queue thread. " +
+                        "Thread: {} | Error: {} | Error type: {} | " +
+                        "This indicates a critical system failure in Discord message processing.", 
+                        thread.getName(), exception.getMessage(), exception.getClass().getSimpleName(), exception);
+                
+                // Attempt to restart the message queue thread if it crashes
+                if (running) {
+                    VonixCore.LOGGER.warn("[Discord] Attempting to restart message queue thread after crash");
+                    try {
+                        startMessageQueueThread();
+                    } catch (Exception restartError) {
+                        VonixCore.LOGGER.error("[Discord] Failed to restart message queue thread: {}", 
+                                restartError.getMessage(), restartError);
+                    }
+                }
+            });
+            
+            messageQueueThread.start();
+            VonixCore.LOGGER.debug("[Discord] Message queue thread configured and started successfully");
+            
+        } catch (Exception threadError) {
+            VonixCore.LOGGER.error("[Discord] Failed to configure or start message queue thread. " +
+                    "Error: {} | Error type: {} | " +
+                    "Discord message sending will not work.", 
+                    threadError.getMessage(), threadError.getClass().getSimpleName(), threadError);
+        }
     }
 
     private void sendWebhookMessage(WebhookMessage webhookMessage) {
-        JsonObject json = new JsonObject();
-        json.addProperty("content", webhookMessage.content);
-        json.addProperty("username", webhookMessage.username);
-
-        if (webhookMessage.avatarUrl != null) {
-            json.addProperty("avatar_url", webhookMessage.avatarUrl);
+        if (webhookMessage == null) {
+            VonixCore.LOGGER.warn("[Discord] Cannot send null webhook message");
+            return;
         }
 
-        RequestBody body = RequestBody.create(
-                json.toString(),
-                MediaType.parse("application/json"));
+        try {
+            // Enhanced error handling for JSON payload creation
+            JsonObject json;
+            try {
+                json = new JsonObject();
+                
+                // Validate and add content with null safety
+                if (webhookMessage.content != null) {
+                    json.addProperty("content", webhookMessage.content);
+                } else {
+                    VonixCore.LOGGER.warn("[Discord] Webhook message content is null, using empty string");
+                    json.addProperty("content", "");
+                }
+                
+                // Validate and add username with null safety
+                if (webhookMessage.username != null && !webhookMessage.username.trim().isEmpty()) {
+                    json.addProperty("username", webhookMessage.username);
+                } else {
+                    VonixCore.LOGGER.warn("[Discord] Webhook username is null or empty, using default");
+                    json.addProperty("username", "Server");
+                }
 
-        Request request = new Request.Builder()
-                .url(webhookMessage.webhookUrl)
-                .post(body)
-                .build();
-
-        try (Response response = httpClient.newCall(request).execute()) {
-            if (!response.isSuccessful() && DiscordConfig.CONFIG.debugLogging.get()) {
-                VonixCore.LOGGER.error("[Discord] Failed to send message: {}", response.code());
+                // Add avatar URL if provided and valid
+                if (webhookMessage.avatarUrl != null && !webhookMessage.avatarUrl.trim().isEmpty()) {
+                    try {
+                        json.addProperty("avatar_url", webhookMessage.avatarUrl);
+                    } catch (Exception avatarError) {
+                        VonixCore.LOGGER.warn("[Discord] Error adding avatar URL to webhook message: {} | " +
+                                "Avatar URL: {} | Message will be sent without avatar.", 
+                                avatarError.getMessage(), webhookMessage.avatarUrl);
+                    }
+                }
+            } catch (Exception jsonError) {
+                VonixCore.LOGGER.error("[Discord] Failed to create webhook message JSON payload. " +
+                        "Error: {} | Error type: {} | Content length: {} | Username: {} | " +
+                        "Message will not be sent.", 
+                        jsonError.getMessage(), jsonError.getClass().getSimpleName(),
+                        webhookMessage.content != null ? webhookMessage.content.length() : 0,
+                        webhookMessage.username, jsonError);
+                return;
             }
-        } catch (IOException e) {
-            VonixCore.LOGGER.error("[Discord] Error sending message", e);
+
+            // Enhanced error handling for HTTP request creation and execution
+            try {
+                // Validate webhook URL
+                if (webhookMessage.webhookUrl == null || webhookMessage.webhookUrl.trim().isEmpty()) {
+                    VonixCore.LOGGER.error("[Discord] Webhook URL is null or empty, cannot send message. " +
+                            "Content: {} | Username: {}", 
+                            webhookMessage.content != null && webhookMessage.content.length() > 50 
+                                ? webhookMessage.content.substring(0, 50) + "..." 
+                                : webhookMessage.content,
+                            webhookMessage.username);
+                    return;
+                }
+
+                RequestBody body = RequestBody.create(
+                        json.toString(),
+                        MediaType.parse("application/json"));
+
+                Request request = new Request.Builder()
+                        .url(webhookMessage.webhookUrl)
+                        .post(body)
+                        .build();
+
+                try (Response response = httpClient.newCall(request).execute()) {
+                    if (!response.isSuccessful()) {
+                        // Enhanced error logging with response details
+                        String responseBody = "";
+                        try {
+                            if (response.body() != null) {
+                                responseBody = response.body().string();
+                                if (responseBody.length() > 200) {
+                                    responseBody = responseBody.substring(0, 200) + "...";
+                                }
+                            }
+                        } catch (Exception bodyReadError) {
+                            responseBody = "Could not read response body: " + bodyReadError.getMessage();
+                        }
+
+                        VonixCore.LOGGER.error("[Discord] Failed to send webhook message. " +
+                                "HTTP Status: {} | Response: {} | Content: {} | Username: {} | " +
+                                "Webhook URL: {} | This may indicate webhook configuration issues.", 
+                                response.code(), responseBody,
+                                webhookMessage.content != null && webhookMessage.content.length() > 50 
+                                    ? webhookMessage.content.substring(0, 50) + "..." 
+                                    : webhookMessage.content,
+                                webhookMessage.username,
+                                webhookMessage.webhookUrl.length() > 50 
+                                    ? webhookMessage.webhookUrl.substring(0, 50) + "..." 
+                                    : webhookMessage.webhookUrl);
+                    } else if (DiscordConfig.CONFIG.debugLogging.get()) {
+                        VonixCore.LOGGER.debug("[Discord] Successfully sent webhook message (HTTP {}) | " +
+                                "Content length: {} | Username: {}", 
+                                response.code(), 
+                                webhookMessage.content != null ? webhookMessage.content.length() : 0,
+                                webhookMessage.username);
+                    }
+                }
+            } catch (IOException httpError) {
+                VonixCore.LOGGER.error("[Discord] Network error sending webhook message. " +
+                        "Error: {} | Error type: {} | Content: {} | Username: {} | " +
+                        "Webhook URL: {} | This may indicate network connectivity issues.", 
+                        httpError.getMessage(), httpError.getClass().getSimpleName(),
+                        webhookMessage.content != null && webhookMessage.content.length() > 50 
+                            ? webhookMessage.content.substring(0, 50) + "..." 
+                            : webhookMessage.content,
+                        webhookMessage.username,
+                        webhookMessage.webhookUrl != null && webhookMessage.webhookUrl.length() > 50 
+                            ? webhookMessage.webhookUrl.substring(0, 50) + "..." 
+                            : webhookMessage.webhookUrl, httpError);
+            } catch (Exception requestError) {
+                VonixCore.LOGGER.error("[Discord] Error creating or executing HTTP request for webhook message. " +
+                        "Error: {} | Error type: {} | Content: {} | Username: {} | " +
+                        "This indicates an HTTP client configuration issue.", 
+                        requestError.getMessage(), requestError.getClass().getSimpleName(),
+                        webhookMessage.content != null && webhookMessage.content.length() > 50 
+                            ? webhookMessage.content.substring(0, 50) + "..." 
+                            : webhookMessage.content,
+                        webhookMessage.username, requestError);
+            }
+
+        } catch (Exception generalError) {
+            VonixCore.LOGGER.error("[Discord] Unexpected error during webhook message sending. " +
+                    "Error: {} | Error type: {} | Content: {} | Username: {} | " +
+                    "This indicates a system-level issue.", 
+                    generalError.getMessage(), generalError.getClass().getSimpleName(),
+                    webhookMessage.content != null && webhookMessage.content.length() > 50 
+                        ? webhookMessage.content.substring(0, 50) + "..." 
+                        : webhookMessage.content,
+                    webhookMessage.username, generalError);
+        } catch (Throwable criticalError) {
+            VonixCore.LOGGER.error("[Discord] Critical error during webhook message sending. " +
+                    "Error: {} | Error type: {} | " +
+                    "This indicates a severe system issue that needs immediate attention.", 
+                    criticalError.getMessage(), criticalError.getClass().getSimpleName(), criticalError);
         }
     }
 
@@ -1056,5 +2203,56 @@ public class DiscordManager {
             this.username = username;
             this.avatarUrl = avatarUrl;
         }
+    }
+
+    /**
+     * Gets the configured server prefix for a specific Discord server.
+     * Uses the ServerPrefixConfig system to provide unique prefixes for different servers.
+     * 
+     * @param server The Discord server, can be null
+     * @return The server prefix, never null or empty
+     */
+    public String getServerPrefix(org.javacord.api.entity.server.Server server) {
+        if (serverPrefixConfig == null) {
+            // Fallback to old config system if prefix config is not initialized
+            return DiscordConfig.CONFIG.serverPrefix.get();
+        }
+        return serverPrefixConfig.getServerPrefix(server);
+    }
+
+    /**
+     * Gets the configured server prefix for a specific Discord server ID.
+     * Uses the ServerPrefixConfig system to provide unique prefixes for different servers.
+     * 
+     * @param serverId The Discord server ID
+     * @return The server prefix, never null or empty
+     */
+    public String getServerPrefix(long serverId) {
+        if (serverPrefixConfig == null) {
+            // Fallback to old config system if prefix config is not initialized
+            return DiscordConfig.CONFIG.serverPrefix.get();
+        }
+        return serverPrefixConfig.getServerPrefix(serverId);
+    }
+
+    /**
+     * Gets the fallback server prefix used when no specific server context is available.
+     * 
+     * @return The fallback server prefix
+     */
+    public String getFallbackServerPrefix() {
+        if (serverPrefixConfig == null) {
+            return DiscordConfig.CONFIG.serverPrefix.get();
+        }
+        return serverPrefixConfig.getFallbackPrefix();
+    }
+
+    /**
+     * Gets the ServerPrefixConfig instance for advanced configuration.
+     * 
+     * @return The ServerPrefixConfig instance, may be null if not initialized
+     */
+    public ServerPrefixConfig getServerPrefixConfig() {
+        return serverPrefixConfig;
     }
 }
