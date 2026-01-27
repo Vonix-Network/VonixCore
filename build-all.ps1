@@ -21,7 +21,7 @@ Write-ColorOutput Cyan "=========================================="
 Write-Host ""
 
 # Get version from gradle.properties (NeoForge as source of truth)
-$Version = "1.1.1"
+$Version = "1.2"
 $PropsFile = Join-Path $PSScriptRoot "VonixCore-NeoForge-Universal\gradle.properties"
 if (Test-Path $PropsFile) {
     $Content = Get-Content $PropsFile
