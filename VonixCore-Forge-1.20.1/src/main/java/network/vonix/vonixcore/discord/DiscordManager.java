@@ -144,17 +144,36 @@ public class DiscordManager {
                 // Remove listeners first to stop processing new events
                 discordApi.getListeners().keySet().forEach(listener -> discordApi.removeListener(listener));
 
-                // Disconnect with timeout
-                discordApi.disconnect().get(5, TimeUnit.SECONDS);
+                // Disconnect with longer timeout for cleaner shutdown
+                try {
+                    discordApi.disconnect().get(10, TimeUnit.SECONDS);
+                } catch (Exception e) {
+                    VonixCore.LOGGER.warn("[Discord] Javacord disconnect timeout, forcing shutdown");
+                }
 
                 // Force shutdown Javacord's internal thread pool
                 // This helps prevent "Central ExecutorService" leaks
                 if (discordApi.getThreadPool() != null) {
                     try {
-                        discordApi.getThreadPool().getExecutorService().shutdownNow();
-                        discordApi.getThreadPool().getScheduler().shutdownNow();
+                        // Try graceful shutdown first
+                        discordApi.getThreadPool().getExecutorService().shutdown();
+                        discordApi.getThreadPool().getScheduler().shutdown();
+                        
+                        // Wait a bit for graceful shutdown
+                        if (!discordApi.getThreadPool().getExecutorService().awaitTermination(3, TimeUnit.SECONDS)) {
+                            discordApi.getThreadPool().getExecutorService().shutdownNow();
+                        }
+                        if (!discordApi.getThreadPool().getScheduler().awaitTermination(3, TimeUnit.SECONDS)) {
+                            discordApi.getThreadPool().getScheduler().shutdownNow();
+                        }
                     } catch (Exception e) {
-                        // Ignore if already shutdown
+                        // Force shutdown if graceful fails
+                        try {
+                            discordApi.getThreadPool().getExecutorService().shutdownNow();
+                            discordApi.getThreadPool().getScheduler().shutdownNow();
+                        } catch (Exception ignored) {
+                            // Ignore if already shutdown
+                        }
                     }
                 }
                 VonixCore.LOGGER.info("[Discord] Javacord disconnected and thread pools shut down");

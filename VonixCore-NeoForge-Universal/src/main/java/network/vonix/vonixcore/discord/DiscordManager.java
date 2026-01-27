@@ -149,10 +149,27 @@ public class DiscordManager {
 
         if (discordApi != null) {
             try {
+                // Remove listeners first to stop processing new events
+                discordApi.getListeners().keySet().forEach(listener -> discordApi.removeListener(listener));
+
+                // Disconnect with timeout
                 discordApi.disconnect().get(5, TimeUnit.SECONDS);
-                VonixCore.LOGGER.info("[Discord] Javacord disconnected");
-            } catch (Exception e) {
-                VonixCore.LOGGER.warn("[Discord] Javacord disconnect timeout: {}", e.getMessage());
+
+                // Force shutdown Javacord's internal thread pool
+                // This helps prevent "Central ExecutorService" leaks
+                if (discordApi.getThreadPool() != null) {
+                    try {
+                        discordApi.getThreadPool().getExecutorService().shutdownNow();
+                        discordApi.getThreadPool().getScheduler().shutdownNow();
+                    } catch (Exception e) {
+                        // Ignore if already shutdown
+                    }
+                }
+                VonixCore.LOGGER.info("[Discord] Javacord disconnected and thread pools shut down");
+            } catch (Throwable e) {
+                // Catch Throwable to handle NoClassDefFoundError during shutdown
+                VonixCore.LOGGER.debug("[Discord] Javacord disconnect failed (likely shutdown race condition): {}",
+                        e.getMessage());
             } finally {
                 discordApi = null;
             }
