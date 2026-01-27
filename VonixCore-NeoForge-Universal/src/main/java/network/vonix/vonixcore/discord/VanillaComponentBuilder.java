@@ -304,7 +304,7 @@ public class VanillaComponentBuilder {
         } catch (Exception e) {
             // Ultimate fallback - create the most basic possible component
             try {
-                return Component.literal("⚠ An advancement was earned but could not be displayed")
+                return Component.literal("An advancement was earned but could not be displayed")
                         .withStyle(ChatFormatting.YELLOW);
             } catch (Exception ultimateError) {
                 // If even the ultimate fallback fails, return empty component

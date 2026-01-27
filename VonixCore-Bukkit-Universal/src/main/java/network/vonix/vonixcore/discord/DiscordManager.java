@@ -40,6 +40,16 @@ public class DiscordManager {
     private String ourWebhookId = null;
     private String eventWebhookId = null;
     private DiscordApi discordApi = null;
+    private ServerPrefixConfig serverPrefixConfig = null;
+    
+    // Advancement message formatting components
+    private final AdvancementEmbedDetector advancementDetector;
+    private final AdvancementDataExtractor advancementExtractor;
+    private final VanillaComponentBuilder componentBuilder;
+    
+    // Event message formatting components
+    private final EventEmbedDetector eventDetector;
+    private final EventDataExtractor eventExtractor;
 
     private static final Pattern DISCORD_MARKDOWN_LINK = Pattern.compile("\\[([^\\]]+)]\\((https?://[^)]+)\\)");
 
@@ -52,6 +62,15 @@ public class DiscordManager {
                 .build();
         this.messageQueue = new LinkedBlockingQueue<>(
                 DiscordConfig.messageQueueSize);
+        
+        // Initialize advancement processing components
+        this.advancementDetector = new AdvancementEmbedDetector();
+        this.advancementExtractor = new AdvancementDataExtractor();
+        this.componentBuilder = new VanillaComponentBuilder();
+        
+        // Initialize event processing components
+        this.eventDetector = new EventEmbedDetector();
+        this.eventExtractor = new EventDataExtractor();
     }
 
     public static DiscordManager getInstance() {
@@ -77,6 +96,20 @@ public class DiscordManager {
         plugin.getLogger().info("[Discord] Starting Discord integration (Javacord + Webhooks)...");
 
         extractWebhookId();
+
+        // Initialize server prefix configuration
+        try {
+            serverPrefixConfig = new ServerPrefixConfig();
+            String configPrefix = DiscordConfig.serverPrefix;
+            if (configPrefix != null && !configPrefix.trim().isEmpty()) {
+                String strippedPrefix = stripBracketsFromPrefix(configPrefix.trim());
+                serverPrefixConfig.setFallbackPrefix(strippedPrefix);
+            }
+            plugin.getLogger().info("[Discord] Server prefix configuration system initialized");
+        } catch (Exception e) {
+            plugin.getLogger().log(Level.WARNING, "[Discord] Failed to initialize server prefix configuration", e);
+            serverPrefixConfig = new ServerPrefixConfig();
+        }
 
         running = true;
         startMessageQueueThread();
@@ -300,8 +333,9 @@ public class DiscordManager {
         String authorName = event.getMessageAuthor().getDisplayName();
 
         // Filter our own webhooks based on username prefix
+        // The webhook username format is "[prefix]username", so check for bracket-wrapped prefix
         if (isWebhook) {
-            String ourPrefix = DiscordConfig.serverPrefix;
+            String ourPrefix = "[" + getFallbackServerPrefix() + "]";
             if (authorName != null && authorName.startsWith(ourPrefix)) {
                 return;
             }
@@ -310,7 +344,8 @@ public class DiscordManager {
         // Filter other webhooks if configured
         if (DiscordConfig.ignoreWebhooks && isWebhook) {
             if (DiscordConfig.filterByPrefix) {
-                String ourPrefix = DiscordConfig.serverPrefix;
+                // Use same prefix as sending to ensure accurate filtering
+                String ourPrefix = "[" + getFallbackServerPrefix() + "]";
                 if (authorName != null && authorName.startsWith(ourPrefix)) {
                     return;
                 }
@@ -327,6 +362,28 @@ public class DiscordManager {
         // Handle !list command with embed
         if (content.trim().equalsIgnoreCase("!list")) {
             handleTextListCommand(event);
+            return;
+        }
+
+        // Check for empty content with embeds (often used for cross-server events)
+        if (content.isEmpty()) {
+            if (!event.getMessage().getEmbeds().isEmpty()) {
+                // Check for advancement embeds and process them specially
+                for (org.javacord.api.entity.message.embed.Embed embed : event.getMessage().getEmbeds()) {
+                    if (advancementDetector.isAdvancementEmbed(embed)) {
+                        processAdvancementEmbed(embed, event);
+                        return;
+                    }
+                }
+                
+                // Check for event embeds (join/leave/death) and process them specially
+                for (org.javacord.api.entity.message.embed.Embed embed : event.getMessage().getEmbeds()) {
+                    if (eventDetector.isEventEmbed(embed)) {
+                        processEventEmbed(embed, event);
+                        return;
+                    }
+                }
+            }
             return;
         }
 
@@ -350,8 +407,9 @@ public class DiscordManager {
                     formatted = displayName + ": " + content;
                 }
             } else {
-                // No prefix found, just use raw name
-                formatted = "[Discord] " + authorName + ": " + content;
+                // No bracket prefix found - treat as cross-server player message
+                displayName = "[Cross-Server] " + authorName;
+                formatted = displayName + ": " + content;
             }
         } else {
             formatted = DiscordConfig.discordToMinecraftFormat
@@ -533,6 +591,188 @@ public class DiscordManager {
         }
         result = result.append(Component.text(text.substring(lastEnd)));
         return result;
+    }
+
+    /**
+     * Processes advancement embeds by extracting data and converting to vanilla-style components.
+     */
+    private void processAdvancementEmbed(org.javacord.api.entity.message.embed.Embed embed,
+                                        org.javacord.api.event.message.MessageCreateEvent event) {
+        try {
+            AdvancementData data = advancementExtractor.extractFromEmbed(embed);
+            String serverPrefix = extractServerPrefixFromAuthor(event.getMessageAuthor().getDisplayName());
+            Component advancementComponent = componentBuilder.buildAdvancementMessage(data, serverPrefix);
+            
+            Bukkit.broadcast(advancementComponent);
+            return;
+        } catch (ExtractionException e) {
+            plugin.getLogger().log(Level.WARNING, "[Discord] Failed to extract advancement data: " + e.getMessage());
+        } catch (Exception e) {
+            plugin.getLogger().log(Level.SEVERE, "[Discord] Error processing advancement embed", e);
+        }
+        
+        handleAdvancementFallback(embed, event);
+    }
+    
+    private void handleAdvancementFallback(org.javacord.api.entity.message.embed.Embed embed,
+                                          org.javacord.api.event.message.MessageCreateEvent event) {
+        try {
+            String playerName = extractPlayerNameFallback(embed);
+            String advancementTitle = extractAdvancementTitleFallback(embed);
+            
+            if (playerName != null && advancementTitle != null) {
+                String serverPrefix = extractServerPrefixFromAuthor(event.getMessageAuthor().getDisplayName());
+                Component fallbackComponent = componentBuilder.createFallbackComponent(
+                        playerName, advancementTitle, serverPrefix);
+                
+                if (fallbackComponent != null) {
+                    Bukkit.broadcast(fallbackComponent);
+                }
+            }
+        } catch (Exception e) {
+            plugin.getLogger().log(Level.SEVERE, "[Discord] Fallback advancement processing failed", e);
+        }
+    }
+    
+    private String extractPlayerNameFallback(org.javacord.api.entity.message.embed.Embed embed) {
+        if (embed == null) return null;
+        
+        for (org.javacord.api.entity.message.embed.EmbedField field : embed.getFields()) {
+            String fieldName = field.getName();
+            if (fieldName != null) {
+                String lowerFieldName = fieldName.toLowerCase();
+                if (lowerFieldName.contains("player") || lowerFieldName.contains("user") || lowerFieldName.contains("name")) {
+                    String value = field.getValue();
+                    if (value != null && !value.trim().isEmpty()) {
+                        return value.trim();
+                    }
+                }
+            }
+        }
+        
+        if (embed.getAuthor().isPresent()) {
+            String authorName = embed.getAuthor().get().getName();
+            if (authorName != null && !authorName.trim().isEmpty()) {
+                return authorName.trim();
+            }
+        }
+        
+        return null;
+    }
+    
+    private String extractAdvancementTitleFallback(org.javacord.api.entity.message.embed.Embed embed) {
+        if (embed == null) return null;
+        
+        for (org.javacord.api.entity.message.embed.EmbedField field : embed.getFields()) {
+            String fieldName = field.getName();
+            if (fieldName != null) {
+                String lowerFieldName = fieldName.toLowerCase();
+                if (lowerFieldName.contains("advancement") || lowerFieldName.contains("achievement") || 
+                    lowerFieldName.contains("title")) {
+                    String value = field.getValue();
+                    if (value != null && !value.trim().isEmpty()) {
+                        return value.trim();
+                    }
+                }
+            }
+        }
+        
+        if (embed.getTitle().isPresent()) {
+            String title = embed.getTitle().get().trim();
+            if (!title.isEmpty()) {
+                return title;
+            }
+        }
+        
+        return null;
+    }
+    
+    private String extractServerPrefixFromAuthor(String authorName) {
+        if (authorName != null && authorName.startsWith("[") && authorName.contains("]")) {
+            int endBracket = authorName.indexOf("]");
+            String prefix = authorName.substring(1, endBracket).trim();
+            if (!prefix.isEmpty()) {
+                return prefix;
+            }
+        }
+        return stripBracketsFromPrefix(getFallbackServerPrefix());
+    }
+    
+    private String extractServerPrefixFromAuthorForEvents(String authorName) {
+        if (authorName != null && authorName.startsWith("[") && authorName.contains("]")) {
+            int endBracket = authorName.indexOf("]");
+            String prefix = authorName.substring(1, endBracket).trim();
+            if (!prefix.isEmpty()) {
+                return prefix;
+            }
+        }
+        return "Cross-Server";
+    }
+    
+    private String stripBracketsFromPrefix(String prefix) {
+        if (prefix == null || prefix.isEmpty()) {
+            return prefix;
+        }
+        String stripped = prefix.trim();
+        if (stripped.startsWith("[")) {
+            stripped = stripped.substring(1);
+        }
+        if (stripped.endsWith("]")) {
+            stripped = stripped.substring(0, stripped.length() - 1);
+        }
+        return stripped.trim();
+    }
+    
+    public String getFallbackServerPrefix() {
+        if (serverPrefixConfig == null) {
+            return stripBracketsFromPrefix(DiscordConfig.serverPrefix);
+        }
+        return serverPrefixConfig.getFallbackPrefix();
+    }
+
+    /**
+     * Processes event embeds (join/leave/death) by extracting data and converting to simplified format.
+     */
+    private void processEventEmbed(org.javacord.api.entity.message.embed.Embed embed,
+                                  org.javacord.api.event.message.MessageCreateEvent event) {
+        try {
+            EventData data = eventExtractor.extractFromEmbed(embed);
+            String serverPrefix = extractServerPrefixFromAuthorForEvents(event.getMessageAuthor().getDisplayName());
+            Component eventComponent = componentBuilder.buildEventMessage(data, serverPrefix);
+            
+            Bukkit.broadcast(eventComponent);
+            return;
+        } catch (ExtractionException e) {
+            plugin.getLogger().log(Level.WARNING, "[Discord] Failed to extract event data: " + e.getMessage());
+        } catch (Exception e) {
+            plugin.getLogger().log(Level.SEVERE, "[Discord] Error processing event embed", e);
+        }
+        
+        handleEventFallback(embed, event);
+    }
+    
+    private void handleEventFallback(org.javacord.api.entity.message.embed.Embed embed,
+                                    org.javacord.api.event.message.MessageCreateEvent event) {
+        try {
+            String playerName = extractPlayerNameFallback(embed);
+            String serverPrefix = extractServerPrefixFromAuthorForEvents(event.getMessageAuthor().getDisplayName());
+            
+            String action = "performed an action";
+            EventEmbedDetector.EventType eventType = eventDetector.getEventType(embed);
+            if (eventType != EventEmbedDetector.EventType.UNKNOWN) {
+                action = eventType.getActionVerb();
+            }
+            
+            if (playerName != null) {
+                Component fallbackComponent = componentBuilder.createEventFallbackComponent(
+                        playerName, action, serverPrefix);
+                if (fallbackComponent != null) {
+                    Bukkit.broadcast(fallbackComponent);
+                }
+            }
+        } catch (Exception e) {
+            plugin.getLogger().log(Level.SEVERE, "[Discord] Event fallback processing failed", e);
+        }
     }
 
     private static class WebhookMessage {

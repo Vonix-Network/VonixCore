@@ -57,6 +57,10 @@ public class DiscordManager {
     private final AdvancementEmbedDetector advancementDetector;
     private final AdvancementDataExtractor advancementExtractor;
     private final VanillaComponentBuilder componentBuilder;
+    
+    // Event message formatting components
+    private final EventEmbedDetector eventDetector;
+    private final EventDataExtractor eventExtractor;
 
     private static final Pattern DISCORD_MARKDOWN_LINK = Pattern.compile("\\[([^\\]]+)]\\((https?://[^)]+)\\)");
 
@@ -82,6 +86,10 @@ public class DiscordManager {
         this.advancementDetector = new AdvancementEmbedDetector();
         this.advancementExtractor = new AdvancementDataExtractor();
         this.componentBuilder = new VanillaComponentBuilder();
+        
+        // Initialize event processing components
+        this.eventDetector = new EventEmbedDetector();
+        this.eventExtractor = new EventDataExtractor();
     }
 
     public static DiscordManager getInstance() {
@@ -120,10 +128,11 @@ public class DiscordManager {
         // Initialize server prefix configuration
         try {
             serverPrefixConfig = new ServerPrefixConfig();
-            // Set fallback prefix from existing config
+            // Set fallback prefix from existing config (strip brackets if present)
             String configPrefix = DiscordConfig.CONFIG.serverPrefix.get();
             if (configPrefix != null && !configPrefix.trim().isEmpty()) {
-                serverPrefixConfig.setFallbackPrefix(configPrefix.trim());
+                String strippedPrefix = stripBracketsFromPrefix(configPrefix.trim());
+                serverPrefixConfig.setFallbackPrefix(strippedPrefix);
             }
             VonixCore.LOGGER.info("[Discord] Server prefix configuration system initialized");
         } catch (Exception e) {
@@ -556,10 +565,9 @@ public class DiscordManager {
             }
 
             // Filter our own webhooks based on username prefix
+            // The webhook username format is "[prefix]username", so check for bracket-wrapped prefix
             if (isWebhook) {
-                // Get server context for prefix determination
-                org.javacord.api.entity.server.Server server = event.getServer().orElse(null);
-                String ourPrefix = getServerPrefix(server);
+                String ourPrefix = "[" + getFallbackServerPrefix() + "]";
                 if (authorName != null && authorName.startsWith(ourPrefix)) {
                     return;
                 }
@@ -568,9 +576,8 @@ public class DiscordManager {
             // Filter other webhooks if configured
             if (DiscordConfig.CONFIG.ignoreWebhooks.get() && isWebhook) {
                 if (DiscordConfig.CONFIG.filterByPrefix.get()) {
-                    // Get server context for prefix determination
-                    org.javacord.api.entity.server.Server server = event.getServer().orElse(null);
-                    String ourPrefix = getServerPrefix(server);
+                    // Use same prefix as sending to ensure accurate filtering
+                    String ourPrefix = "[" + getFallbackServerPrefix() + "]";
                     if (authorName != null && authorName.startsWith(ourPrefix)) {
                         return;
                     }
@@ -596,7 +603,15 @@ public class DiscordManager {
                         }
                     }
                     
-                    // Continue with normal embed processing if no advancement embeds found
+                    // Second, check for event embeds (join/leave/death) and process them specially
+                    for (org.javacord.api.entity.message.embed.Embed embed : event.getMessage().getEmbeds()) {
+                        if (eventDetector.isEventEmbed(embed)) {
+                            processEventEmbed(embed, event);
+                            return; // Skip normal embed processing for event embeds
+                        }
+                    }
+                    
+                    // Continue with normal embed processing if no special embeds found
                     org.javacord.api.entity.message.embed.Embed embed = event.getMessage().getEmbeds().get(0);
                     isEvent = true;
 
@@ -690,8 +705,10 @@ public class DiscordManager {
                         }
                     }
                 } else {
-                    // No prefix found, just use raw name
-                    formattedMessage = "§7[Discord] §f" + authorName + "§7: §f" + cleanedContent;
+                    // No bracket prefix found - treat as cross-server player message
+                    // Format with green [Cross-Server] prefix for consistency
+                    displayName = "§a[Cross-Server] §f" + authorName;
+                    formattedMessage = displayName + "§7: §f" + cleanedContent;
                 }
             } else {
                 // Standard Discord user message
@@ -775,9 +792,9 @@ public class DiscordManager {
                         data.getPlayerName(), data.getAdvancementTitle(), data.getType(), contextInfo);
             }
             
-            // Determine server prefix for this message
-            org.javacord.api.entity.server.Server discordServer = event.getServer().orElse(null);
-            String serverPrefix = getServerPrefix(discordServer);
+            // Determine server prefix for this message by extracting from webhook author name
+            // This ensures cross-server advancement messages display the correct source server prefix
+            String serverPrefix = extractServerPrefixFromAuthor(event.getMessageAuthor().getDisplayName());
             
             try {
                 // Generate vanilla-style advancement component
@@ -868,8 +885,7 @@ public class DiscordManager {
             String advancementTitle = extractAdvancementTitleFallback(embed);
             
             if (playerName != null && advancementTitle != null) {
-                org.javacord.api.entity.server.Server discordServer = event.getServer().orElse(null);
-                String serverPrefix = getServerPrefix(discordServer);
+                String serverPrefix = extractServerPrefixFromAuthor(event.getMessageAuthor().getDisplayName());
                 
                 MutableComponent fallbackComponent = componentBuilder.createFallbackComponent(
                         playerName, advancementTitle, serverPrefix);
@@ -937,8 +953,7 @@ public class DiscordManager {
         }
         
         try {
-            org.javacord.api.entity.server.Server discordServer = event.getServer().orElse(null);
-            String serverPrefix = getServerPrefix(discordServer);
+            String serverPrefix = extractServerPrefixFromAuthor(event.getMessageAuthor().getDisplayName());
             
             MutableComponent errorComponent = createMinimalErrorComponent(serverPrefix, contextInfo);
             
@@ -1414,6 +1429,106 @@ public class DiscordManager {
                lowerTitle.equals("challenge");
     }
 
+    /**
+     * Processes event embeds (join/leave/death) by extracting data and converting to simplified format.
+     * Format: [ServerPrefix] PlayerName action (e.g., "[MCSurvival] Steve joined")
+     * 
+     * @param embed The Discord embed containing event information
+     * @param event The message event for context
+     */
+    private void processEventEmbed(org.javacord.api.entity.message.embed.Embed embed, 
+                                  org.javacord.api.event.message.MessageCreateEvent event) {
+        String contextInfo = buildErrorContext(embed, event);
+        
+        if (DiscordConfig.CONFIG.debugLogging.get()) {
+            VonixCore.LOGGER.debug("[Discord] Starting event embed processing {}", contextInfo);
+        }
+        
+        try {
+            // Extract event data from the embed
+            EventData data = eventExtractor.extractFromEmbed(embed);
+            
+            if (DiscordConfig.CONFIG.debugLogging.get()) {
+                VonixCore.LOGGER.debug("[Discord] Successfully extracted event data: player='{}', type='{}' {}", 
+                        data.getPlayerName(), data.getEventType(), contextInfo);
+            }
+            
+            // Determine server prefix from webhook author name
+            // For events, use "Cross-Server" as fallback since we can't determine source
+            String serverPrefix = extractServerPrefixFromAuthorForEvents(event.getMessageAuthor().getDisplayName());
+            
+            try {
+                // Generate simplified event component
+                MutableComponent eventComponent = componentBuilder.buildEventMessage(data, serverPrefix);
+                
+                if (server != null) {
+                    server.getPlayerList().broadcastSystemMessage(eventComponent, false);
+                    
+                    if (DiscordConfig.CONFIG.debugLogging.get()) {
+                        VonixCore.LOGGER.info("[Discord] Successfully processed event embed: {} {} {}", 
+                                data.getPlayerName(), data.getActionString(), contextInfo);
+                    }
+                    return;
+                } else {
+                    VonixCore.LOGGER.error("[Discord] Cannot send event message - server instance is null {}", contextInfo);
+                }
+            } catch (Exception componentError) {
+                VonixCore.LOGGER.error("[Discord] Failed to generate event component. Error: {} | Player: {} | Type: {} {}", 
+                        componentError.getMessage(), data.getPlayerName(), data.getEventType(), contextInfo);
+            }
+            
+        } catch (ExtractionException e) {
+            VonixCore.LOGGER.warn("[Discord] Failed to extract event data from embed: {} {}", e.getMessage(), contextInfo);
+        } catch (Exception e) {
+            VonixCore.LOGGER.error("[Discord] Unexpected error during event processing: {} {}", e.getMessage(), contextInfo, e);
+        }
+        
+        // Fallback: try to create a basic event message
+        handleEventFallback(embed, event, contextInfo);
+    }
+    
+    /**
+     * Handles fallback processing for event embeds when primary processing fails.
+     */
+    private void handleEventFallback(org.javacord.api.entity.message.embed.Embed embed,
+                                    org.javacord.api.event.message.MessageCreateEvent event,
+                                    String contextInfo) {
+        try {
+            String playerName = extractPlayerNameFallback(embed);
+            String serverPrefix = extractServerPrefixFromAuthorForEvents(event.getMessageAuthor().getDisplayName());
+            
+            // Determine action from embed
+            String action = "performed an action";
+            EventEmbedDetector.EventType eventType = eventDetector.getEventType(embed);
+            if (eventType != EventEmbedDetector.EventType.UNKNOWN) {
+                action = eventType.getActionVerb();
+            }
+            
+            if (playerName != null) {
+                MutableComponent fallbackComponent = componentBuilder.createEventFallbackComponent(
+                        playerName, action, serverPrefix);
+                
+                if (server != null && fallbackComponent != null) {
+                    server.getPlayerList().broadcastSystemMessage(fallbackComponent, false);
+                    VonixCore.LOGGER.info("[Discord] Used fallback processing for event embed: {} {} {}", 
+                            playerName, action, contextInfo);
+                    return;
+                }
+            }
+            
+            // Ultimate fallback: convert embed to basic format
+            MutableComponent originalComponent = convertEmbedToMinecraftComponent(embed, event);
+            if (server != null && originalComponent != null) {
+                server.getPlayerList().broadcastSystemMessage(originalComponent, false);
+                VonixCore.LOGGER.info("[Discord] Used original embed display for event fallback {}", contextInfo);
+            }
+            
+        } catch (Exception fallbackError) {
+            VonixCore.LOGGER.error("[Discord] Event fallback processing failed: {} {}", 
+                    fallbackError.getMessage(), contextInfo);
+        }
+    }
+
     // ========= Minecraft → Discord =========
 
     public void sendMinecraftMessage(String username, String message) {
@@ -1426,7 +1541,7 @@ public class DiscordManager {
             return;
         }
 
-        String prefix = getFallbackServerPrefix();
+        String prefix = DiscordConfig.CONFIG.serverPrefix.get();
         String formattedUsername = DiscordConfig.CONFIG.webhookUsernameFormat.get()
                 .replace("{prefix}", prefix)
                 .replace("{username}", username);
@@ -1755,7 +1870,7 @@ public class DiscordManager {
                 try {
                     payload = new JsonObject();
 
-                    String prefix = getFallbackServerPrefix();
+                    String prefix = DiscordConfig.CONFIG.serverPrefix.get();
                     String serverName = DiscordConfig.CONFIG.serverName.get();
                     String baseUsername = serverName == null ? "Server" : serverName;
                     String formattedUsername = DiscordConfig.CONFIG.webhookUsernameFormat.get()
@@ -2237,14 +2352,81 @@ public class DiscordManager {
 
     /**
      * Gets the fallback server prefix used when no specific server context is available.
+     * Returns prefix without brackets for consistent use with component builders.
      * 
-     * @return The fallback server prefix
+     * @return The fallback server prefix (without brackets)
      */
     public String getFallbackServerPrefix() {
         if (serverPrefixConfig == null) {
-            return DiscordConfig.CONFIG.serverPrefix.get();
+            return stripBracketsFromPrefix(DiscordConfig.CONFIG.serverPrefix.get());
         }
         return serverPrefixConfig.getFallbackPrefix();
+    }
+
+    /**
+     * Extracts server prefix from a webhook author name.
+     * Webhook usernames follow the format "[Prefix]Username" or "[Prefix] Username".
+     * This method extracts the prefix portion (without brackets) for use in advancement messages.
+     * 
+     * @param authorName The webhook author display name
+     * @return The extracted prefix (without brackets), or fallback prefix if extraction fails
+     */
+    private String extractServerPrefixFromAuthor(String authorName) {
+        if (authorName != null && authorName.startsWith("[") && authorName.contains("]")) {
+            int endBracket = authorName.indexOf("]");
+            // Extract the prefix without the brackets
+            String prefix = authorName.substring(1, endBracket).trim();
+            if (!prefix.isEmpty()) {
+                return prefix;
+            }
+        }
+        // Fallback to configured prefix if extraction fails
+        // getFallbackServerPrefix() may return value with brackets, so strip them
+        return stripBracketsFromPrefix(getFallbackServerPrefix());
+    }
+    
+    /**
+     * Extracts server prefix from a webhook author name for event messages.
+     * Uses "Cross-Server" as fallback since events from unknown sources should not
+     * display the local server's prefix (that would be confusing to players).
+     * 
+     * @param authorName The webhook author display name
+     * @return The extracted prefix (without brackets), or "Cross-Server" if extraction fails
+     */
+    private String extractServerPrefixFromAuthorForEvents(String authorName) {
+        if (authorName != null && authorName.startsWith("[") && authorName.contains("]")) {
+            int endBracket = authorName.indexOf("]");
+            // Extract the prefix without the brackets
+            String prefix = authorName.substring(1, endBracket).trim();
+            if (!prefix.isEmpty()) {
+                return prefix;
+            }
+        }
+        // For events, use "Cross-Server" as fallback to clearly indicate the source is unknown
+        return "Cross-Server";
+    }
+    
+    /**
+     * Strips brackets from a prefix if present.
+     * Handles prefixes in formats like "[Prefix]", "[Prefix", "Prefix]", or "Prefix".
+     * 
+     * @param prefix The prefix that may contain brackets
+     * @return The prefix without surrounding brackets
+     */
+    private String stripBracketsFromPrefix(String prefix) {
+        if (prefix == null || prefix.isEmpty()) {
+            return prefix;
+        }
+        String stripped = prefix.trim();
+        // Remove leading bracket if present
+        if (stripped.startsWith("[")) {
+            stripped = stripped.substring(1);
+        }
+        // Remove trailing bracket if present
+        if (stripped.endsWith("]")) {
+            stripped = stripped.substring(0, stripped.length() - 1);
+        }
+        return stripped.trim();
     }
 
     /**

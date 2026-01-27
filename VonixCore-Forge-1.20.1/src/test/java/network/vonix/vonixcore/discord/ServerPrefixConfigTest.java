@@ -75,9 +75,9 @@ class ServerPrefixConfigTest {
         assertThrows(IllegalArgumentException.class, () -> 
             config.setServerPrefix(serverId, "   "));
         
-        // Test too long prefix
+        // Test too long prefix (max is 16)
         assertThrows(IllegalArgumentException.class, () -> 
-            config.setServerPrefix(serverId, "VERYLONGPREFIX"));
+            config.setServerPrefix(serverId, "VERYLONGPREFIXNAME"));
         
         // Test invalid characters
         assertThrows(IllegalArgumentException.class, () -> 
