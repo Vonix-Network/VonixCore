@@ -22,7 +22,6 @@ public class EssentialsConfig {
         public final ForgeConfigSpec.IntValue tpaTimeout;
         public final ForgeConfigSpec.IntValue cooldown;
         public final ForgeConfigSpec.IntValue backTimeout;
-        public final ForgeConfigSpec.IntValue deathBackTimeout;
         public final ForgeConfigSpec.IntValue deathBackDelay;
         public final ForgeConfigSpec.BooleanValue warpGuiEnabled;
         public final ForgeConfigSpec.ConfigValue<String> currencySymbol;
@@ -82,12 +81,10 @@ public class EssentialsConfig {
                 backTimeout = builder
                         .comment("Back command timeout in seconds")
                         .defineInRange("teleport.back_timeout", 0, 0, 300);
-                deathBackTimeout = builder
-                        .comment("Death back timeout in seconds")
-                        .defineInRange("teleport.death_back_timeout", 0, 0, 300);
                 deathBackDelay = builder
-                        .comment("Death back delay/cooldown in seconds")
-                        .defineInRange("teleport.death_back_delay", 3, 0, 300);
+                        .comment("Minimum time to wait before using /back after death (seconds)")
+                        .comment("Prevents immediate return to boss fights etc.")
+                        .defineInRange("teleport.death_back_delay", 60, 0, 3600);
         }
 
         private static EssentialsConfig instance;
@@ -154,10 +151,6 @@ public class EssentialsConfig {
         
         public int getBackTimeout() {
                 return CONFIG.backTimeout.get();
-        }
-        
-        public int getDeathBackTimeout() {
-                return CONFIG.deathBackTimeout.get();
         }
         
         public int getDeathBackDelay() {

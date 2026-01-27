@@ -34,18 +34,20 @@ public class EssentialsConfig {
         // Homes settings
         public final ForgeConfigSpec.IntValue maxHomes;
         public final ForgeConfigSpec.IntValue homeCooldown;
+        public final ForgeConfigSpec.IntValue teleportDelay;
+        public final ForgeConfigSpec.IntValue tpaTimeout;
+        public final ForgeConfigSpec.IntValue cooldown;
+        public final ForgeConfigSpec.IntValue backTimeout;
+        public final ForgeConfigSpec.IntValue deathBackDelay;
+        public final ForgeConfigSpec.BooleanValue warpGuiEnabled;
+        public final ForgeConfigSpec.ConfigValue<String> currencySymbol;
+        public final ForgeConfigSpec.ConfigValue<String> currencyName;
 
         // TPA settings
         public final ForgeConfigSpec.IntValue tpaCooldown;
-        public final ForgeConfigSpec.IntValue tpaTimeout;
-        public final ForgeConfigSpec.IntValue backTimeout;
-        public final ForgeConfigSpec.IntValue deathBackTimeout;
-        public final ForgeConfigSpec.IntValue deathBackDelay;
 
         // Economy settings
         public final ForgeConfigSpec.DoubleValue startingBalance;
-        public final ForgeConfigSpec.ConfigValue<String> currencySymbol;
-        public final ForgeConfigSpec.ConfigValue<String> currencyName;
 
         // Kits settings
         public final ForgeConfigSpec.IntValue defaultKitCooldown;
@@ -115,6 +117,39 @@ public class EssentialsConfig {
                                 "Set to 0 to disable cooldown")
                                 .defineInRange("cooldown", 5, 0, 300);
 
+                teleportDelay = builder.comment(
+                                "Teleport delay in seconds")
+                                .defineInRange("teleport_delay", 0, 0, 10);
+
+                tpaTimeout = builder.comment(
+                                "TPA request timeout in seconds")
+                                .defineInRange("tpa_timeout", 60, 10, 300);
+
+                cooldown = builder.comment(
+                                "Teleport cooldown in seconds")
+                                .defineInRange("teleport.cooldown", 0, 0, 300);
+
+                backTimeout = builder.comment(
+                                "Back command timeout in seconds")
+                                .defineInRange("teleport.back_timeout", 0, 0, 300);
+
+                deathBackDelay = builder.comment(
+                                "Minimum time to wait before using /back after death (seconds)")
+                                .comment("Prevents immediate return to boss fights etc.")
+                                .defineInRange("teleport.death_back_delay", 60, 0, 3600);
+
+                warpGuiEnabled = builder.comment(
+                                "Enable warp GUI instead of command-based warps")
+                                .define("warp_gui_enabled", true);
+
+                currencySymbol = builder.comment(
+                                "Currency symbol to display (e.g., $, €, £)")
+                                .define("currency_symbol", "$");
+
+                currencyName = builder.comment(
+                                "Currency name (e.g., Coins, Credits, Gold)")
+                                .define("currency_name", "Coins");
+
                 builder.pop().comment(
                                 "TPA Settings",
                                 "Configure teleport request feature")
@@ -124,26 +159,6 @@ public class EssentialsConfig {
                                 "Cooldown between TPA requests in seconds")
                                 .defineInRange("cooldown", 30, 0, 3600);
 
-                tpaTimeout = builder.comment(
-                                "How long TPA requests remain valid (seconds)",
-                                "After this time, the request expires")
-                                .defineInRange("timeout", 120, 30, 600);
-
-                backTimeout = builder.comment(
-                                "How long /back locations remain valid (seconds)",
-                                "Set to 0 to disable timeout (infinite)")
-                                .defineInRange("back_timeout", 300, 0, 86400);
-
-                deathBackTimeout = builder.comment(
-                                "How long /back locations remain valid after death (seconds)",
-                                "Set to 0 to disable timeout (infinite)")
-                                .defineInRange("death_back_timeout", 60, 0, 86400);
-
-                deathBackDelay = builder.comment(
-                                "Minimum time to wait before using /back after death (seconds)",
-                                "Prevents immediate return to boss fights etc.")
-                                .defineInRange("death_back_delay", 0, 0, 3600);
-
                 builder.pop().comment(
                                 "Economy Settings",
                                 "Configure the economy system")
@@ -152,14 +167,6 @@ public class EssentialsConfig {
                 startingBalance = builder.comment(
                                 "Starting balance for new players")
                                 .defineInRange("starting_balance", 100.0, 0.0, 1000000.0);
-
-                currencySymbol = builder.comment(
-                                "Currency symbol to display (e.g., $, €, £)")
-                                .define("currency_symbol", "$");
-
-                currencyName = builder.comment(
-                                "Currency name (e.g., Coins, Credits, Gold)")
-                                .define("currency_name", "Coins");
 
                 builder.pop().comment(
                                 "Kits Settings",

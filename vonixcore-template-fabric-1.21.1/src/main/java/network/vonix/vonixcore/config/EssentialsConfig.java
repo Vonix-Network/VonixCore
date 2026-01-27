@@ -144,12 +144,8 @@ public class EssentialsConfig extends BaseConfig {
         return getInt("teleport.back_timeout", 300);
     }
 
-    public int getDeathBackTimeout() {
-        return getInt("teleport.death_back_timeout", 60);
-    }
-
     public int getDeathBackDelay() {
-        return getInt("teleport.death_back_delay", 0);
+        return getInt("teleport.death_back_delay", 60);
     }
 
     // Economy

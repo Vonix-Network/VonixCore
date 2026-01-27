@@ -391,33 +391,16 @@ public class VonixCoreCommands {
             return 0;
         }
 
-        // Check timeout
-        int timeoutSeconds;
-        if (loc.isDeath()) {
-            timeoutSeconds = network.vonix.vonixcore.config.EssentialsConfig.CONFIG.deathBackTimeout.get();
-        } else {
-            timeoutSeconds = network.vonix.vonixcore.config.EssentialsConfig.CONFIG.backTimeout.get();
-        }
-
-        // Check death back delay
+        // Check death back delay (cooldown ONLY applies to deaths)
         if (loc.isDeath()) {
             int delaySeconds = network.vonix.vonixcore.config.EssentialsConfig.CONFIG.deathBackDelay.get();
             if (delaySeconds > 0) {
                 long elapsed = (System.currentTimeMillis() - loc.timestamp()) / 1000;
                 if (elapsed < delaySeconds) {
-                    player.sendSystemMessage(Component.literal("§c[VC] You must wait " +
+                    ctx.getSource().sendFailure(Component.literal("§c[VC] You must wait " +
                             formatTime((int) (delaySeconds - elapsed)) + " before returning to your death location."));
                     return 0;
                 }
-            }
-        }
-
-        if (timeoutSeconds > 0) {
-            long elapsed = (System.currentTimeMillis() - loc.timestamp()) / 1000;
-            if (elapsed > timeoutSeconds) {
-                player.sendSystemMessage(Component
-                        .literal("§c[VC] Your previous location has expired (" + timeoutSeconds + "s timeout)."));
-                return 0;
             }
         }
 

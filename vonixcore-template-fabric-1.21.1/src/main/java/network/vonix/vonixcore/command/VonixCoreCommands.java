@@ -382,32 +382,16 @@ public class VonixCoreCommands {
                         return 0;
                     }
 
-                    int timeoutSeconds;
-                    if (loc.isDeath()) {
-                        timeoutSeconds = EssentialsConfig.getInstance().getDeathBackTimeout();
-                    } else {
-                        timeoutSeconds = EssentialsConfig.getInstance().getBackTimeout();
-                    }
-
-                    // Check death back delay (cooldown only applies to deaths)
+                    // Check death back delay (cooldown ONLY applies to deaths)
                     if (loc.isDeath()) {
                         int delaySeconds = EssentialsConfig.getInstance().getDeathBackDelay();
                         if (delaySeconds > 0) {
                             long elapsed = (System.currentTimeMillis() - loc.timestamp()) / 1000;
                             if (elapsed < delaySeconds) {
                                 ctx.getSource().sendFailure(Component.literal("§c[VC] You must wait " +
-                                        (delaySeconds - elapsed) + "s before returning to your death location."));
+                                        formatTime((int) (delaySeconds - elapsed)) + " before returning to your death location."));
                                 return 0;
                             }
-                        }
-                    }
-
-                    if (timeoutSeconds > 0) {
-                        long elapsed = (System.currentTimeMillis() - loc.timestamp()) / 1000;
-                        if (elapsed > timeoutSeconds) {
-                            ctx.getSource().sendFailure(Component
-                                    .literal("§c[VC] Your previous location has expired (" + timeoutSeconds + "s timeout)."));
-                            return 0;
                         }
                     }
 
@@ -503,5 +487,15 @@ public class VonixCoreCommands {
                     }
                     return 1;
                 }));
+    }
+
+    private static String formatTime(int seconds) {
+        if (seconds < 60) {
+            return seconds + "s";
+        } else if (seconds < 3600) {
+            return (seconds / 60) + "m " + (seconds % 60) + "s";
+        } else {
+            return (seconds / 3600) + "h " + ((seconds % 3600) / 60) + "m";
+        }
     }
 }

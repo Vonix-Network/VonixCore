@@ -136,11 +136,9 @@ public class TeleportCommands {
                 return 0;
             }
 
-            // Check timeout based on whether it's a death location
-            int timeoutSeconds;
-            if (loc.isDeath()) {
-                timeoutSeconds = EssentialsConfig.getInstance().getDeathBackTimeout();
-            } else {
+            // Check timeout for regular /back (not death locations)
+            int timeoutSeconds = 0;
+            if (!loc.isDeath()) {
                 timeoutSeconds = EssentialsConfig.getInstance().getBackTimeout();
             }
 
@@ -158,8 +156,8 @@ public class TeleportCommands {
                 }
             }
 
-            // Check if location has expired
-            if (timeoutSeconds > 0) {
+            // Check if regular back location has expired (not death locations)
+            if (timeoutSeconds > 0 && !loc.isDeath()) {
                 long elapsed = (System.currentTimeMillis() - loc.timestamp()) / 1000;
                 if (elapsed > timeoutSeconds) {
                     ctx.getSource().sendFailure(new TextComponent(
