@@ -24,7 +24,7 @@ echo -e "${CYAN}==========================================${NC}"
 echo ""
 
 # Get version from gradle.properties
-VERSION="1.1.1"
+VERSION="1.2"
 PROPS_FILE="$SCRIPT_DIR/VonixCore-NeoForge-Universal/gradle.properties"
 if [ -f "$PROPS_FILE" ]; then
     VERSION=$(grep "^mod_version=" "$PROPS_FILE" | cut -d'=' -f2 | tr -d '[:space:]')
