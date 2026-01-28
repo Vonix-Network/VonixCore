@@ -191,11 +191,17 @@ public class XPSyncManager {
                 return players;
             }
 
-            List<ServerPlayer> online = server.getPlayerList().getPlayers();
             List<String> onlineUuids = new ArrayList<>();
-            for (ServerPlayer p : online) {
-                players.add(buildPlayerDataFromOnline(p));
-                onlineUuids.add(p.getUUID().toString());
+
+            // Handle case where server player list is not available (early startup)
+            if (server.getPlayerList() == null) {
+                VonixCore.LOGGER.warn("[XPSync] Player list not available yet, skipping online player sync");
+            } else {
+                List<ServerPlayer> online = server.getPlayerList().getPlayers();
+                for (ServerPlayer p : online) {
+                    players.add(buildPlayerDataFromOnline(p));
+                    onlineUuids.add(p.getUUID().toString());
+                }
             }
 
             File[] datFiles = playerDataPath.toFile().listFiles((dir, name) -> name.endsWith(".dat"));

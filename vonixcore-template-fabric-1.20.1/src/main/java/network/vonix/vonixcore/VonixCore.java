@@ -260,23 +260,7 @@ public class VonixCore implements ModInitializer {
             }
         }
 
-        // Initialize XPSync module
-        if (XPSyncConfig.getInstance().isEnabled()) {
-            String apiKey = XPSyncConfig.getInstance().getApiKey();
-            if (apiKey == null || apiKey.isEmpty() || apiKey.equals("YOUR_API_KEY_HERE")) {
-                LOGGER.warn("[{}] XPSync is enabled but API key not configured", MOD_NAME);
-            } else {
-                try {
-                    xpSyncManager = new XPSyncManager(server);
-                    xpSyncManager.start();
-                    xpsyncEnabled = true;
-                    enabledModules.add("XPSync");
-                    LOGGER.info("[{}] XPSync module enabled", MOD_NAME);
-                } catch (Exception e) {
-                    LOGGER.error("[{}] Failed to initialize XPSync: {}", MOD_NAME, e.getMessage());
-                }
-            }
-        }
+        // Initialize XPSync module (moved to onServerStarted for proper initialization)
 
         // Initialize Claims module
         if (ClaimsConfig.getInstance().isEnabled()) {
@@ -307,6 +291,23 @@ public class VonixCore implements ModInitializer {
                 LOGGER.info("[{}] Discord module enabled", MOD_NAME);
             } catch (Exception e) {
                 LOGGER.error("[{}] Failed to initialize Discord: {}", MOD_NAME, e.getMessage());
+            }
+        }
+
+        // Initialize XPSync module (requires server to be fully started for player list access)
+        if (XPSyncConfig.getInstance().isEnabled()) {
+            String apiKey = XPSyncConfig.getInstance().getApiKey();
+            if (apiKey == null || apiKey.isEmpty() || apiKey.equals("YOUR_API_KEY_HERE")) {
+                LOGGER.warn("[{}] XPSync is enabled but API key not configured", MOD_NAME);
+            } else {
+                try {
+                    xpSyncManager = new XPSyncManager(server);
+                    xpSyncManager.start();
+                    xpsyncEnabled = true;
+                    LOGGER.info("[{}] XPSync module enabled", MOD_NAME);
+                } catch (Exception e) {
+                    LOGGER.error("[{}] Failed to initialize XPSync: {}", MOD_NAME, e.getMessage());
+                }
             }
         }
     }

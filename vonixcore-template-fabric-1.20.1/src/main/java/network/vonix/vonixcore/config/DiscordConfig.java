@@ -62,7 +62,7 @@ public class DiscordConfig extends BaseConfig {
         setDefault("server_identity.avatar_url", "");
 
         // Message formats
-        setDefault("message_formats.discord_to_minecraft", "§b[Discord] §f<{username}> {message}");
+        setDefault("message_formats.discord_to_minecraft", "§b[Discord] §f{username}: {message}");
         setDefault("message_formats.minecraft_to_discord", "{message}");
         setDefault("message_formats.webhook_username", "{prefix}{username}");
         setDefault("message_formats.avatar_url", "https://minotar.net/armor/bust/{uuid}/100.png");

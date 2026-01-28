@@ -116,8 +116,7 @@ public class AuthConfig {
 
         builder.pop();
 
-        Pair<AuthConfig, ForgeConfigSpec> pair = new ForgeConfigSpec.Builder()
-                .configure(AuthConfig::new);
+        Pair<AuthConfig, ForgeConfigSpec> pair = builder.configure(AuthConfig::new);
         CONFIG = pair.getLeft();
         SPEC = pair.getRight();
     }
