@@ -28,6 +28,7 @@ import network.vonix.vonixcore.economy.EconomyManager;
 import network.vonix.vonixcore.economy.ShopManager;
 
 import java.util.Map;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -717,9 +718,67 @@ public class ShopEventListener {
     }
 
     /**
-     * Prevent interaction with shop display entities (hologram dupe prevention)
+     * Prevent explosions from destroying shop chests
      */
-    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    @SubscribeEvent(priority = EventPriority.HIGH)
+    public static void onExplosionDetonate(net.neoforged.neoforge.event.level.ExplosionEvent.Detonate event) {
+        if (event.getLevel().isClientSide())
+            return;
+        if (!ShopsConfig.CONFIG.enabled.get())
+            return;
+
+        ServerLevel level = (ServerLevel) event.getLevel();
+        String world = level.dimension().location().toString();
+        List<BlockPos> affectedBlocks = event.getAffectedBlocks();
+
+        // Remove shop chests from the affected blocks list
+        affectedBlocks.removeIf(pos -> {
+            if (level.getBlockState(pos).getBlock() instanceof ChestBlock || level.getBlockState(pos).is(Blocks.BARREL)) {
+                // Check cache first
+                if (ShopManager.getInstance().isShopCached(world, pos)) {
+                    return true; // Protect shop
+                }
+                // If not in cache, check DB (async check not possible here, so we rely on cache)
+                // Assuming cache is authoritative for loaded chunks.
+            }
+            return false;
+        });
+    }
+
+    /**
+     * Prevent pistons from moving shop chests
+     */
+    @SubscribeEvent(priority = EventPriority.HIGH)
+    public static void onPistonMove(net.neoforged.neoforge.event.level.PistonEvent.Pre event) {
+        if (event.getLevel().isClientSide())
+            return;
+        if (!ShopsConfig.CONFIG.enabled.get())
+            return;
+
+        if (!(event.getLevel() instanceof ServerLevel level))
+            return;
+
+        String world = level.dimension().location().toString();
+        
+        // Check the block being pushed/pulled
+        var structure = event.getStructureHelper();
+        if (structure != null && structure.resolve()) {
+            // Check all blocks to be moved
+            for (BlockPos movePos : structure.getToPush()) {
+                if (ShopManager.getInstance().isShopCached(world, movePos)) {
+                    event.setCanceled(true);
+                    return;
+                }
+            }
+            // Check blocks to be destroyed (e.g. by crushing)
+            for (BlockPos destroyPos : structure.getToDestroy()) {
+                if (ShopManager.getInstance().isShopCached(world, destroyPos)) {
+                    event.setCanceled(true);
+                    return;
+                }
+            }
+        }
+    }
     public static void onEntityInteract(PlayerInteractEvent.EntityInteract event) {
         if (event.getLevel().isClientSide())
             return;

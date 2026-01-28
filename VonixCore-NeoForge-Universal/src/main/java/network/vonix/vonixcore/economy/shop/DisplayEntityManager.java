@@ -160,6 +160,9 @@ public class DisplayEntityManager {
                 for (var shopLoc : shops) {
                     String key = locationKey(level, shopLoc.pos());
 
+                    // Clean up potential duplicates from disk (e.g. after crash/restart)
+                    removeDisplayByPosition(level, shopLoc.pos());
+
                     // Skip if already tracked (might have been loaded via entity load)
                     if (displayEntities.containsKey(key)) {
                         continue;
