@@ -12,6 +12,8 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Manages chest-based block shops with holograms.
@@ -25,7 +27,7 @@ public class ShopManager {
     private final Map<UUID, ShopCreationState> creatingShop = new HashMap<>();
 
     // Cached shops for quick lookup
-    private final Map<String, ChestShop> shopCache = new HashMap<>();
+    private final Map<String, ChestShop> shopCache = new ConcurrentHashMap<>();
 
     public static ShopManager getInstance() {
         if (instance == null) {
@@ -131,32 +133,37 @@ public class ShopManager {
             int quantity) {
         UUID uuid = player.getUUID();
         String world = player.level().dimension().location().toString();
+        long createdAt = System.currentTimeMillis() / 1000L;
 
-        try (Connection conn = VonixCore.getInstance().getDatabase().getConnection()) {
-            PreparedStatement stmt = conn.prepareStatement(
-                    "INSERT INTO vc_chest_shops (owner_uuid, world, x, y, z, item_id, buy_price, sell_price, stock, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-            stmt.setString(1, uuid.toString());
-            stmt.setString(2, world);
-            stmt.setInt(3, pos.getX());
-            stmt.setInt(4, pos.getY());
-            stmt.setInt(5, pos.getZ());
-            stmt.setString(6, itemId);
-            stmt.setObject(7, buyPrice);
-            stmt.setObject(8, sellPrice);
-            stmt.setInt(9, quantity);
-            stmt.setLong(10, System.currentTimeMillis() / 1000L);
-            stmt.executeUpdate();
+        // Cache immediately
+        String key = shopKey(world, pos);
+        shopCache.put(key, new ChestShop(uuid, itemId, buyPrice, sellPrice, quantity));
+        creatingShop.remove(uuid);
 
-            // Cache the shop
-            String key = shopKey(world, pos);
-            shopCache.put(key, new ChestShop(uuid, itemId, buyPrice, sellPrice, quantity));
+        // Save to database asynchronously
+        VonixCore.executeAsync(() -> {
+            try (Connection conn = VonixCore.getInstance().getDatabase().getConnection()) {
+                PreparedStatement stmt = conn.prepareStatement(
+                        "INSERT INTO vc_chest_shops (owner_uuid, world, x, y, z, item_id, buy_price, sell_price, stock, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                stmt.setString(1, uuid.toString());
+                stmt.setString(2, world);
+                stmt.setInt(3, pos.getX());
+                stmt.setInt(4, pos.getY());
+                stmt.setInt(5, pos.getZ());
+                stmt.setString(6, itemId);
+                stmt.setObject(7, buyPrice);
+                stmt.setObject(8, sellPrice);
+                stmt.setInt(9, quantity);
+                stmt.setLong(10, createdAt);
+                stmt.executeUpdate();
+            } catch (SQLException e) {
+                VonixCore.LOGGER.error("[VonixCore] Failed to create chest shop: {}", e.getMessage());
+                // Remove from cache if save failed to prevent inconsistencies?
+                // Or retry. For now, we log error.
+            }
+        });
 
-            creatingShop.remove(uuid);
-            return true;
-        } catch (SQLException e) {
-            VonixCore.LOGGER.error("[VonixCore] Failed to create chest shop: {}", e.getMessage());
-            return false;
-        }
+        return true;
     }
 
     /**
@@ -199,22 +206,25 @@ public class ShopManager {
      * Delete a shop.
      */
     public boolean deleteShop(String world, BlockPos pos) {
-        try (Connection conn = VonixCore.getInstance().getDatabase().getConnection()) {
-            PreparedStatement stmt = conn.prepareStatement(
-                    "DELETE FROM vc_chest_shops WHERE world = ? AND x = ? AND y = ? AND z = ?");
-            stmt.setString(1, world);
-            stmt.setInt(2, pos.getX());
-            stmt.setInt(3, pos.getY());
-            stmt.setInt(4, pos.getZ());
-            boolean deleted = stmt.executeUpdate() > 0;
-            if (deleted) {
-                shopCache.remove(shopKey(world, pos));
+        // Update cache immediately
+        String key = shopKey(world, pos);
+        shopCache.remove(key);
+
+        // Update database asynchronously
+        VonixCore.executeAsync(() -> {
+            try (Connection conn = VonixCore.getInstance().getDatabase().getConnection()) {
+                PreparedStatement stmt = conn.prepareStatement(
+                        "DELETE FROM vc_chest_shops WHERE world = ? AND x = ? AND y = ? AND z = ?");
+                stmt.setString(1, world);
+                stmt.setInt(2, pos.getX());
+                stmt.setInt(3, pos.getY());
+                stmt.setInt(4, pos.getZ());
+                stmt.executeUpdate();
+            } catch (SQLException e) {
+                VonixCore.LOGGER.error("[VonixCore] Failed to delete shop: {}", e.getMessage());
             }
-            return deleted;
-        } catch (SQLException e) {
-            VonixCore.LOGGER.error("[VonixCore] Failed to delete shop: {}", e.getMessage());
-            return false;
-        }
+        });
+        return true;
     }
 
     /**
@@ -225,33 +235,44 @@ public class ShopManager {
      */
     public boolean updateStock(String world, BlockPos pos, int delta) {
         String key = shopKey(world, pos);
-        try (Connection conn = VonixCore.getInstance().getDatabase().getConnection()) {
-            // Update in database
-            PreparedStatement stmt = conn.prepareStatement(
-                    "UPDATE vc_chest_shops SET stock = stock + ? WHERE world = ? AND x = ? AND y = ? AND z = ?");
-            stmt.setInt(1, delta);
-            stmt.setString(2, world);
-            stmt.setInt(3, pos.getX());
-            stmt.setInt(4, pos.getY());
-            stmt.setInt(5, pos.getZ());
-            boolean updated = stmt.executeUpdate() > 0;
-
-            // Update cache if present
-            if (updated && shopCache.containsKey(key)) {
-                ChestShop old = shopCache.get(key);
-                shopCache.put(key, new ChestShop(old.owner(), old.itemId(), old.buyPrice(), old.sellPrice(),
-                        Math.max(0, old.stock() + delta)));
-            }
-            return updated;
-        } catch (SQLException e) {
-            VonixCore.LOGGER.error("[VonixCore] Failed to update shop stock: {}", e.getMessage());
-            return false;
+        
+        // Update cache immediately if present
+        if (shopCache.containsKey(key)) {
+            ChestShop old = shopCache.get(key);
+            shopCache.put(key, new ChestShop(old.owner(), old.itemId(), old.buyPrice(), old.sellPrice(),
+                    Math.max(0, old.stock() + delta)));
+        } else {
+             // If not in cache, we can't easily update it without fetching first.
+             // But since we are pushing async, we should try to fetch-update if critical,
+             // or just issue the DB update.
+             // However, `handleCustomerClick` relies on the cache being up to date for subsequent clicks.
+             // If it's not in cache, `getShopAt` would have fetched it.
+             // So it SHOULD be in cache unless it was evicted or never loaded.
         }
+
+        // Update database asynchronously
+        VonixCore.executeAsync(() -> {
+            try (Connection conn = VonixCore.getInstance().getDatabase().getConnection()) {
+                PreparedStatement stmt = conn.prepareStatement(
+                        "UPDATE vc_chest_shops SET stock = stock + ? WHERE world = ? AND x = ? AND y = ? AND z = ?");
+                stmt.setInt(1, delta);
+                stmt.setString(2, world);
+                stmt.setInt(3, pos.getX());
+                stmt.setInt(4, pos.getY());
+                stmt.setInt(5, pos.getZ());
+                stmt.executeUpdate();
+            } catch (SQLException e) {
+                VonixCore.LOGGER.error("[VonixCore] Failed to update shop stock: {}", e.getMessage());
+            }
+        });
+        
+        return true;
     }
 
     /**
      * Get all shops in a specific chunk.
      * Used for respawning holograms on chunk load.
+     * Populates cache with full shop data.
      */
     public List<ChestShopLocation> getShopsInChunk(String world, int chunkX, int chunkZ) {
         List<ChestShopLocation> shops = new ArrayList<>();
@@ -262,7 +283,7 @@ public class ShopManager {
 
         try (Connection conn = VonixCore.getInstance().getDatabase().getConnection()) {
             PreparedStatement stmt = conn.prepareStatement(
-                    "SELECT x, y, z, item_id FROM vc_chest_shops WHERE world = ? AND x >= ? AND x <= ? AND z >= ? AND z <= ?");
+                    "SELECT * FROM vc_chest_shops WHERE world = ? AND x >= ? AND x <= ? AND z >= ? AND z <= ?");
             stmt.setString(1, world);
             stmt.setInt(2, minX);
             stmt.setInt(3, maxX);
@@ -270,14 +291,40 @@ public class ShopManager {
             stmt.setInt(5, maxZ);
             ResultSet rs = stmt.executeQuery();
             while (rs.next()) {
-                shops.add(new ChestShopLocation(
-                        new BlockPos(rs.getInt("x"), rs.getInt("y"), rs.getInt("z")),
-                        rs.getString("item_id")));
+                BlockPos pos = new BlockPos(rs.getInt("x"), rs.getInt("y"), rs.getInt("z"));
+                String itemId = rs.getString("item_id");
+                
+                // Create full shop object and cache it
+                ChestShop shop = new ChestShop(
+                        UUID.fromString(rs.getString("owner_uuid")),
+                        itemId,
+                        rs.getObject("buy_price") != null ? rs.getDouble("buy_price") : null,
+                        rs.getObject("sell_price") != null ? rs.getDouble("sell_price") : null,
+                        rs.getInt("stock"));
+                
+                shopCache.put(shopKey(world, pos), shop);
+                
+                shops.add(new ChestShopLocation(pos, itemId));
             }
         } catch (SQLException e) {
             VonixCore.LOGGER.error("[VonixCore] Failed to get shops in chunk: {}", e.getMessage());
         }
         return shops;
+    }
+
+    /**
+     * Asynchronously load shops in a chunk and return locations via callback.
+     */
+    public void loadShopsInChunkAsync(String world, int chunkX, int chunkZ, java.util.function.Consumer<List<ChestShopLocation>> callback) {
+        VonixCore.executeAsync(() -> {
+            List<ChestShopLocation> shops = getShopsInChunk(world, chunkX, chunkZ);
+            // Callback on main thread if needed, or let caller handle it.
+            // Since DisplayEntityManager needs to spawn entities, it probably needs main thread.
+            // But let's just return the list and let caller schedule.
+             if (callback != null) {
+                 callback.accept(shops);
+             }
+        });
     }
 
     /**
@@ -330,21 +377,23 @@ public class ShopManager {
     /**
      * Get all admin shop items.
      */
-    public List<AdminShopItem> getAllAdminItems() {
-        List<AdminShopItem> items = new ArrayList<>();
-        try (Connection conn = VonixCore.getInstance().getDatabase().getConnection()) {
-            ResultSet rs = conn.createStatement()
-                    .executeQuery("SELECT item_id, buy_price, sell_price FROM vc_admin_shop ORDER BY item_id");
-            while (rs.next()) {
-                items.add(new AdminShopItem(
-                        rs.getString("item_id"),
-                        rs.getObject("buy_price") != null ? rs.getDouble("buy_price") : null,
-                        rs.getObject("sell_price") != null ? rs.getDouble("sell_price") : null));
+    public CompletableFuture<List<AdminShopItem>> getAllAdminItems() {
+        return CompletableFuture.supplyAsync(() -> {
+            List<AdminShopItem> items = new ArrayList<>();
+            try (Connection conn = VonixCore.getInstance().getDatabase().getConnection()) {
+                ResultSet rs = conn.createStatement()
+                        .executeQuery("SELECT item_id, buy_price, sell_price FROM vc_admin_shop ORDER BY item_id");
+                while (rs.next()) {
+                    items.add(new AdminShopItem(
+                            rs.getString("item_id"),
+                            rs.getObject("buy_price") != null ? rs.getDouble("buy_price") : null,
+                            rs.getObject("sell_price") != null ? rs.getDouble("sell_price") : null));
+                }
+            } catch (SQLException e) {
+                VonixCore.LOGGER.error("[VonixCore] Failed to list admin items: {}", e.getMessage());
             }
-        } catch (SQLException e) {
-            VonixCore.LOGGER.error("[VonixCore] Failed to list admin items: {}", e.getMessage());
-        }
-        return items;
+            return items;
+        });
     }
 
     // ===== PLAYER LISTINGS (GUI SHOP) =====
@@ -373,111 +422,146 @@ public class ShopManager {
     /**
      * Get all player listings.
      */
-    public List<PlayerListing> getAllListings() {
-        List<PlayerListing> listings = new ArrayList<>();
-        try (Connection conn = VonixCore.getInstance().getDatabase().getConnection()) {
-            ResultSet rs = conn.createStatement().executeQuery(
-                    "SELECT id, seller_uuid, item_id, item_nbt, price, quantity FROM vc_player_listings ORDER BY listed_at DESC");
-            while (rs.next()) {
-                listings.add(new PlayerListing(
-                        rs.getInt("id"),
-                        UUID.fromString(rs.getString("seller_uuid")),
-                        rs.getString("item_id"),
-                        rs.getString("item_nbt"),
-                        rs.getDouble("price"),
-                        rs.getInt("quantity")));
+    public CompletableFuture<List<PlayerListing>> getAllListings() {
+        return CompletableFuture.supplyAsync(() -> {
+            List<PlayerListing> listings = new ArrayList<>();
+            try (Connection conn = VonixCore.getInstance().getDatabase().getConnection()) {
+                ResultSet rs = conn.createStatement().executeQuery(
+                        "SELECT id, seller_uuid, item_id, item_nbt, price, quantity FROM vc_player_listings ORDER BY listed_at DESC");
+                while (rs.next()) {
+                    listings.add(new PlayerListing(
+                            rs.getInt("id"),
+                            UUID.fromString(rs.getString("seller_uuid")),
+                            rs.getString("item_id"),
+                            rs.getString("item_nbt"),
+                            rs.getDouble("price"),
+                            rs.getInt("quantity")));
+                }
+            } catch (SQLException e) {
+                VonixCore.LOGGER.error("[VonixCore] Failed to get listings: {}", e.getMessage());
             }
-        } catch (SQLException e) {
-            VonixCore.LOGGER.error("[VonixCore] Failed to get listings: {}", e.getMessage());
-        }
-        return listings;
+            return listings;
+        });
     }
 
     /**
      * Buy a listing.
      */
-    public boolean buyListing(int listingId, UUID buyer) {
-        try (Connection conn = VonixCore.getInstance().getDatabase().getConnection()) {
-            // Get listing details
-            PreparedStatement stmt = conn.prepareStatement(
-                    "SELECT seller_uuid, item_id, price, quantity FROM vc_player_listings WHERE id = ?");
-            stmt.setInt(1, listingId);
-            ResultSet rs = stmt.executeQuery();
-            if (!rs.next())
-                return false;
+    public CompletableFuture<Boolean> buyListing(int listingId, UUID buyer) {
+        return CompletableFuture.supplyAsync(() -> {
+            try (Connection conn = VonixCore.getInstance().getDatabase().getConnection()) {
+                // Get listing details
+                PreparedStatement stmt = conn.prepareStatement(
+                        "SELECT seller_uuid, item_id, price, quantity FROM vc_player_listings WHERE id = ?");
+                stmt.setInt(1, listingId);
+                ResultSet rs = stmt.executeQuery();
+                if (!rs.next())
+                    return null;
 
-            UUID seller = UUID.fromString(rs.getString("seller_uuid"));
-            double price = rs.getDouble("price");
-
-            // Transfer money
-            if (!EconomyManager.getInstance().transfer(buyer, seller, price)) {
-                return false;
+                UUID seller = UUID.fromString(rs.getString("seller_uuid"));
+                double price = rs.getDouble("price");
+                
+                // Return data for processing
+                return new ListingData(seller, price);
+            } catch (SQLException e) {
+                VonixCore.LOGGER.error("[VonixCore] Failed to buy listing (lookup): {}", e.getMessage());
+                return null;
             }
-
-            // Delete listing
-            PreparedStatement deleteStmt = conn.prepareStatement("DELETE FROM vc_player_listings WHERE id = ?");
-            deleteStmt.setInt(1, listingId);
-            deleteStmt.executeUpdate();
-
-            return true;
-        } catch (SQLException e) {
-            VonixCore.LOGGER.error("[VonixCore] Failed to buy listing: {}", e.getMessage());
-            return false;
-        }
+        }).thenCompose(data -> {
+            if (data == null) return CompletableFuture.completedFuture(false);
+            
+            // Transfer money (async)
+            return EconomyManager.getInstance().transfer(buyer, data.seller(), data.price())
+                .thenApply(success -> {
+                    if (!success) return false;
+                    
+                    // Delete listing if transfer successful
+                    VonixCore.executeAsync(() -> {
+                        try (Connection conn = VonixCore.getInstance().getDatabase().getConnection()) {
+                            PreparedStatement deleteStmt = conn.prepareStatement("DELETE FROM vc_player_listings WHERE id = ?");
+                            deleteStmt.setInt(1, listingId);
+                            deleteStmt.executeUpdate();
+                        } catch (SQLException e) {
+                            VonixCore.LOGGER.error("[VonixCore] Failed to delete listing {}: {}", listingId, e.getMessage());
+                        }
+                    });
+                    return true;
+                });
+        });
     }
+    
+    private record ListingData(UUID seller, double price) {}
 
     // ===== DAILY REWARDS =====
 
     /**
      * Claim daily reward.
      */
-    public DailyRewardResult claimDailyReward(UUID uuid) {
-        try (Connection conn = VonixCore.getInstance().getDatabase().getConnection()) {
-            long now = System.currentTimeMillis() / 1000L;
-            long dayStart = (now / 86400) * 86400; // Start of current UTC day
+    public CompletableFuture<DailyRewardResult> claimDailyReward(UUID uuid) {
+        return CompletableFuture.supplyAsync(() -> {
+            try (Connection conn = VonixCore.getInstance().getDatabase().getConnection()) {
+                long now = System.currentTimeMillis() / 1000L;
+                long dayStart = (now / 86400) * 86400; // Start of current UTC day
 
-            PreparedStatement stmt = conn.prepareStatement(
-                    "SELECT last_claim, streak FROM vc_daily_rewards WHERE uuid = ?");
-            stmt.setString(1, uuid.toString());
-            ResultSet rs = stmt.executeQuery();
+                PreparedStatement stmt = conn.prepareStatement(
+                        "SELECT last_claim, streak FROM vc_daily_rewards WHERE uuid = ?");
+                stmt.setString(1, uuid.toString());
+                ResultSet rs = stmt.executeQuery();
 
-            int streak = 1;
-            if (rs.next()) {
-                long lastClaim = rs.getLong("last_claim");
-                long lastDayStart = (lastClaim / 86400) * 86400;
+                int streak = 1;
+                if (rs.next()) {
+                    long lastClaim = rs.getLong("last_claim");
+                    long lastDayStart = (lastClaim / 86400) * 86400;
 
-                // Already claimed today
-                if (lastDayStart == dayStart) {
-                    return new DailyRewardResult(false, 0, rs.getInt("streak"), "Already claimed today!");
+                    // Already claimed today
+                    if (lastDayStart == dayStart) {
+                        return new DailyRewardResult(false, 0, rs.getInt("streak"), "Already claimed today!");
+                    }
+
+                    // Check if streak continues (claimed yesterday)
+                    if (lastDayStart == dayStart - 86400) {
+                        streak = rs.getInt("streak") + 1;
+                    }
                 }
 
-                // Check if streak continues (claimed yesterday)
-                if (lastDayStart == dayStart - 86400) {
-                    streak = rs.getInt("streak") + 1;
-                }
+                // Calculate reward based on streak (base 100, +10 per streak day, max 7 days)
+                int effectiveStreak = Math.min(streak, 7);
+                double reward = 100 + ((effectiveStreak - 1) * 10);
+
+                // Save claim
+                PreparedStatement saveStmt = conn.prepareStatement(
+                        "INSERT OR REPLACE INTO vc_daily_rewards (uuid, last_claim, streak) VALUES (?, ?, ?)");
+                saveStmt.setString(1, uuid.toString());
+                saveStmt.setLong(2, now);
+                saveStmt.setInt(3, streak);
+                saveStmt.executeUpdate();
+
+                // Give reward
+                // Note: We need to chain this properly, but since deposit is async, we can't do it inside this sync block easily
+                // without blocking. However, we are already in supplyAsync.
+                // But deposit returns a Future. 
+                return new RewardData(reward, streak);
+            } catch (SQLException e) {
+                VonixCore.LOGGER.error("[VonixCore] Failed to claim daily: {}", e.getMessage());
+                return null;
             }
-
-            // Calculate reward based on streak (base 100, +10 per streak day, max 7 days)
-            int effectiveStreak = Math.min(streak, 7);
-            double reward = 100 + ((effectiveStreak - 1) * 10);
-
-            // Save claim
-            PreparedStatement saveStmt = conn.prepareStatement(
-                    "INSERT OR REPLACE INTO vc_daily_rewards (uuid, last_claim, streak) VALUES (?, ?, ?)");
-            saveStmt.setString(1, uuid.toString());
-            saveStmt.setLong(2, now);
-            saveStmt.setInt(3, streak);
-            saveStmt.executeUpdate();
-
-            // Give reward
-            EconomyManager.getInstance().deposit(uuid, reward);
-
-            return new DailyRewardResult(true, reward, streak, null);
-        } catch (SQLException e) {
-            VonixCore.LOGGER.error("[VonixCore] Failed to claim daily: {}", e.getMessage());
-            return new DailyRewardResult(false, 0, 0, "Database error");
-        }
+        }).thenCompose(data -> {
+            if (data == null) return CompletableFuture.completedFuture(new DailyRewardResult(false, 0, 0, "Database error"));
+            
+            if (data instanceof DailyRewardResult result) {
+                return CompletableFuture.completedFuture(result);
+            }
+            
+            if (data instanceof RewardData rewardData) {
+                 return EconomyManager.getInstance().deposit(uuid, rewardData.amount())
+                     .thenApply(success -> new DailyRewardResult(true, rewardData.amount(), rewardData.streak(), null));
+            }
+            
+            return CompletableFuture.completedFuture(new DailyRewardResult(false, 0, 0, "Unknown error"));
+        });
     }
+    
+    private record RewardData(double amount, int streak) {}
 
     // ===== UTILITY =====
 

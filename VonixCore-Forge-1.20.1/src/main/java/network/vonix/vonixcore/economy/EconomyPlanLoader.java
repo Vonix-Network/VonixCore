@@ -8,6 +8,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Handles loading and saving economy plan configurations from JSON files.
@@ -111,31 +112,31 @@ public class EconomyPlanLoader {
      * Export current admin shop prices to a JSON file.
      * 
      * @param jsonPath Path to save the JSON file
-     * @return true if successful
+     * @return Future completing with true if successful
      */
-    public static boolean exportToFile(Path jsonPath) {
-        try {
-            List<ShopManager.AdminShopItem> items = ShopManager.getInstance().getAllAdminItems();
+    public static CompletableFuture<Boolean> exportToFile(Path jsonPath) {
+        return ShopManager.getInstance().getAllAdminItems().thenApply(items -> {
+            try {
+                EconomyPlan plan = new EconomyPlan();
+                plan.version = 1;
+                for (ShopManager.AdminShopItem item : items) {
+                    plan.items.add(new ItemPrice(item.itemId(), item.buyPrice(), item.sellPrice()));
+                }
 
-            EconomyPlan plan = new EconomyPlan();
-            plan.version = 1;
-            for (ShopManager.AdminShopItem item : items) {
-                plan.items.add(new ItemPrice(item.itemId(), item.buyPrice(), item.sellPrice()));
+                // Create parent directories if needed
+                Files.createDirectories(jsonPath.getParent());
+
+                try (Writer writer = Files.newBufferedWriter(jsonPath)) {
+                    GSON.toJson(plan, writer);
+                }
+
+                VonixCore.LOGGER.info("[Economy] Exported {} items to {}", plan.items.size(), jsonPath.getFileName());
+                return true;
+            } catch (IOException e) {
+                VonixCore.LOGGER.error("[Economy] Failed to export to {}: {}", jsonPath, e.getMessage());
+                return false;
             }
-
-            // Create parent directories if needed
-            Files.createDirectories(jsonPath.getParent());
-
-            try (Writer writer = Files.newBufferedWriter(jsonPath)) {
-                GSON.toJson(plan, writer);
-            }
-
-            VonixCore.LOGGER.info("[Economy] Exported {} items to {}", plan.items.size(), jsonPath.getFileName());
-            return true;
-        } catch (IOException e) {
-            VonixCore.LOGGER.error("[Economy] Failed to export to {}: {}", jsonPath, e.getMessage());
-            return false;
-        }
+        });
     }
 
     /**

@@ -28,6 +28,9 @@ public class EssentialsConfig {
 
     public static int defaultKitCooldown;
 
+    public static int rtpMinRange;
+    public static int rtpMaxRange;
+
     public static void load(YamlConfiguration config) {
         enabled = config.getBoolean("essentials.enabled", true);
 
@@ -52,5 +55,8 @@ public class EssentialsConfig {
         currencyName = config.getString("essentials.economy.currency_name", "Coins");
 
         defaultKitCooldown = config.getInt("essentials.kits.default_cooldown", 86400);
+
+        rtpMinRange = config.getInt("essentials.rtp.min_range", 1000);
+        rtpMaxRange = config.getInt("essentials.rtp.max_range", 5000);
     }
 }

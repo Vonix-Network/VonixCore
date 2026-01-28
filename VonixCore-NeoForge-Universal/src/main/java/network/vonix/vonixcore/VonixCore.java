@@ -362,6 +362,13 @@ public class VonixCore {
     }
 
     /**
+     * Execute a task on the main server thread
+     */
+    public static void execute(Runnable task) {
+        net.neoforged.neoforge.server.ServerLifecycleHooks.getCurrentServer().execute(task);
+    }
+
+    /**
      * Get the config path
      */
     public java.nio.file.Path getConfigPath() {

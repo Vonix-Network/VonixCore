@@ -32,11 +32,12 @@ public class EconomyCommands {
                             ServerPlayer target = EntityArgument.getPlayer(ctx, "player");
                             double amount = DoubleArgumentType.getDouble(ctx, "amount");
                             
-                            EconomyManager.getInstance().deposit(target.getUUID(), amount);
-                            String formatted = EconomyManager.getInstance().format(amount);
-                            
-                            ctx.getSource().sendSuccess(() -> Component.literal("§aGave " + formatted + " to " + target.getName().getString()), false);
-                            target.sendSystemMessage(Component.literal("§aYou received " + formatted + " from an admin"));
+                            EconomyManager.getInstance().deposit(target.getUUID(), amount).thenAccept(v -> {
+                                String formatted = EconomyManager.getInstance().format(amount);
+                                
+                                ctx.getSource().sendSuccess(() -> Component.literal("§aGave " + formatted + " to " + target.getName().getString()), false);
+                                target.sendSystemMessage(Component.literal("§aYou received " + formatted + " from an admin"));
+                            });
                             return 1;
                         }))))
             .then(Commands.literal("take")
@@ -46,14 +47,15 @@ public class EconomyCommands {
                             ServerPlayer target = EntityArgument.getPlayer(ctx, "player");
                             double amount = DoubleArgumentType.getDouble(ctx, "amount");
                             
-                            if (EconomyManager.getInstance().withdraw(target.getUUID(), amount)) {
-                                String formatted = EconomyManager.getInstance().format(amount);
-                                ctx.getSource().sendSuccess(() -> Component.literal("§aTook " + formatted + " from " + target.getName().getString()), false);
-                                return 1;
-                            } else {
-                                ctx.getSource().sendFailure(Component.literal("§cPlayer doesn't have enough money"));
-                                return 0;
-                            }
+                            EconomyManager.getInstance().withdraw(target.getUUID(), amount).thenAccept(success -> {
+                                if (success) {
+                                    String formatted = EconomyManager.getInstance().format(amount);
+                                    ctx.getSource().sendSuccess(() -> Component.literal("§aTook " + formatted + " from " + target.getName().getString()), false);
+                                } else {
+                                    ctx.getSource().sendFailure(Component.literal("§cPlayer doesn't have enough money"));
+                                }
+                            });
+                            return 1;
                         }))))
             .then(Commands.literal("set")
                 .then(Commands.argument("player", EntityArgument.player())
@@ -62,10 +64,11 @@ public class EconomyCommands {
                             ServerPlayer target = EntityArgument.getPlayer(ctx, "player");
                             double amount = DoubleArgumentType.getDouble(ctx, "amount");
                             
-                            EconomyManager.getInstance().setBalance(target.getUUID(), amount);
-                            String formatted = EconomyManager.getInstance().format(amount);
-                            
-                            ctx.getSource().sendSuccess(() -> Component.literal("§aSet " + target.getName().getString() + "'s balance to " + formatted), false);
+                            EconomyManager.getInstance().setBalance(target.getUUID(), amount).thenAccept(v -> {
+                                String formatted = EconomyManager.getInstance().format(amount);
+                                
+                                ctx.getSource().sendSuccess(() -> Component.literal("§aSet " + target.getName().getString() + "'s balance to " + formatted), false);
+                            });
                             return 1;
                         }))))
             .then(Commands.literal("reset")
@@ -73,9 +76,9 @@ public class EconomyCommands {
                     .executes(ctx -> {
                         ServerPlayer target = EntityArgument.getPlayer(ctx, "player");
                         
-                        EconomyManager.getInstance().setBalance(target.getUUID(), 100.0);
-                        
-                        ctx.getSource().sendSuccess(() -> Component.literal("§aReset " + target.getName().getString() + "'s balance"), false);
+                        EconomyManager.getInstance().setBalance(target.getUUID(), 100.0).thenAccept(v -> {
+                            ctx.getSource().sendSuccess(() -> Component.literal("§aReset " + target.getName().getString() + "'s balance"), false);
+                        });
                         return 1;
                     })))
         );

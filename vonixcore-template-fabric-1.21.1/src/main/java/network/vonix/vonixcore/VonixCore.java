@@ -247,10 +247,11 @@ public class VonixCore implements ModInitializer {
                 AdminManager.getInstance().initializeTable(conn);
 
                 // Initialize Jobs system
-                if (EssentialsConfig.getInstance().isJobsEnabled()) {
-                    JobsManager.getInstance().initialize(conn);
-                    enabledModules.add("Jobs");
-                }
+            if (EssentialsConfig.getInstance().isJobsEnabled()) {
+                JobsManager.getInstance().initialize(conn);
+                network.vonix.vonixcore.jobs.JobsEventListener.register();
+                enabledModules.add("Jobs");
+            }
 
                 essentialsEnabled = true;
                 enabledModules.add("Essentials");

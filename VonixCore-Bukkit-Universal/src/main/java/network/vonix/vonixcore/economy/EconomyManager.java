@@ -17,6 +17,7 @@ public class EconomyManager {
     private static EconomyManager instance;
     private final VonixCore plugin;
     private double startingBalance;
+    private final java.util.Map<UUID, Double> balanceCache = new java.util.concurrent.ConcurrentHashMap<>();
 
     public EconomyManager(VonixCore plugin) {
         this.plugin = plugin;
@@ -30,16 +31,48 @@ public class EconomyManager {
         return instance;
     }
 
+    public void loadBalanceAsync(UUID uuid) {
+        plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
+            try (Connection conn = plugin.getDatabase().getConnection()) {
+                PreparedStatement stmt = conn.prepareStatement(
+                        "SELECT balance FROM vonixcore_economy WHERE uuid = ?");
+                stmt.setString(1, uuid.toString());
+                ResultSet rs = stmt.executeQuery();
+                if (rs.next()) {
+                    balanceCache.put(uuid, rs.getDouble("balance"));
+                } else {
+                    // Initialize if not exists
+                    setBalance(uuid, startingBalance);
+                    balanceCache.put(uuid, startingBalance);
+                }
+            } catch (SQLException e) {
+                plugin.getLogger().log(Level.SEVERE, "Failed to load balance for " + uuid, e);
+            }
+        });
+    }
+
+    public void unloadBalance(UUID uuid) {
+        balanceCache.remove(uuid);
+    }
+
     public double getBalance(UUID uuid) {
+        if (balanceCache.containsKey(uuid)) {
+            return balanceCache.get(uuid);
+        }
+        
+        // Fallback to sync load if not in cache (should be avoided by preloading)
         try (Connection conn = plugin.getDatabase().getConnection()) {
             PreparedStatement stmt = conn.prepareStatement(
                     "SELECT balance FROM vonixcore_economy WHERE uuid = ?");
             stmt.setString(1, uuid.toString());
             ResultSet rs = stmt.executeQuery();
             if (rs.next()) {
-                return rs.getDouble("balance");
+                double balance = rs.getDouble("balance");
+                balanceCache.put(uuid, balance);
+                return balance;
             } else {
                 setBalance(uuid, startingBalance);
+                balanceCache.put(uuid, startingBalance);
                 return startingBalance;
             }
         } catch (SQLException e) {
@@ -49,18 +82,22 @@ public class EconomyManager {
     }
 
     public boolean setBalance(UUID uuid, double balance) {
-        try (Connection conn = plugin.getDatabase().getConnection()) {
-            PreparedStatement stmt = conn.prepareStatement(
-                    "INSERT OR REPLACE INTO vonixcore_economy (uuid, balance, username) VALUES (?, ?, ?)");
-            stmt.setString(1, uuid.toString());
-            stmt.setDouble(2, Math.max(0, balance));
-            stmt.setString(3, "Unknown"); // We'll update username separately or on join
-            stmt.executeUpdate();
-            return true;
-        } catch (SQLException e) {
-            plugin.getLogger().log(Level.SEVERE, "Failed to set balance", e);
-            return false;
-        }
+        double newBalance = Math.max(0, balance);
+        balanceCache.put(uuid, newBalance);
+        
+        plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
+            try (Connection conn = plugin.getDatabase().getConnection()) {
+                PreparedStatement stmt = conn.prepareStatement(
+                        "INSERT OR REPLACE INTO vonixcore_economy (uuid, balance, username) VALUES (?, ?, ?)");
+                stmt.setString(1, uuid.toString());
+                stmt.setDouble(2, newBalance);
+                stmt.setString(3, "Unknown"); // We'll update username separately or on join
+                stmt.executeUpdate();
+            } catch (SQLException e) {
+                plugin.getLogger().log(Level.SEVERE, "Failed to set balance", e);
+            }
+        });
+        return true;
     }
 
     // Helper to update username on join/transaction if possible, but for now we

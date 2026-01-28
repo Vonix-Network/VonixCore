@@ -27,7 +27,9 @@ import network.vonix.vonixcore.economy.EconomyManager;
 import network.vonix.vonixcore.economy.ShopManager;
 
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -66,33 +68,51 @@ public class ShopEventListener {
         // Check for chest shop interaction
         if (state.getBlock() instanceof ChestBlock || state.is(Blocks.BARREL)) {
             String world = level.dimension().location().toString();
-            ShopManager.ChestShop shop = ShopManager.getInstance().getShopAt(world, pos);
-
-            if (shop != null) {
-                if (shop.owner().equals(player.getUUID())) {
-                    // Owner clicked - allow chest access for restocking (don't cancel)
-                    // Just show a reminder on first click (non-sneaking)
-                    if (!player.isShiftKeyDown()) {
-                        handleOwnerClick(player, pos, shop);
+            var future = ShopManager.getInstance().getShopAt(world, pos);
+            
+            if (future.isDone()) {
+                // Check if shop exists in cache
+                Optional<ShopManager.ChestShop> shopOpt = future.join();
+                
+                if (shopOpt.isPresent()) {
+                    ShopManager.ChestShop shop = shopOpt.get();
+                    if (shop.owner().equals(player.getUUID())) {
+                        // Owner clicked - allow chest access for restocking (don't cancel)
+                        // Just show a reminder on first click (non-sneaking)
+                        if (!player.isShiftKeyDown()) {
+                            handleOwnerClick(player, pos, shop);
+                        } else {
+                            // Track that owner is opening shop chest for restocking
+                            openShopChests.put(player.getUUID(), new OpenShopChest(world, pos, shop.itemId()));
+                        }
+                        // Let the chest open normally for restocking
+                        return;
                     } else {
-                        // Track that owner is opening shop chest for restocking
-                        openShopChests.put(player.getUUID(), new OpenShopChest(world, pos, shop.itemId()));
+                        // Customer clicked - process transaction
+                        event.setCanceled(true); // Prevent chest opening for non-owners
+                        handleCustomerClick(player, pos, shop);
+                        return;
                     }
-                    // Let the chest open normally for restocking
-                    return;
-                } else {
-                    // Customer clicked - process transaction
-                    event.setCanceled(true); // Prevent chest opening for non-owners
-                    handleCustomerClick(player, pos, shop);
                 }
+            } else {
+                // Shop data not loaded yet - cancel to prevent exploitation/confusion
+                // and trigger load
+                event.setCanceled(true);
+                player.sendSystemMessage(Component.literal("§7Loading shop data... please wait."));
+                future.thenAccept(opt -> {
+                     if (opt.isPresent()) {
+                         VonixCore.execute(() -> player.sendSystemMessage(Component.literal("§aShop data loaded! Right-click again.")));
+                     }
+                });
+                return;
             }
         }
 
         // Check if player is creating a chest shop
         if (ShopManager.getInstance().isCreatingShop(player.getUUID())) {
             if (state.getBlock() instanceof ChestBlock || state.is(Blocks.BARREL)) {
+                event.setCanceled(true); // Stop chest from opening
                 handleShopCreation(player, pos, state);
-                event.setCanceled(true);
             }
         }
     }
@@ -149,40 +169,64 @@ public class ShopEventListener {
             double taxAmount = price * taxRate;
             double totalPrice = price + taxAmount;
 
-            double balance = eco.getBalance(player.getUUID());
-            if (balance < totalPrice) {
-                player.sendSystemMessage(
-                        Component.literal("§cInsufficient funds! Need " + symbol + String.format("%.2f", totalPrice)));
-                return;
-            }
-
-            // Process buy: remove item from chest, give to player, transfer money
-            if (ItemUtils.removeChestItems(player.level(), pos, shop.itemId(), 1)) {
-                if (eco.withdraw(player.getUUID(), totalPrice)) {
-                    eco.deposit(shop.owner(), price); // Owner gets price without tax
-                    var leftover = ItemUtils.giveItems(player, shop.itemId(), 1);
-                    if (!leftover.isEmpty()) {
-                        player.drop(leftover, false);
-                    }
-
-                    // Log transaction
-                    if (network.vonix.vonixcore.config.ShopsConfig.CONFIG.transactionLogEnabled.get()) {
-                        network.vonix.vonixcore.economy.TransactionLog.getInstance().logShopBuy(
-                                player.getUUID(), shop.owner(), price, taxAmount,
-                                0, shop.itemId(), 1, world, pos.getX(), pos.getY(), pos.getZ());
-                    }
-
-                    String taxInfo = taxAmount > 0.001 ? String.format(" §7(+%s%.2f tax)", symbol, taxAmount) : "";
-                    player.sendSystemMessage(Component
-                            .literal("§aPurchased 1x " + shop.itemId() + " for " + symbol + String.format("%.2f", price)
-                                    + taxInfo));
-                } else {
-                    // Refund the item to chest if payment failed
-                    ItemUtils.addChestItems(player.level(), pos, shop.itemId(), 1);
+            // Async balance check
+            eco.getBalance(player.getUUID()).thenAccept(balance -> {
+                if (balance < totalPrice) {
+                    player.sendSystemMessage(
+                            Component.literal("§cInsufficient funds! Need " + symbol + String.format("%.2f", totalPrice)));
+                    return;
                 }
-            } else {
-                player.sendSystemMessage(Component.literal("§cFailed to remove item from shop!"));
-            }
+
+                // Proceed to main thread for item manipulation
+                player.getServer().execute(() -> {
+                    // Double check stock
+                    if (ItemUtils.countChestItems(player.level(), pos, shop.itemId()) <= 0) {
+                        player.sendSystemMessage(Component.literal("§cThis shop is out of stock!"));
+                        return;
+                    }
+
+                    // Remove item from chest first (reserve it)
+                    if (ItemUtils.removeChestItems(player.level(), pos, shop.itemId(), 1)) {
+                        // Withdraw money
+                        eco.withdraw(player.getUUID(), totalPrice).thenAccept(success -> {
+                            if (success) {
+                                // Deposit to owner
+                                eco.deposit(shop.owner(), price); // Owner gets price without tax
+
+                                // Give item to player (Main thread)
+                                player.getServer().execute(() -> {
+                                    var leftover = ItemUtils.giveItems(player, shop.itemId(), 1);
+                                    if (!leftover.isEmpty()) {
+                                        player.drop(leftover, false);
+                                    }
+
+                                    // Log transaction
+                                    if (network.vonix.vonixcore.config.ShopsConfig.CONFIG.transactionLogEnabled.get()) {
+                                        network.vonix.vonixcore.economy.TransactionLog.getInstance().logShopBuy(
+                                                player.getUUID(), shop.owner(), price, taxAmount,
+                                                0, shop.itemId(), 1, world, pos.getX(), pos.getY(), pos.getZ());
+                                    }
+
+                                    String taxInfo = taxAmount > 0.001
+                                            ? String.format(" §7(+%s%.2f tax)", symbol, taxAmount)
+                                            : "";
+                                    player.sendSystemMessage(Component.literal("§aPurchased 1x " + shop.itemId()
+                                            + " for " + symbol + String.format("%.2f", price)
+                                            + taxInfo));
+                                });
+                            } else {
+                                // Refund item to chest if payment failed
+                                player.getServer().execute(() -> {
+                                    ItemUtils.addChestItems(player.level(), pos, shop.itemId(), 1);
+                                    player.sendSystemMessage(Component.literal("§cTransaction failed: Insufficient funds."));
+                                });
+                            }
+                        });
+                    } else {
+                        player.sendSystemMessage(Component.literal("§cFailed to remove item from shop!"));
+                    }
+                });
+            });
 
         } else if (isSneaking && shop.sellPrice() != null && shop.sellPrice() > 0) {
             // Sell one item to the shop
@@ -201,37 +245,66 @@ public class ShopEventListener {
             double taxAmount = price * taxRate;
             double sellerReceives = price - taxAmount;
 
-            // Check if shop owner can afford
-            double ownerBalance = eco.getBalance(shop.owner());
-            if (ownerBalance < price) {
-                player.sendSystemMessage(Component.literal("§cThe shop owner doesn't have enough money!"));
-                return;
-            }
-
-            // Process sell: remove from player, add to chest, transfer money
-            if (ItemUtils.removeItems(player, shop.itemId(), 1)) {
-                int notAdded = ItemUtils.addChestItems(player.level(), pos, shop.itemId(), 1);
-                if (notAdded > 0) {
-                    // Chest is full, refund player and notify
-                    ItemUtils.giveItems(player, shop.itemId(), 1);
-                    player.sendSystemMessage(Component.literal("§cThe shop chest is full!"));
+            // Check if shop owner can afford (Async)
+            eco.getBalance(shop.owner()).thenAccept(ownerBalance -> {
+                if (ownerBalance < price) {
+                    player.sendSystemMessage(Component.literal("§cThe shop owner doesn't have enough money!"));
                     return;
                 }
-                eco.withdraw(shop.owner(), price);
-                eco.deposit(player.getUUID(), sellerReceives); // Seller gets amount minus tax
 
-                // Log transaction
-                if (network.vonix.vonixcore.config.ShopsConfig.CONFIG.transactionLogEnabled.get()) {
-                    network.vonix.vonixcore.economy.TransactionLog.getInstance().logShopSell(
-                            player.getUUID(), shop.owner(), price, taxAmount,
-                            0, shop.itemId(), 1, world, pos.getX(), pos.getY(), pos.getZ());
-                }
+                // Proceed to main thread
+                player.getServer().execute(() -> {
+                    // Double check player has item
+                    if (ItemUtils.countItems(player, shop.itemId()) < 1) {
+                        player.sendSystemMessage(Component.literal("§cYou don't have any " + shop.itemId() + " to sell!"));
+                        return;
+                    }
 
-                String taxInfo = taxAmount > 0.001 ? String.format(" §7(-%s%.2f tax)", symbol, taxAmount) : "";
-                player.sendSystemMessage(Component
-                        .literal("§aSold 1x " + shop.itemId() + " for " + symbol + String.format("%.2f", sellerReceives)
-                                + taxInfo));
-            }
+                    // Remove from player
+                    if (ItemUtils.removeItems(player, shop.itemId(), 1)) {
+                        // Add to chest
+                        int notAdded = ItemUtils.addChestItems(player.level(), pos, shop.itemId(), 1);
+                        if (notAdded > 0) {
+                            // Chest is full, refund player
+                            ItemUtils.giveItems(player, shop.itemId(), 1);
+                            player.sendSystemMessage(Component.literal("§cThe shop chest is full!"));
+                            return;
+                        }
+
+                        // Transfer money
+                        eco.withdraw(shop.owner(), price).thenAccept(success -> {
+                            if (success) {
+                                eco.deposit(player.getUUID(), sellerReceives); // Seller gets amount minus tax
+
+                                player.getServer().execute(() -> {
+                                    // Log transaction
+                                    if (network.vonix.vonixcore.config.ShopsConfig.CONFIG.transactionLogEnabled.get()) {
+                                        network.vonix.vonixcore.economy.TransactionLog.getInstance().logShopSell(
+                                                player.getUUID(), shop.owner(), price, taxAmount,
+                                                0, shop.itemId(), 1, world, pos.getX(), pos.getY(), pos.getZ());
+                                    }
+
+                                    String taxInfo = taxAmount > 0.001
+                                            ? String.format(" §7(-%s%.2f tax)", symbol, taxAmount)
+                                            : "";
+                                    player.sendSystemMessage(Component.literal("§aSold 1x " + shop.itemId() + " for "
+                                            + symbol + String.format("%.2f", sellerReceives)
+                                            + taxInfo));
+                                });
+                            } else {
+                                // Owner ran out of money? Revert item move
+                                player.getServer().execute(() -> {
+                                    ItemUtils.removeChestItems(player.level(), pos, shop.itemId(), 1);
+                                    ItemUtils.giveItems(player, shop.itemId(), 1);
+                                    player.sendSystemMessage(
+                                            Component.literal("§cTransaction failed: Owner cannot afford this."));
+                                });
+                            }
+                        });
+                    }
+                });
+            });
+
         } else {
             // Show shop info
             player.sendSystemMessage(Component.literal("§6=== Shop ==="));
@@ -261,47 +334,52 @@ public class ShopEventListener {
         if (creation.step == 0) {
             // Verify it's not already a shop
             String world = player.level().dimension().location().toString();
-            if (ShopManager.getInstance().getShopAt(world, pos) != null) {
-                player.sendSystemMessage(Component.literal("§cThis chest is already a shop!"));
-                ShopManager.getInstance().cancelShopCreation(player.getUUID());
-                return;
-            }
-
-            // Read chest inventory to detect item type
-            if (player.level().getBlockEntity(pos) instanceof ChestBlockEntity chest) {
-                String itemId = null;
-
-                // Find first non-empty slot
-                for (int i = 0; i < chest.getContainerSize(); i++) {
-                    ItemStack stack = chest.getItem(i);
-                    if (!stack.isEmpty()) {
-                        itemId = BuiltInRegistries.ITEM.getKey(stack.getItem()).toString();
-                        break; // Only need first item
+            
+            ShopManager.getInstance().getShopAt(world, pos).thenAccept(shopOpt -> {
+                VonixCore.execute(() -> {
+                    if (shopOpt.isPresent()) {
+                        player.sendSystemMessage(Component.literal("§cThis chest is already a shop!"));
+                        ShopManager.getInstance().cancelShopCreation(player.getUUID());
+                        return;
                     }
-                }
 
-                if (itemId == null) {
-                    player.sendSystemMessage(Component.literal("§cThe chest is empty! Put items in the chest first."));
-                    ShopManager.getInstance().cancelShopCreation(player.getUUID());
-                    return;
-                }
+                    // Read chest inventory to detect item type
+                    if (player.level().getBlockEntity(pos) instanceof ChestBlockEntity chest) {
+                        String itemId = null;
 
-                // Store detected item
-                creation.chestPos = pos;
-                creation.itemId = itemId;
-                creation.step = 1;
+                        // Find first non-empty slot
+                        for (int i = 0; i < chest.getContainerSize(); i++) {
+                            ItemStack stack = chest.getItem(i);
+                            if (!stack.isEmpty()) {
+                                itemId = BuiltInRegistries.ITEM.getKey(stack.getItem()).toString();
+                                break; // Only need first item
+                            }
+                        }
 
-                player.sendSystemMessage(Component.literal("§a§l✓ §7Chest selected!"));
-                player.sendSystemMessage(Component.literal("§7Item detected: §f" + itemId));
-                player.sendSystemMessage(Component.literal(""));
-                player.sendSystemMessage(
-                        Component.literal("§eEnter the §aBUY §eprice in chat §7(price players pay to buy):"));
-                player.sendSystemMessage(Component.literal("§7Type §c0 §7or §cskip §7to disable buying."));
-                player.sendSystemMessage(Component.literal("§7Type §ccancel §7to cancel."));
-            } else {
-                player.sendSystemMessage(Component.literal("§cFailed to read chest inventory!"));
-                ShopManager.getInstance().cancelShopCreation(player.getUUID());
-            }
+                        if (itemId == null) {
+                            player.sendSystemMessage(Component.literal("§cThe chest is empty! Put items in the chest first."));
+                            ShopManager.getInstance().cancelShopCreation(player.getUUID());
+                            return;
+                        }
+
+                        // Store detected item
+                        creation.chestPos = pos;
+                        creation.itemId = itemId;
+                        creation.step = 1;
+
+                        player.sendSystemMessage(Component.literal("§a§l✓ §7Chest selected!"));
+                        player.sendSystemMessage(Component.literal("§7Item detected: §f" + itemId));
+                        player.sendSystemMessage(Component.literal(""));
+                        player.sendSystemMessage(
+                                Component.literal("§eEnter the §aBUY §eprice in chat §7(price players pay to buy):"));
+                        player.sendSystemMessage(Component.literal("§7Type §c0 §7or §cskip §7to disable buying."));
+                        player.sendSystemMessage(Component.literal("§7Type §ccancel §7to cancel."));
+                    } else {
+                        player.sendSystemMessage(Component.literal("§cFailed to read chest inventory!"));
+                        ShopManager.getInstance().cancelShopCreation(player.getUUID());
+                    }
+                });
+            });
         }
     }
 
@@ -324,21 +402,34 @@ public class ShopEventListener {
 
         String world = player.level().dimension().location().toString();
         BlockPos pos = event.getPos();
-        ShopManager.ChestShop shop = ShopManager.getInstance().getShopAt(world, pos);
+        var future = ShopManager.getInstance().getShopAt(world, pos);
 
-        if (shop != null) {
-            // Only owner or admin can break
-            if (!shop.owner().equals(player.getUUID()) && !player.hasPermissions(2)) {
-                event.setCanceled(true);
-                player.sendSystemMessage(Component.literal("§cYou cannot break someone else's shop!"));
-            } else {
-                // Remove shop and display
-                ShopManager.getInstance().deleteShop(world, pos);
-                if (player.level() instanceof ServerLevel serverLevel) {
-                    DisplayEntityManager.getInstance().removeDisplay(serverLevel, pos);
+        if (future.isDone()) {
+            Optional<ShopManager.ChestShop> shopOpt = future.join();
+            if (shopOpt.isPresent()) {
+                ShopManager.ChestShop shop = shopOpt.get();
+                // Only owner or admin can break
+                if (!shop.owner().equals(player.getUUID()) && !player.hasPermissions(2)) {
+                    event.setCanceled(true);
+                    player.sendSystemMessage(Component.literal("§cYou cannot break someone else's shop!"));
+                } else {
+                    // Remove shop and display
+                    ShopManager.getInstance().deleteShop(world, pos);
+                    if (player.level() instanceof ServerLevel serverLevel) {
+                        DisplayEntityManager.getInstance().removeDisplay(serverLevel, pos);
+                    }
+                    player.sendSystemMessage(Component.literal("§eShop removed."));
                 }
-                player.sendSystemMessage(Component.literal("§eShop removed."));
             }
+        } else {
+            // Not loaded. Prevent breaking to be safe.
+            event.setCanceled(true);
+            player.sendSystemMessage(Component.literal("§7Loading shop data... please wait."));
+            future.thenAccept(opt -> {
+                if (opt.isPresent()) {
+                    VonixCore.execute(() -> player.sendSystemMessage(Component.literal("§aShop data loaded! Try breaking again.")));
+                }
+            });
         }
     }
 
@@ -567,14 +658,17 @@ public class ShopEventListener {
                 }
 
                 // Get current shop to find old stock
-                ShopManager.ChestShop shop = ShopManager.getInstance().getShopAt(openShop.world(), pos);
-                if (shop != null) {
-                    int delta = stockCount - shop.stock();
-                    if (delta != 0) {
-                        ShopManager.getInstance().updateStock(openShop.world(), pos, delta);
-                        player.sendSystemMessage(Component.literal("§a[Shop] Stock updated: " + stockCount + " items"));
+                final int finalStockCount = stockCount;
+                ShopManager.getInstance().getShopAt(openShop.world(), pos).thenAccept(shopOpt -> {
+                    if (shopOpt.isPresent()) {
+                        ShopManager.ChestShop shop = shopOpt.get();
+                        int delta = finalStockCount - shop.stock();
+                        if (delta != 0) {
+                            ShopManager.getInstance().updateStock(openShop.world(), pos, delta);
+                            VonixCore.execute(() -> player.sendSystemMessage(Component.literal("§a[Shop] Stock updated: " + finalStockCount + " items")));
+                        }
                     }
-                }
+                });
             }
         }
     }

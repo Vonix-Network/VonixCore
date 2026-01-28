@@ -263,6 +263,8 @@ public class JobsManager {
             hunterKill.set("blaze.exp", 10.0);
             hunterKill.set("wither_skeleton.income", 8.0);
             hunterKill.set("wither_skeleton.exp", 12.0);
+            hunterKill.set("warden.income", 350.0);
+            hunterKill.set("warden.exp", 100.0);
 
             // Fisherman job
             ConfigurationSection fisherman = config.createSection("jobs.fisherman");
@@ -364,7 +366,7 @@ public class JobsManager {
             return false;
         }
 
-        List<PlayerJob> pJobs = playerJobs.computeIfAbsent(player.getUniqueId(), k -> new ArrayList<>());
+        List<PlayerJob> pJobs = playerJobs.computeIfAbsent(player.getUniqueId(), k -> new java.util.concurrent.CopyOnWriteArrayList<>());
 
         // Check if already has job
         if (pJobs.stream().anyMatch(pj -> pj.getJobId().equalsIgnoreCase(jobId))) {
@@ -548,5 +550,13 @@ public class JobsManager {
 
     public int getMaxJobs() {
         return maxJobs;
+    }
+
+    public void loadPlayerJobs(UUID uuid) {
+        // Already loaded in initialize()
+    }
+
+    public void unloadPlayerJobs(UUID uuid) {
+        // Jobs are saved on shutdown
     }
 }

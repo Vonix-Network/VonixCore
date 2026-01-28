@@ -462,9 +462,10 @@ public class VonixCoreCommands {
         if (player == null)
             return 0;
 
-        double balance = EconomyManager.getInstance().getBalance(player.getUUID());
-        player.sendSystemMessage(
-                Component.literal("§6[VC] Balance: §e" + EconomyManager.getInstance().format(balance)));
+        EconomyManager.getInstance().getBalance(player.getUUID()).thenAccept(balance -> {
+            player.sendSystemMessage(
+                    Component.literal("§6[VC] Balance: §e" + EconomyManager.getInstance().format(balance)));
+        });
         return 1;
     }
 
@@ -476,28 +477,31 @@ public class VonixCoreCommands {
         if (sender == null)
             return 0;
 
-        if (EconomyManager.getInstance().transfer(sender.getUUID(), target.getUUID(), amount)) {
-            sender.sendSystemMessage(Component.literal("§a[VC] Sent " + EconomyManager.getInstance().format(amount)
-                    + " to " + target.getName().getString()));
-            target.sendSystemMessage(Component.literal("§a[VC] Received " + EconomyManager.getInstance().format(amount)
-                    + " from " + sender.getName().getString()));
-            return 1;
-        }
-        sender.sendSystemMessage(Component.literal("§c[VC] Insufficient funds!"));
-        return 0;
+        EconomyManager.getInstance().transfer(sender.getUUID(), target.getUUID(), amount).thenAccept(success -> {
+            if (success) {
+                sender.sendSystemMessage(Component.literal("§a[VC] Sent " + EconomyManager.getInstance().format(amount)
+                        + " to " + target.getName().getString()));
+                target.sendSystemMessage(Component.literal("§a[VC] Received " + EconomyManager.getInstance().format(amount)
+                        + " from " + sender.getName().getString()));
+            } else {
+                sender.sendSystemMessage(Component.literal("§c[VC] Insufficient funds!"));
+            }
+        });
+        return 1;
     }
 
     private static int baltopCommand(CommandContext<CommandSourceStack> ctx) {
-        var top = EconomyManager.getInstance().getTopBalances(10);
-        ctx.getSource().sendSuccess(() -> Component.literal("§6§l----- Balance Top -----"), false);
-        int rank = 1;
-        for (var entry : top) {
-            int r = rank++;
-            var player = ctx.getSource().getServer().getPlayerList().getPlayer(entry.uuid());
-            String name = player != null ? player.getName().getString() : entry.uuid().toString().substring(0, 8);
-            ctx.getSource().sendSuccess(() -> Component.literal("§e" + r + ". §f" + name + " §7- §a" +
-                    EconomyManager.getInstance().format(entry.balance())), false);
-        }
+        EconomyManager.getInstance().getTopBalances(10).thenAccept(top -> {
+            ctx.getSource().sendSuccess(() -> Component.literal("§6§l----- Balance Top -----"), false);
+            int rank = 1;
+            for (var entry : top) {
+                int r = rank++;
+                var player = ctx.getSource().getServer().getPlayerList().getPlayer(entry.uuid());
+                String name = player != null ? player.getName().getString() : entry.uuid().toString().substring(0, 8);
+                ctx.getSource().sendSuccess(() -> Component.literal("§e" + r + ". §f" + name + " §7- §a" +
+                        EconomyManager.getInstance().format(entry.balance())), false);
+            }
+        });
         return 1;
     }
 

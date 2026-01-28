@@ -1154,7 +1154,9 @@ public class DiscordManager {
             String serverPrefix = extractServerPrefixFromAuthorForEvents(event.getMessageAuthor().getDisplayName());
             MutableComponent eventComponent = componentBuilder.buildEventMessage(data, serverPrefix);
             if (server != null) {
-                server.getPlayerList().broadcastSystemMessage(eventComponent, false);
+                for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+                    player.sendMessage(eventComponent, Util.NIL_UUID);
+                }
                 return;
             }
         } catch (ExtractionException e) {
@@ -1189,7 +1191,9 @@ public class DiscordManager {
             
             if (playerName != null && server != null) {
                 MutableComponent fallback = componentBuilder.createEventFallbackComponent(playerName, action, serverPrefix);
-                server.getPlayerList().broadcastSystemMessage(fallback, false);
+                for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+                    player.sendMessage(fallback, Util.NIL_UUID);
+                }
             }
         } catch (Exception e) {
             VonixCore.LOGGER.error("[Discord] Event fallback failed: {}", e.getMessage());

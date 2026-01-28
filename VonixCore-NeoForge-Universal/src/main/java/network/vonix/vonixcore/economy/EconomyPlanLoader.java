@@ -8,6 +8,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Handles loading and saving economy plan configurations from JSON files.
@@ -76,15 +77,15 @@ public class EconomyPlanLoader {
      * Import an economy plan into the database.
      * 
      * @param plan The economy plan to import
-     * @return Number of items imported successfully
+     * @return Future completing with number of items imported successfully
      */
-    public static int importToDatabase(EconomyPlan plan) {
+    public static CompletableFuture<Integer> importToDatabase(EconomyPlan plan) {
         if (plan == null || plan.items == null || plan.items.isEmpty()) {
-            return 0;
+            return CompletableFuture.completedFuture(0);
         }
 
         ShopManager shopManager = ShopManager.getInstance();
-        int imported = 0;
+        List<CompletableFuture<Boolean>> futures = new ArrayList<>();
 
         for (ItemPrice item : plan.items) {
             if (item.id == null || item.id.isEmpty()) {
@@ -98,44 +99,51 @@ public class EconomyPlanLoader {
                 itemId = "minecraft:" + itemId;
             }
 
-            if (shopManager.setAdminPrice(itemId, item.buy, item.sell)) {
-                imported++;
-            }
+            futures.add(shopManager.setAdminPrice(itemId, item.buy, item.sell));
         }
 
-        VonixCore.LOGGER.info("[Economy] Imported {} of {} items to admin shop", imported, plan.items.size());
-        return imported;
+        return CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
+                .thenApply(v -> {
+                    int imported = 0;
+                    for (var f : futures) {
+                        if (f.join())
+                            imported++;
+                    }
+                    VonixCore.LOGGER.info("[Economy] Imported {} of {} items to admin shop", imported,
+                            plan.items.size());
+                    return imported;
+                });
     }
 
     /**
      * Export current admin shop prices to a JSON file.
      * 
      * @param jsonPath Path to save the JSON file
-     * @return true if successful
+     * @return Future completing with true if successful
      */
-    public static boolean exportToFile(Path jsonPath) {
-        try {
-            List<ShopManager.AdminShopItem> items = ShopManager.getInstance().getAllAdminItems();
+    public static CompletableFuture<Boolean> exportToFile(Path jsonPath) {
+        return ShopManager.getInstance().getAllAdminItems().thenApply(items -> {
+            try {
+                EconomyPlan plan = new EconomyPlan();
+                plan.version = 1;
+                for (ShopManager.AdminShopItem item : items) {
+                    plan.items.add(new ItemPrice(item.itemId(), item.buyPrice(), item.sellPrice()));
+                }
 
-            EconomyPlan plan = new EconomyPlan();
-            plan.version = 1;
-            for (ShopManager.AdminShopItem item : items) {
-                plan.items.add(new ItemPrice(item.itemId(), item.buyPrice(), item.sellPrice()));
+                // Create parent directories if needed
+                Files.createDirectories(jsonPath.getParent());
+
+                try (Writer writer = Files.newBufferedWriter(jsonPath)) {
+                    GSON.toJson(plan, writer);
+                }
+
+                VonixCore.LOGGER.info("[Economy] Exported {} items to {}", plan.items.size(), jsonPath.getFileName());
+                return true;
+            } catch (IOException e) {
+                VonixCore.LOGGER.error("[Economy] Failed to export to {}: {}", jsonPath, e.getMessage());
+                return false;
             }
-
-            // Create parent directories if needed
-            Files.createDirectories(jsonPath.getParent());
-
-            try (Writer writer = Files.newBufferedWriter(jsonPath)) {
-                GSON.toJson(plan, writer);
-            }
-
-            VonixCore.LOGGER.info("[Economy] Exported {} items to {}", plan.items.size(), jsonPath.getFileName());
-            return true;
-        } catch (IOException e) {
-            VonixCore.LOGGER.error("[Economy] Failed to export to {}: {}", jsonPath, e.getMessage());
-            return false;
-        }
+        });
     }
 
     /**

@@ -143,30 +143,36 @@ public class DisplayEntityManager {
     public void respawnDisplaysInChunk(ServerLevel level, int chunkX, int chunkZ) {
         String world = level.dimension().location().toString();
 
-        // Query database for shops in this chunk
-        var shops = network.vonix.vonixcore.economy.ShopManager.getInstance().getShopsInChunk(world, chunkX, chunkZ);
-
-        if (shops.isEmpty()) {
-            return;
-        }
-
-        VonixCore.LOGGER.debug("[Shop] Respawning {} display(s) in chunk {},{}", shops.size(), chunkX, chunkZ);
-
-        // Respawn each shop's display
-        for (var shopLoc : shops) {
-            String key = locationKey(level, shopLoc.pos());
-
-            // Skip if already tracked (might have been loaded via entity load)
-            if (displayEntities.containsKey(key)) {
-                continue;
+        // Query database asynchronously
+        network.vonix.vonixcore.economy.ShopManager.getInstance().loadShopsInChunkAsync(world, chunkX, chunkZ, (shops) -> {
+            if (shops.isEmpty()) {
+                return;
             }
 
-            // Create display item from item ID
-            ItemStack displayItem = ItemUtils.createItemFromId(shopLoc.itemId());
-            if (!displayItem.isEmpty()) {
-                spawnDisplay(level, shopLoc.pos(), displayItem);
-            }
-        }
+            // Schedule spawning on main thread
+            level.getServer().execute(() -> {
+                 // Double check if level is still loaded/valid if needed
+                 if (level.getServer().getLevel(level.dimension()) == null) return;
+
+                VonixCore.LOGGER.debug("[Shop] Respawning {} display(s) in chunk {},{}", shops.size(), chunkX, chunkZ);
+
+                // Respawn each shop's display
+                for (var shopLoc : shops) {
+                    String key = locationKey(level, shopLoc.pos());
+
+                    // Skip if already tracked (might have been loaded via entity load)
+                    if (displayEntities.containsKey(key)) {
+                        continue;
+                    }
+
+                    // Create display item from item ID
+                    ItemStack displayItem = ItemUtils.createItemFromId(shopLoc.itemId());
+                    if (!displayItem.isEmpty()) {
+                        spawnDisplay(level, shopLoc.pos(), displayItem);
+                    }
+                }
+            });
+        });
     }
 
     /**

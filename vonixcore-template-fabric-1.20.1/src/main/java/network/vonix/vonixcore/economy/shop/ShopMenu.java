@@ -24,6 +24,7 @@ import java.util.function.Consumer;
 public class ShopMenu extends ChestMenu {
 
     private final ShopType shopType;
+    private final Player player;
     private int currentPage = 0;
     private Consumer<ShopClickEvent> clickHandler;
 
@@ -36,11 +37,13 @@ public class ShopMenu extends ChestMenu {
     public ShopMenu(int containerId, Inventory playerInventory, ShopType type) {
         super(MenuType.GENERIC_9x6, containerId, playerInventory, new SimpleContainer(54), 6);
         this.shopType = type;
+        this.player = playerInventory.player;
     }
 
     public ShopMenu(int containerId, Inventory playerInventory, Container container, ShopType type) {
         super(MenuType.GENERIC_9x6, containerId, playerInventory, container, 6);
         this.shopType = type;
+        this.player = playerInventory.player;
     }
 
     /**
@@ -156,42 +159,47 @@ public class ShopMenu extends ChestMenu {
             container.setItem(i, ItemStack.EMPTY);
         }
 
-        List<ShopManager.PlayerListing> listings = ShopManager.getInstance().getAllListings();
-        int itemsPerPage = 45;
-        int startIndex = page * itemsPerPage;
-        int endIndex = Math.min(startIndex + itemsPerPage, listings.size());
+        ShopManager.getInstance().getAllListings().thenAccept(listings -> {
+            if (!(player instanceof ServerPlayer serverPlayer)) return;
+            
+            serverPlayer.getServer().execute(() -> {
+                int itemsPerPage = 45;
+                int startIndex = page * itemsPerPage;
+                int endIndex = Math.min(startIndex + itemsPerPage, listings.size());
 
-        // Populate listings
-        for (int i = startIndex; i < endIndex; i++) {
-            int slot = i - startIndex;
-            ShopManager.PlayerListing listing = listings.get(i);
+                // Populate listings
+                for (int i = startIndex; i < endIndex; i++) {
+                    int slot = i - startIndex;
+                    ShopManager.PlayerListing listing = listings.get(i);
 
-            ItemStack displayStack = ItemUtils.createItemFromId(listing.itemId());
-            if (!displayStack.isEmpty()) {
-                displayStack.setCount(listing.quantity());
-                ItemUtils.addListingLore(displayStack, listing.price(), listing.seller());
-                container.setItem(slot, displayStack);
-            }
-        }
+                    ItemStack displayStack = ItemUtils.createItemFromId(listing.itemId());
+                    if (!displayStack.isEmpty()) {
+                        displayStack.setCount(listing.quantity());
+                        ItemUtils.addListingLore(displayStack, listing.price(), listing.seller());
+                        container.setItem(slot, displayStack);
+                    }
+                }
 
-        // Navigation
-        if (page > 0) {
-            ItemStack prevPage = new ItemStack(Items.ARROW);
-            prevPage.setHoverName(Component.literal("§e« Previous Page"));
-            container.setItem(45, prevPage);
-        }
+                // Navigation
+                if (page > 0) {
+                    ItemStack prevPage = new ItemStack(Items.ARROW);
+                    prevPage.setHoverName(Component.literal("§e« Previous Page"));
+                    container.setItem(45, prevPage);
+                }
 
-        ItemStack info = new ItemStack(Items.EMERALD);
-        info.setHoverName(Component.literal("§aPlayer Market - Page " + (page + 1)));
-        container.setItem(49, info);
+                ItemStack info = new ItemStack(Items.EMERALD);
+                info.setHoverName(Component.literal("§aPlayer Market - Page " + (page + 1)));
+                container.setItem(49, info);
 
-        if (endIndex < listings.size()) {
-            ItemStack nextPage = new ItemStack(Items.ARROW);
-            nextPage.setHoverName(Component.literal("§eNext Page »"));
-            container.setItem(53, nextPage);
-        }
+                if (endIndex < listings.size()) {
+                    ItemStack nextPage = new ItemStack(Items.ARROW);
+                    nextPage.setHoverName(Component.literal("§eNext Page »"));
+                    container.setItem(53, nextPage);
+                }
 
-        this.currentPage = page;
+                this.currentPage = page;
+            });
+        });
     }
 
     /**

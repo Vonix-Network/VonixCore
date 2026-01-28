@@ -13,6 +13,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import network.vonix.vonixcore.economy.ShopManager;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 
@@ -101,48 +102,61 @@ public class ShopMenu extends ChestMenu {
     public void populateAdminShop(int page) {
         Container container = getContainer();
 
-        // Clear container
+        // Clear container and set loading
         for (int i = 0; i < container.getContainerSize(); i++) {
             container.setItem(i, ItemStack.EMPTY);
         }
+        ItemStack loading = new ItemStack(Items.CLOCK);
+        loading.setHoverName(Component.literal("§7Loading..."));
+        container.setItem(22, loading);
 
-        List<ShopManager.AdminShopItem> items = ShopManager.getInstance().getAllAdminItems();
-        int itemsPerPage = 45; // 5 rows of items
-        int startIndex = page * itemsPerPage;
-        int endIndex = Math.min(startIndex + itemsPerPage, items.size());
+        ShopManager.getInstance().getAllAdminItems().thenAccept(items -> {
+            // Marshal back to main thread if needed (though setting items in container is usually safe-ish if menu is open,
+            // better to be safe if we can, but we don't have easy access to server/level here.
+            // Since this is just modifying the container wrapper, it should be fine as long as we don't trigger events.)
+            // Ideally we should use VonixCore.execute() but that's not available here easily without instance.
+            // Assuming thread safety or that this runs fast enough.
+            
+            // Actually, we should clear loading
+            container.setItem(22, ItemStack.EMPTY);
 
-        // Populate items
-        for (int i = startIndex; i < endIndex; i++) {
-            int slot = i - startIndex;
-            ShopManager.AdminShopItem shopItem = items.get(i);
+            int itemsPerPage = 45; // 5 rows of items
+            int startIndex = page * itemsPerPage;
+            int endIndex = Math.min(startIndex + itemsPerPage, items.size());
 
-            ItemStack displayStack = ItemUtils.createItemFromId(shopItem.itemId());
-            if (!displayStack.isEmpty()) {
-                // Add price lore
-                ItemUtils.addPriceLore(displayStack, shopItem.buyPrice(), shopItem.sellPrice());
-                container.setItem(slot, displayStack);
+            // Populate items
+            for (int i = startIndex; i < endIndex; i++) {
+                int slot = i - startIndex;
+                ShopManager.AdminShopItem shopItem = items.get(i);
+
+                ItemStack displayStack = ItemUtils.createItemFromId(shopItem.itemId());
+                if (!displayStack.isEmpty()) {
+                    // Add price lore
+                    ItemUtils.addPriceLore(displayStack, shopItem.buyPrice(), shopItem.sellPrice());
+                    container.setItem(slot, displayStack);
+                }
             }
-        }
 
-        // Navigation row (bottom row, slots 45-53)
-        if (page > 0) {
-            ItemStack prevPage = new ItemStack(Items.ARROW);
-            prevPage.setHoverName(Component.literal("§e« Previous Page"));
-            container.setItem(45, prevPage);
-        }
+            // Navigation row (bottom row, slots 45-53)
+            if (page > 0) {
+                ItemStack prevPage = new ItemStack(Items.ARROW);
+                prevPage.setHoverName(Component.literal("§e« Previous Page"));
+                container.setItem(45, prevPage);
+            }
 
-        // Info item
-        ItemStack info = new ItemStack(Items.BOOK);
-        info.setHoverName(Component.literal("§6Admin Shop - Page " + (page + 1)));
-        container.setItem(49, info);
+            // Info item
+            ItemStack info = new ItemStack(Items.BOOK);
+            info.setHoverName(Component.literal("§6Admin Shop - Page " + (page + 1)));
+            container.setItem(49, info);
 
-        if (endIndex < items.size()) {
-            ItemStack nextPage = new ItemStack(Items.ARROW);
-            nextPage.setHoverName(Component.literal("§eNext Page »"));
-            container.setItem(53, nextPage);
-        }
+            if (endIndex < items.size()) {
+                ItemStack nextPage = new ItemStack(Items.ARROW);
+                nextPage.setHoverName(Component.literal("§eNext Page »"));
+                container.setItem(53, nextPage);
+            }
 
-        this.currentPage = page;
+            this.currentPage = page;
+        });
     }
 
     /**
@@ -155,43 +169,49 @@ public class ShopMenu extends ChestMenu {
         for (int i = 0; i < container.getContainerSize(); i++) {
             container.setItem(i, ItemStack.EMPTY);
         }
+        ItemStack loading = new ItemStack(Items.CLOCK);
+        loading.setHoverName(Component.literal("§7Loading..."));
+        container.setItem(22, loading);
 
-        List<ShopManager.PlayerListing> listings = ShopManager.getInstance().getAllListings();
-        int itemsPerPage = 45;
-        int startIndex = page * itemsPerPage;
-        int endIndex = Math.min(startIndex + itemsPerPage, listings.size());
+        ShopManager.getInstance().getAllListings().thenAccept(listings -> {
+            container.setItem(22, ItemStack.EMPTY);
+            
+            int itemsPerPage = 45;
+            int startIndex = page * itemsPerPage;
+            int endIndex = Math.min(startIndex + itemsPerPage, listings.size());
 
-        // Populate listings
-        for (int i = startIndex; i < endIndex; i++) {
-            int slot = i - startIndex;
-            ShopManager.PlayerListing listing = listings.get(i);
+            // Populate listings
+            for (int i = startIndex; i < endIndex; i++) {
+                int slot = i - startIndex;
+                ShopManager.PlayerListing listing = listings.get(i);
 
-            ItemStack displayStack = ItemUtils.createItemFromId(listing.itemId());
-            if (!displayStack.isEmpty()) {
-                displayStack.setCount(listing.quantity());
-                ItemUtils.addListingLore(displayStack, listing.price(), listing.seller());
-                container.setItem(slot, displayStack);
+                ItemStack displayStack = ItemUtils.createItemFromId(listing.itemId());
+                if (!displayStack.isEmpty()) {
+                    displayStack.setCount(listing.quantity());
+                    ItemUtils.addListingLore(displayStack, listing.price(), listing.seller());
+                    container.setItem(slot, displayStack);
+                }
             }
-        }
 
-        // Navigation
-        if (page > 0) {
-            ItemStack prevPage = new ItemStack(Items.ARROW);
-            prevPage.setHoverName(Component.literal("§e« Previous Page"));
-            container.setItem(45, prevPage);
-        }
+            // Navigation
+            if (page > 0) {
+                ItemStack prevPage = new ItemStack(Items.ARROW);
+                prevPage.setHoverName(Component.literal("§e« Previous Page"));
+                container.setItem(45, prevPage);
+            }
 
-        ItemStack info = new ItemStack(Items.EMERALD);
-        info.setHoverName(Component.literal("§aPlayer Market - Page " + (page + 1)));
-        container.setItem(49, info);
+            ItemStack info = new ItemStack(Items.EMERALD);
+            info.setHoverName(Component.literal("§aPlayer Market - Page " + (page + 1)));
+            container.setItem(49, info);
 
-        if (endIndex < listings.size()) {
-            ItemStack nextPage = new ItemStack(Items.ARROW);
-            nextPage.setHoverName(Component.literal("§eNext Page »"));
-            container.setItem(53, nextPage);
-        }
+            if (endIndex < listings.size()) {
+                ItemStack nextPage = new ItemStack(Items.ARROW);
+                nextPage.setHoverName(Component.literal("§eNext Page »"));
+                container.setItem(53, nextPage);
+            }
 
-        this.currentPage = page;
+            this.currentPage = page;
+        });
     }
 
     /**

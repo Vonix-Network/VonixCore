@@ -8,14 +8,23 @@ import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.network.chat.TextComponent;
 import net.minecraft.server.level.ServerPlayer;
 import network.vonix.vonixcore.config.EssentialsConfig;
+import network.vonix.vonixcore.teleport.AsyncRtpManager;
 import network.vonix.vonixcore.teleport.TeleportManager;
 
 /**
- * Teleport commands: /tpa, /tpaccept, /tpdeny, /back
+ * Teleport commands: /tpa, /tpaccept, /tpdeny, /back, /rtp
  */
 public class TeleportCommands {
 
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
+        // /rtp
+        dispatcher.register(Commands.literal("rtp")
+                .executes(ctx -> {
+                    ServerPlayer player = ctx.getSource().getPlayerOrException();
+                    AsyncRtpManager.randomTeleport(player);
+                    return 1;
+                }));
+
         // /tpa <player>
         dispatcher.register(Commands.literal("tpa")
                 .then(Commands.argument("player", EntityArgument.player())

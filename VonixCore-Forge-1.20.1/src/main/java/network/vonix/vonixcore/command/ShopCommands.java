@@ -18,8 +18,15 @@ import net.minecraftforge.event.RegisterCommandsEvent;
 import network.vonix.vonixcore.VonixCore;
 import network.vonix.vonixcore.economy.EconomyManager;
 import network.vonix.vonixcore.economy.ShopManager;
+import network.vonix.vonixcore.economy.shop.ItemUtils;
 import network.vonix.vonixcore.economy.shop.ShopGUIManager;
 import network.vonix.vonixcore.config.EssentialsConfig;
+
+import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Shop commands for the economy system.
@@ -152,7 +159,7 @@ public class ShopCommands {
             return 0;
         }
 
-        String itemId = ShopManager.getItemId(held);
+        String itemId = ItemUtils.getItemId(held);
         player.sendSystemMessage(Component.literal("§6[Shop] §eYou're selling: §f" + held.getHoverName().getString()));
         player.sendSystemMessage(Component.literal("§7Type the price in chat (e.g., §e100§7):"));
 
@@ -185,7 +192,7 @@ public class ShopCommands {
             return 0;
         }
 
-        String itemId = ShopManager.getItemId(held);
+        String itemId = ItemUtils.getItemId(held);
         var priceInfo = ShopManager.getInstance().getAdminPrice(itemId);
 
         if (priceInfo == null || priceInfo.sellPrice() == null) {
@@ -230,7 +237,7 @@ public class ShopCommands {
             return 0;
         }
 
-        String itemId = ShopManager.getItemId(held);
+        String itemId = ItemUtils.getItemId(held);
         ShopManager.getInstance().setAdminPrice(itemId, price, null);
 
         ctx.getSource().sendSuccess(() -> Component.literal("§a[Shop] Set buy price for " + itemId + " to " +
@@ -251,7 +258,7 @@ public class ShopCommands {
             return 0;
         }
 
-        String itemId = ShopManager.getItemId(held);
+        String itemId = ItemUtils.getItemId(held);
         var existing = ShopManager.getInstance().getAdminPrice(itemId);
         Double buyPrice = existing != null ? existing.buyPrice() : null;
         ShopManager.getInstance().setAdminPrice(itemId, buyPrice, price);
@@ -265,8 +272,7 @@ public class ShopCommands {
 
     private static int sellHand(CommandContext<CommandSourceStack> ctx) {
         ServerPlayer player = ctx.getSource().getPlayer();
-        if (player == null)
-            return 0;
+        if (player == null) return 0;
 
         ItemStack held = player.getMainHandItem();
         if (held.isEmpty()) {
@@ -274,7 +280,7 @@ public class ShopCommands {
             return 0;
         }
 
-        String itemId = ShopManager.getItemId(held);
+        String itemId = ItemUtils.getItemId(held);
         var priceInfo = ShopManager.getInstance().getAdminPrice(itemId);
 
         if (priceInfo == null || priceInfo.sellPrice() == null) {
@@ -283,47 +289,62 @@ public class ShopCommands {
         }
 
         double totalPrice = priceInfo.sellPrice() * held.getCount();
-        EconomyManager.getInstance().deposit(player.getUUID(), totalPrice);
-
         int count = held.getCount();
-        player.getMainHandItem().setCount(0);
 
-        player.sendSystemMessage(Component.literal("§a[Shop] Sold " + count + " items for " +
-                EconomyManager.getInstance().format(totalPrice) + "!"));
+        EconomyManager.getInstance().deposit(player.getUUID(), totalPrice).thenAccept(deposited -> {
+            if (deposited) {
+                VonixCore.execute(() -> {
+                    player.getMainHandItem().setCount(0);
+                    player.sendSystemMessage(Component.literal("§a[Shop] Sold " + count + " items for " +
+                            EconomyManager.getInstance().format(totalPrice) + "!"));
+                });
+            }
+        });
+
         return 1;
     }
 
     private static int sellAll(CommandContext<CommandSourceStack> ctx) {
         ServerPlayer player = ctx.getSource().getPlayer();
-        if (player == null)
-            return 0;
+        if (player == null) return 0;
 
-        double total = 0;
-        int itemsSold = 0;
+        ShopManager.getInstance().getAllAdminItems().thenAccept(adminItems -> {
+            VonixCore.execute(() -> {
+                Map<String, Double> prices = adminItems.stream()
+                        .filter(i -> i.sellPrice() != null)
+                        .collect(Collectors.toMap(ShopManager.AdminShopItem::itemId, ShopManager.AdminShopItem::sellPrice));
 
-        for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
-            ItemStack stack = player.getInventory().getItem(i);
-            if (stack.isEmpty())
-                continue;
+                double total = 0;
+                int itemsSold = 0;
 
-            String itemId = ShopManager.getItemId(stack);
-            var priceInfo = ShopManager.getInstance().getAdminPrice(itemId);
+                for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
+                    ItemStack stack = player.getInventory().getItem(i);
+                    if (stack.isEmpty()) continue;
 
-            if (priceInfo != null && priceInfo.sellPrice() != null) {
-                double price = priceInfo.sellPrice() * stack.getCount();
-                total += price;
-                itemsSold += stack.getCount();
-                player.getInventory().setItem(i, ItemStack.EMPTY);
-            }
-        }
+                    String itemId = ItemUtils.getItemId(stack);
+                    if (prices.containsKey(itemId)) {
+                        double price = prices.get(itemId) * stack.getCount();
+                        total += price;
+                        itemsSold += stack.getCount();
+                        player.getInventory().setItem(i, ItemStack.EMPTY);
+                    }
+                }
 
-        if (itemsSold > 0) {
-            EconomyManager.getInstance().deposit(player.getUUID(), total);
-            player.sendSystemMessage(Component.literal("§a[Shop] Sold " + itemsSold + " items for " +
-                    EconomyManager.getInstance().format(total) + "!"));
-        } else {
-            player.sendSystemMessage(Component.literal("§c[Shop] No sellable items in your inventory."));
-        }
+                if (itemsSold > 0) {
+                    final double finalTotal = total;
+                    final int finalItemsSold = itemsSold;
+                    EconomyManager.getInstance().deposit(player.getUUID(), total).thenAccept(success -> {
+                        VonixCore.execute(() -> {
+                            player.sendSystemMessage(Component.literal("§a[Shop] Sold " + finalItemsSold + " items for " +
+                                    EconomyManager.getInstance().format(finalTotal) + "!"));
+                        });
+                    });
+                } else {
+                    player.sendSystemMessage(Component.literal("§c[Shop] No sellable items in your inventory."));
+                }
+            });
+        });
+
         return 1;
     }
 
@@ -331,24 +352,23 @@ public class ShopCommands {
 
     private static int claimDaily(CommandContext<CommandSourceStack> ctx) {
         ServerPlayer player = ctx.getSource().getPlayer();
-        if (player == null)
-            return 0;
+        if (player == null) return 0;
 
-        var result = ShopManager.getInstance().claimDailyReward(player.getUUID());
-
-        if (result.success()) {
-            player.sendSystemMessage(Component.literal("§6§l✦ DAILY REWARD ✦"));
-            player.sendSystemMessage(
-                    Component.literal("§aYou received " + EconomyManager.getInstance().format(result.amount()) + "!"));
-            player.sendSystemMessage(Component.literal("§7Current streak: §e" + result.streak() + " days"));
-            if (result.streak() < 7) {
-                player.sendSystemMessage(Component.literal("§7Come back tomorrow for a bigger reward!"));
+        ShopManager.getInstance().claimDailyReward(player.getUUID()).thenAccept(result -> {
+            if (result.success()) {
+                player.sendSystemMessage(Component.literal("§6§l✦ DAILY REWARD ✦"));
+                player.sendSystemMessage(Component.literal("§aYou received " + EconomyManager.getInstance().format(result.amount()) + "!"));
+                player.sendSystemMessage(Component.literal("§7Current streak: §e" + result.streak() + " days"));
+                if (result.streak() < 7) {
+                    player.sendSystemMessage(Component.literal("§7Come back tomorrow for a bigger reward!"));
+                } else {
+                    player.sendSystemMessage(Component.literal("§6You've reached the maximum streak bonus!"));
+                }
             } else {
-                player.sendSystemMessage(Component.literal("§6You've reached the maximum streak bonus!"));
+                player.sendSystemMessage(Component.literal("§c[Daily] " + result.message()));
             }
-        } else {
-            player.sendSystemMessage(Component.literal("§c[Daily] " + result.message()));
-        }
+        });
+
         return 1;
     }
 

@@ -115,6 +115,9 @@ public class VonixCore {
 
     @net.minecraftforge.eventbus.api.SubscribeEvent
     public void onServerStarted(net.minecraftforge.event.server.ServerStartedEvent event) {
+        // Register Economy Event Listener
+        MinecraftForge.EVENT_BUS.register(network.vonix.vonixcore.listener.EconomyEventListener.class);
+
         // Initialize Protection module
         if (network.vonix.vonixcore.config.ProtectionConfig.CONFIG.enabled.get()) {
             try {
@@ -136,9 +139,31 @@ public class VonixCore {
                 // Initialize all sub-modules since 1.18.2 config lacks granular toggles
                 network.vonix.vonixcore.homes.HomeManager.getInstance().initializeTable(conn);
                 network.vonix.vonixcore.warps.WarpManager.getInstance().initializeTable(conn);
-                network.vonix.vonixcore.economy.EconomyManager.getInstance().initializeTable(conn);
-                network.vonix.vonixcore.economy.ShopManager.getInstance().initializeTable(conn);
                 network.vonix.vonixcore.admin.AdminManager.getInstance().initializeTable(conn);
+
+                // Economy (Initialize tables)
+                network.vonix.vonixcore.economy.EconomyManager.getInstance().initializeTable(conn);
+                network.vonix.vonixcore.economy.TransactionLog.getInstance().initializeTable(conn);
+
+                // Shops
+                if (network.vonix.vonixcore.config.EssentialsConfig.CONFIG.shopsEnabled.get()) {
+                    network.vonix.vonixcore.economy.ShopManager.getInstance().initializeTable(conn);
+                }
+
+                // Jobs (Config managed internally, but table needs creating if enabled in main config)
+                // Note: JobsManager handles its own init call below because it needs event registration
+                if (network.vonix.vonixcore.config.EssentialsConfig.CONFIG.jobsEnabled.get()) {
+                     network.vonix.vonixcore.jobs.JobsManager.getInstance().initialize(conn);
+                }
+
+                // Kits
+                if (network.vonix.vonixcore.config.EssentialsConfig.CONFIG.kitsEnabled.get()) {
+                    network.vonix.vonixcore.kits.KitManager.getInstance().initializeTable(conn);
+                    network.vonix.vonixcore.kits.KitManager.getInstance().loadDefaultKits();
+                }
+
+                // Permissions (Always initialized as it handles groups for other modules)
+                network.vonix.vonixcore.permissions.PermissionManager.getInstance().initialize(conn);
 
                 essentialsEnabled = true;
                 LOGGER.info("[VonixCore] Essentials module enabled");
@@ -197,6 +222,9 @@ public class VonixCore {
         network.vonix.vonixcore.homes.HomeCommands.register(event.getDispatcher());
         network.vonix.vonixcore.warps.WarpCommands.register(event.getDispatcher());
         network.vonix.vonixcore.economy.commands.ShopCommands.register(event.getDispatcher());
+        network.vonix.vonixcore.jobs.JobsCommands.register(event.getDispatcher());
+        network.vonix.vonixcore.kits.KitCommands.register(event.getDispatcher());
+        network.vonix.vonixcore.permissions.PermissionCommands.register(event.getDispatcher());
         LOGGER.info("[VonixCore] Registered commands");
     }
 
@@ -208,6 +236,7 @@ public class VonixCore {
         network.vonix.vonixcore.discord.DiscordManager.getInstance().shutdown();
         network.vonix.vonixcore.auth.api.VonixNetworkAPI.shutdown();
         network.vonix.vonixcore.auth.AuthenticationManager.shutdown();
+        network.vonix.vonixcore.teleport.AsyncRtpManager.shutdown();
         
         // Shutdown async executor
         try {

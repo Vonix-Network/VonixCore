@@ -108,7 +108,7 @@ public abstract class BaseConfig {
     // ============ Helper Methods ============
 
     @SuppressWarnings("unchecked")
-    protected <T> T get(String key, T defaultValue) {
+    public <T> T get(String key, T defaultValue) {
         String[] parts = key.split("\\.");
         Map<String, Object> current = data;
 
@@ -151,7 +151,7 @@ public abstract class BaseConfig {
     }
 
     @SuppressWarnings("unchecked")
-    protected void set(String key, Object value) {
+    public void set(String key, Object value) {
         String[] parts = key.split("\\.");
         Map<String, Object> current = data;
 
@@ -172,29 +172,29 @@ public abstract class BaseConfig {
     /**
      * Set a value only if it doesn't already exist.
      */
-    protected void setDefault(String key, Object value) {
+    public void setDefault(String key, Object value) {
         if (get(key, null) == null) {
             set(key, value);
         }
     }
 
-    protected String getString(String key, String defaultValue) {
+    public String getString(String key, String defaultValue) {
         return get(key, defaultValue);
     }
 
-    protected int getInt(String key, int defaultValue) {
+    public int getInt(String key, int defaultValue) {
         return get(key, defaultValue);
     }
 
-    protected long getLong(String key, long defaultValue) {
+    public long getLong(String key, long defaultValue) {
         return get(key, defaultValue);
     }
 
-    protected double getDouble(String key, double defaultValue) {
+    public double getDouble(String key, double defaultValue) {
         return get(key, defaultValue);
     }
 
-    protected boolean getBoolean(String key, boolean defaultValue) {
+    public boolean getBoolean(String key, boolean defaultValue) {
         return get(key, defaultValue);
     }
 }

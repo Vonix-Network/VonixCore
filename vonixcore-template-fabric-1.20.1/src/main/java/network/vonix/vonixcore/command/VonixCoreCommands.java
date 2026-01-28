@@ -421,20 +421,22 @@ public class VonixCoreCommands {
         dispatcher.register(Commands.literal("balance")
                 .executes(ctx -> {
                     ServerPlayer player = ctx.getSource().getPlayerOrException();
-                    double balance = EconomyManager.getInstance().getBalance(player.getUUID());
-                    ctx.getSource().sendSuccess(
-                            () -> Component.literal("§6Balance: §a" + EconomyManager.getInstance().format(balance)),
-                            false);
+                    EconomyManager.getInstance().getBalance(player.getUUID()).thenAccept(balance -> {
+                        ctx.getSource().sendSuccess(
+                                () -> Component.literal("§6Balance: §a" + EconomyManager.getInstance().format(balance)),
+                                false);
+                    });
                     return 1;
                 }));
 
         dispatcher.register(Commands.literal("bal")
                 .executes(ctx -> {
                     ServerPlayer player = ctx.getSource().getPlayerOrException();
-                    double balance = EconomyManager.getInstance().getBalance(player.getUUID());
-                    ctx.getSource().sendSuccess(
-                            () -> Component.literal("§6Balance: §a" + EconomyManager.getInstance().format(balance)),
-                            false);
+                    EconomyManager.getInstance().getBalance(player.getUUID()).thenAccept(balance -> {
+                        ctx.getSource().sendSuccess(
+                                () -> Component.literal("§6Balance: §a" + EconomyManager.getInstance().format(balance)),
+                                false);
+                    });
                     return 1;
                 }));
 
@@ -454,37 +456,39 @@ public class VonixCoreCommands {
                                         return 0;
                                     }
 
-                                    if (EconomyManager.getInstance().transfer(sender.getUUID(), target.getUUID(),
-                                            amount)) {
-                                        String formatted = EconomyManager.getInstance().format(amount);
-                                        ctx.getSource()
-                                                .sendSuccess(() -> Component.literal(
-                                                        "§aPaid " + formatted + " to " + target.getName().getString()),
-                                                        false);
-                                        target.sendSystemMessage(Component.literal(
-                                                "§aReceived " + formatted + " from " + sender.getName().getString()));
-                                        return 1;
-                                    } else {
-                                        ctx.getSource().sendFailure(Component.literal("§cInsufficient funds"));
-                                        return 0;
-                                    }
+                                    EconomyManager.getInstance().transfer(sender.getUUID(), target.getUUID(), amount)
+                                        .thenAccept(success -> {
+                                            if (success) {
+                                                String formatted = EconomyManager.getInstance().format(amount);
+                                                ctx.getSource()
+                                                        .sendSuccess(() -> Component.literal(
+                                                                "§aPaid " + formatted + " to " + target.getName().getString()),
+                                                                false);
+                                                target.sendSystemMessage(Component.literal(
+                                                        "§aReceived " + formatted + " from " + sender.getName().getString()));
+                                            } else {
+                                                ctx.getSource().sendFailure(Component.literal("§cInsufficient funds"));
+                                            }
+                                        });
+                                    return 1;
                                 }))));
 
         // /baltop
         dispatcher.register(Commands.literal("baltop")
                 .executes(ctx -> {
                     ctx.getSource().sendSuccess(() -> Component.literal("§6=== Balance Leaderboard ==="), false);
-                    var top = EconomyManager.getInstance().getTopBalances(10);
-                    int rank = 1;
-                    for (var entry : top) {
-                        String formatted = EconomyManager.getInstance().format(entry.balance());
-                        final int finalRank = rank;
-                        ctx.getSource().sendSuccess(
-                                () -> Component
-                                        .literal("§e#" + finalRank + " §7" + entry.uuid() + " §f- §a" + formatted),
-                                false);
-                        rank++;
-                    }
+                    EconomyManager.getInstance().getTopBalances(10).thenAccept(top -> {
+                        int rank = 1;
+                        for (var entry : top) {
+                            String formatted = EconomyManager.getInstance().format(entry.balance());
+                            final int finalRank = rank;
+                            ctx.getSource().sendSuccess(
+                                    () -> Component
+                                            .literal("§e#" + finalRank + " §7" + entry.uuid() + " §f- §a" + formatted),
+                                    false);
+                            rank++;
+                        }
+                    });
                     return 1;
                 }));
     }

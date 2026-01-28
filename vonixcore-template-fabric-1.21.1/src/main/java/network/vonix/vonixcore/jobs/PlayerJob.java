@@ -6,22 +6,58 @@ import java.util.UUID;
  * Represents a player's job data.
  */
 public class PlayerJob {
-    private final UUID playerUuid;
+
+    private UUID playerUuid;
     private String jobId;
     private int level;
-    private int xp;
+    private double experience;
     private long joinedAt;
+    private long lastWorked;
 
-    public PlayerJob(UUID playerUuid, String jobId, int level, int xp, long joinedAt) {
-        this.playerUuid = playerUuid;
-        this.jobId = jobId;
-        this.level = level;
-        this.xp = xp;
-        this.joinedAt = joinedAt;
+    public PlayerJob() {
+        this.level = 1;
+        this.experience = 0;
+        this.joinedAt = System.currentTimeMillis();
     }
 
+    public PlayerJob(UUID playerUuid, String jobId) {
+        this();
+        this.playerUuid = playerUuid;
+        this.jobId = jobId;
+    }
+
+    /**
+     * Add experience and check for level up
+     */
+    public boolean addExperience(double amount, Job job) {
+        this.experience += amount;
+        this.lastWorked = System.currentTimeMillis();
+
+        // Check for level up
+        double required = job.getRequiredExp(level);
+        if (experience >= required && level < job.getMaxLevel()) {
+            experience -= required;
+            level++;
+            return true; // Leveled up
+        }
+        return false;
+    }
+
+    /**
+     * Get progress to next level (0.0 to 1.0)
+     */
+    public double getProgress(Job job) {
+        double required = job.getRequiredExp(level);
+        return Math.min(1.0, experience / required);
+    }
+
+    // Getters and Setters
     public UUID getPlayerUuid() {
         return playerUuid;
+    }
+
+    public void setPlayerUuid(UUID playerUuid) {
+        this.playerUuid = playerUuid;
     }
 
     public String getJobId() {
@@ -40,29 +76,27 @@ public class PlayerJob {
         this.level = level;
     }
 
-    public int getXp() {
-        return xp;
+    public double getExperience() {
+        return experience;
     }
 
-    public void setXp(int xp) {
-        this.xp = xp;
-    }
-
-    public void addXp(int amount) {
-        this.xp += amount;
-        // Check for level up
-        int xpForNextLevel = getXpForNextLevel();
-        while (this.xp >= xpForNextLevel) {
-            this.xp -= xpForNextLevel;
-            this.level++;
-        }
-    }
-
-    public int getXpForNextLevel() {
-        return 100 * level; // Basic formula
+    public void setExperience(double experience) {
+        this.experience = experience;
     }
 
     public long getJoinedAt() {
         return joinedAt;
+    }
+
+    public void setJoinedAt(long joinedAt) {
+        this.joinedAt = joinedAt;
+    }
+
+    public long getLastWorked() {
+        return lastWorked;
+    }
+
+    public void setLastWorked(long lastWorked) {
+        this.lastWorked = lastWorked;
     }
 }

@@ -178,23 +178,23 @@ public abstract class BaseConfig {
         }
     }
 
-    protected String getString(String key, String defaultValue) {
+    public String getString(String key, String defaultValue) {
         return get(key, defaultValue);
     }
 
-    protected int getInt(String key, int defaultValue) {
+    public int getInt(String key, int defaultValue) {
         return get(key, defaultValue);
     }
 
-    protected long getLong(String key, long defaultValue) {
+    public long getLong(String key, long defaultValue) {
         return get(key, defaultValue);
     }
 
-    protected double getDouble(String key, double defaultValue) {
+    public double getDouble(String key, double defaultValue) {
         return get(key, defaultValue);
     }
 
-    protected boolean getBoolean(String key, boolean defaultValue) {
+    public boolean getBoolean(String key, boolean defaultValue) {
         return get(key, defaultValue);
     }
 }

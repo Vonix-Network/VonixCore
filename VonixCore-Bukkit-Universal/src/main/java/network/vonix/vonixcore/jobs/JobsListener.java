@@ -27,6 +27,16 @@ public class JobsListener implements Listener {
         this.manager = manager;
     }
 
+    @EventHandler
+    public void onPlayerJoin(org.bukkit.event.player.PlayerJoinEvent event) {
+        manager.loadPlayerJobs(event.getPlayer().getUniqueId());
+    }
+
+    @EventHandler
+    public void onPlayerQuit(org.bukkit.event.player.PlayerQuitEvent event) {
+        manager.unloadPlayerJobs(event.getPlayer().getUniqueId());
+    }
+
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onBlockBreak(BlockBreakEvent event) {
         if (!manager.isEnabled())

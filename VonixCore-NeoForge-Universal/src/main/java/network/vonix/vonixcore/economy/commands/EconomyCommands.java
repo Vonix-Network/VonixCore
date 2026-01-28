@@ -131,9 +131,10 @@ public class EconomyCommands {
             return 0;
         }
 
-        double balance = EconomyManager.getInstance().getBalance(player.getUUID());
-        String symbol = EssentialsConfig.CONFIG.currencySymbol.get();
-        player.sendSystemMessage(Component.literal("§6Balance: §f" + symbol + String.format("%.2f", balance)));
+        EconomyManager.getInstance().getBalance(player.getUUID()).thenAccept(balance -> {
+            String symbol = EssentialsConfig.CONFIG.currencySymbol.get();
+            player.sendSystemMessage(Component.literal("§6Balance: §f" + symbol + String.format("%.2f", balance)));
+        });
         return 1;
     }
 
@@ -158,40 +159,42 @@ public class EconomyCommands {
 
         String symbol = EssentialsConfig.CONFIG.currencySymbol.get();
 
-        if (EconomyManager.getInstance().transfer(player.getUUID(), targetPlayer.getUUID(), amount)) {
-            player.sendSystemMessage(
-                    Component.literal("§aYou sent " + symbol + String.format("%.2f", amount) + " to " + targetName));
-            targetPlayer.sendSystemMessage(Component.literal("§aYou received " + symbol + String.format("%.2f", amount)
-                    + " from " + player.getName().getString()));
-            return 1;
-        } else {
-            source.sendFailure(Component.literal("§cInsufficient funds!"));
-            return 0;
-        }
+        EconomyManager.getInstance().transfer(player.getUUID(), targetPlayer.getUUID(), amount).thenAccept(success -> {
+            if (success) {
+                player.sendSystemMessage(
+                        Component.literal("§aYou sent " + symbol + String.format("%.2f", amount) + " to " + targetName));
+                targetPlayer.sendSystemMessage(Component.literal("§aYou received " + symbol + String.format("%.2f", amount)
+                        + " from " + player.getName().getString()));
+            } else {
+                source.sendFailure(Component.literal("§cInsufficient funds!"));
+            }
+        });
+        return 1;
     }
 
     private static int showBalTop(CommandSourceStack source) {
-        var top = EconomyManager.getInstance().getTopBalances(10);
-        String symbol = EssentialsConfig.CONFIG.currencySymbol.get();
+        EconomyManager.getInstance().getTopBalances(10).thenAccept(top -> {
+            String symbol = EssentialsConfig.CONFIG.currencySymbol.get();
 
-        source.sendSuccess(() -> Component.literal("§6=== Balance Top ==="), false);
-        int rank = 1;
-        for (var entry : top) {
-            var server = source.getServer();
-            String name = entry.uuid().toString().substring(0, 8) + "...";
-            var profile = server.getProfileCache();
-            if (profile != null) {
-                var optional = profile.get(entry.uuid());
-                if (optional.isPresent()) {
-                    name = optional.get().getName();
+            source.sendSuccess(() -> Component.literal("§6=== Balance Top ==="), false);
+            int rank = 1;
+            for (var entry : top) {
+                var server = source.getServer();
+                String name = entry.uuid().toString().substring(0, 8) + "...";
+                var profile = server.getProfileCache();
+                if (profile != null) {
+                    var optional = profile.get(entry.uuid());
+                    if (optional.isPresent()) {
+                        name = optional.get().getName();
+                    }
                 }
+                String finalName = name;
+                int finalRank = rank;
+                source.sendSuccess(() -> Component.literal("§e" + finalRank + ". §f" + finalName + " §7- §a" + symbol
+                        + String.format("%.2f", entry.balance())), false);
+                rank++;
             }
-            String finalName = name;
-            int finalRank = rank;
-            source.sendSuccess(() -> Component.literal("§e" + finalRank + ". §f" + finalName + " §7- §a" + symbol
-                    + String.format("%.2f", entry.balance())), false);
-            rank++;
-        }
+        });
         return 1;
     }
 
@@ -255,19 +258,19 @@ public class EconomyCommands {
             return 0;
         }
 
-        var result = ShopManager.getInstance().claimDailyReward(player.getUUID());
-        String symbol = EssentialsConfig.CONFIG.currencySymbol.get();
+        ShopManager.getInstance().claimDailyReward(player.getUUID()).thenAccept(result -> {
+            String symbol = EssentialsConfig.CONFIG.currencySymbol.get();
 
-        if (result.success()) {
-            player.sendSystemMessage(Component.literal("§a§l✓ Daily Reward Claimed!"));
-            player.sendSystemMessage(
-                    Component.literal("§7Amount: §a" + symbol + String.format("%.2f", result.amount())));
-            player.sendSystemMessage(Component.literal("§7Streak: §e" + result.streak() + " days"));
-            return 1;
-        } else {
-            source.sendFailure(Component.literal("§c" + result.message()));
-            return 0;
-        }
+            if (result.success()) {
+                player.sendSystemMessage(Component.literal("§a§l✓ Daily Reward Claimed!"));
+                player.sendSystemMessage(
+                        Component.literal("§7Amount: §a" + symbol + String.format("%.2f", result.amount())));
+                player.sendSystemMessage(Component.literal("§7Streak: §e" + result.streak() + " days"));
+            } else {
+                source.sendFailure(Component.literal("§c" + result.message()));
+            }
+        });
+        return 1;
     }
 
     private static int startChestShopCreation(CommandSourceStack source) {
@@ -326,29 +329,32 @@ public class EconomyCommands {
         Double sell = sellPrice > 0 ? sellPrice : null;
         final String finalItemId = normalizedItemId;
 
-        if (ShopManager.getInstance().setAdminPrice(finalItemId, buy, sell)) {
-            String symbol = EssentialsConfig.CONFIG.currencySymbol.get();
-            source.sendSuccess(() -> Component.literal("§aSet prices for " + finalItemId + ": Buy=" +
-                    (buy != null ? symbol + String.format("%.2f", buy) : "N/A") + ", Sell=" +
-                    (sell != null ? symbol + String.format("%.2f", sell) : "N/A")), true);
-            return 1;
-        }
-
-        source.sendFailure(Component.literal("§cFailed to set price."));
-        return 0;
+        ShopManager.getInstance().setAdminPrice(finalItemId, buy, sell).thenAccept(success -> {
+            if (success) {
+                String symbol = EssentialsConfig.CONFIG.currencySymbol.get();
+                source.sendSuccess(() -> Component.literal("§aSet prices for " + finalItemId + ": Buy=" +
+                        (buy != null ? symbol + String.format("%.2f", buy) : "N/A") + ", Sell=" +
+                        (sell != null ? symbol + String.format("%.2f", sell) : "N/A")), true);
+            } else {
+                source.sendFailure(Component.literal("§cFailed to set price."));
+            }
+        });
+        
+        return 1;
     }
 
     private static int listAdminPrices(CommandSourceStack source) {
-        var items = ShopManager.getInstance().getAllAdminItems();
-        String symbol = EssentialsConfig.CONFIG.currencySymbol.get();
+        ShopManager.getInstance().getAllAdminItems().thenAccept(items -> {
+            String symbol = EssentialsConfig.CONFIG.currencySymbol.get();
 
-        source.sendSuccess(() -> Component.literal("§6=== Admin Shop Prices ==="), false);
-        for (var item : items) {
-            String buy = item.buyPrice() != null ? symbol + String.format("%.2f", item.buyPrice()) : "N/A";
-            String sell = item.sellPrice() != null ? symbol + String.format("%.2f", item.sellPrice()) : "N/A";
-            source.sendSuccess(
-                    () -> Component.literal("§f" + item.itemId() + " §7- Buy: §a" + buy + " §7Sell: §c" + sell), false);
-        }
+            source.sendSuccess(() -> Component.literal("§6=== Admin Shop Prices ==="), false);
+            for (var item : items) {
+                String buy = item.buyPrice() != null ? symbol + String.format("%.2f", item.buyPrice()) : "N/A";
+                String sell = item.sellPrice() != null ? symbol + String.format("%.2f", item.sellPrice()) : "N/A";
+                source.sendSuccess(
+                        () -> Component.literal("§f" + item.itemId() + " §7- Buy: §a" + buy + " §7Sell: §c" + sell), false);
+            }
+        });
         return 1;
     }
 
@@ -362,11 +368,12 @@ public class EconomyCommands {
         }
 
         String symbol = EssentialsConfig.CONFIG.currencySymbol.get();
-        EconomyManager.getInstance().deposit(targetPlayer.getUUID(), amount);
-        source.sendSuccess(
-                () -> Component.literal("§aGave " + symbol + String.format("%.2f", amount) + " to " + targetName),
-                true);
-        targetPlayer.sendSystemMessage(Component.literal("§aYou received " + symbol + String.format("%.2f", amount)));
+        EconomyManager.getInstance().deposit(targetPlayer.getUUID(), amount).thenAccept(success -> {
+            source.sendSuccess(
+                    () -> Component.literal("§aGave " + symbol + String.format("%.2f", amount) + " to " + targetName),
+                    true);
+            targetPlayer.sendSystemMessage(Component.literal("§aYou received " + symbol + String.format("%.2f", amount)));
+        });
         return 1;
     }
 
@@ -380,15 +387,16 @@ public class EconomyCommands {
         }
 
         String symbol = EssentialsConfig.CONFIG.currencySymbol.get();
-        if (EconomyManager.getInstance().withdraw(targetPlayer.getUUID(), amount)) {
-            source.sendSuccess(
-                    () -> Component.literal("§cTook " + symbol + String.format("%.2f", amount) + " from " + targetName),
-                    true);
-            return 1;
-        } else {
-            source.sendFailure(Component.literal("§cPlayer doesn't have enough money."));
-            return 0;
-        }
+        EconomyManager.getInstance().withdraw(targetPlayer.getUUID(), amount).thenAccept(success -> {
+            if (success) {
+                source.sendSuccess(
+                        () -> Component.literal("§cTook " + symbol + String.format("%.2f", amount) + " from " + targetName),
+                        true);
+            } else {
+                source.sendFailure(Component.literal("§cPlayer doesn't have enough money."));
+            }
+        });
+        return 1;
     }
 
     private static int ecoSet(CommandSourceStack source, String targetName, double amount) {
@@ -401,11 +409,12 @@ public class EconomyCommands {
         }
 
         String symbol = EssentialsConfig.CONFIG.currencySymbol.get();
-        EconomyManager.getInstance().setBalance(targetPlayer.getUUID(), amount);
-        source.sendSuccess(
-                () -> Component
-                        .literal("§aSet " + targetName + "'s balance to " + symbol + String.format("%.2f", amount)),
-                true);
+        EconomyManager.getInstance().setBalance(targetPlayer.getUUID(), amount).thenAccept(success -> {
+            source.sendSuccess(
+                    () -> Component
+                            .literal("§aSet " + targetName + "'s balance to " + symbol + String.format("%.2f", amount)),
+                    true);
+        });
         return 1;
     }
 
@@ -433,9 +442,11 @@ public class EconomyCommands {
             return 0;
         }
 
-        int imported = EconomyPlanLoader.importToDatabase(plan);
-        source.sendSuccess(
-                () -> Component.literal("§aImported " + imported + " items from " + filePath.getFileName()), true);
+        final java.nio.file.Path finalFilePath = filePath;
+        EconomyPlanLoader.importToDatabase(plan).thenAccept(imported -> {
+            source.sendSuccess(
+                    () -> Component.literal("§aImported " + imported + " items from " + finalFilePath.getFileName()), true);
+        });
         return 1;
     }
 
@@ -457,14 +468,15 @@ public class EconomyCommands {
             filePath = java.nio.file.Path.of(filePath.toString() + ".json");
         }
 
-        if (EconomyPlanLoader.exportToFile(filePath)) {
-            java.nio.file.Path finalPath = filePath;
-            source.sendSuccess(
-                    () -> Component.literal("§aExported economy plan to: " + finalPath.getFileName()), true);
-            return 1;
-        } else {
-            source.sendFailure(Component.literal("§cFailed to export economy plan."));
-            return 0;
-        }
+        final java.nio.file.Path finalFilePath = filePath;
+        EconomyPlanLoader.exportToFile(filePath).thenAccept(success -> {
+            if (success) {
+                source.sendSuccess(
+                        () -> Component.literal("§aExported economy plan to: " + finalFilePath.getFileName()), true);
+            } else {
+                source.sendFailure(Component.literal("§cFailed to export economy plan."));
+            }
+        });
+        return 1;
     }
 }

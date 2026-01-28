@@ -38,7 +38,7 @@ public class JobsManager {
     private final Map<String, Job> jobs = new LinkedHashMap<>();
 
     // Player job data (UUID -> list of their jobs)
-    private final Map<UUID, List<PlayerJob>> playerJobs = new ConcurrentHashMap<>();
+    private final Map<UUID, java.util.concurrent.CopyOnWriteArrayList<PlayerJob>> playerJobs = new ConcurrentHashMap<>();
 
     // Configuration
     private int maxJobs = 3;
@@ -60,7 +60,7 @@ public class JobsManager {
     public void initialize(Connection conn) throws SQLException {
         createTables(conn);
         loadJobsConfig();
-        loadPlayerData();
+        // loadPlayerData(); // Removed bulk load in favor of on-join loading
 
         // Register event handler
         MinecraftForge.EVENT_BUS.register(this);
@@ -211,7 +211,7 @@ public class JobsManager {
         hunter.addReward(Job.ActionType.KILL, "witch", 5.0, 8.0, 5.0);
         hunter.addReward(Job.ActionType.KILL, "pillager", 4.0, 7.0, 4.0);
         hunter.addReward(Job.ActionType.KILL, "ravager", 15.0, 25.0, 15.0);
-        hunter.addReward(Job.ActionType.KILL, "warden", 50.0, 100.0, 50.0);
+        hunter.addReward(Job.ActionType.KILL, "warden", 350.0, 100.0, 350.0);
         jobs.put("hunter", hunter);
 
         // Builder
@@ -294,14 +294,16 @@ public class JobsManager {
         }
     }
 
-    private void loadPlayerData() {
+    public void loadPlayerJobs(UUID uuid) {
         VonixCore.executeAsync(() -> {
             try (Connection conn = VonixCore.getInstance().getDatabase().getConnection()) {
-                ResultSet rs = conn.createStatement().executeQuery(
-                        "SELECT * FROM vonixcore_player_jobs");
+                PreparedStatement stmt = conn.prepareStatement(
+                        "SELECT * FROM vonixcore_player_jobs WHERE uuid = ?");
+                stmt.setString(1, uuid.toString());
+                ResultSet rs = stmt.executeQuery();
 
+                java.util.concurrent.CopyOnWriteArrayList<PlayerJob> jobsList = new java.util.concurrent.CopyOnWriteArrayList<>();
                 while (rs.next()) {
-                    UUID uuid = UUID.fromString(rs.getString("uuid"));
                     PlayerJob pj = new PlayerJob();
                     pj.setPlayerUuid(uuid);
                     pj.setJobId(rs.getString("job_id"));
@@ -310,13 +312,17 @@ public class JobsManager {
                     pj.setPoints(rs.getDouble("points"));
                     pj.setJoinedAt(rs.getLong("joined_at"));
                     pj.setLastWorked(rs.getLong("last_worked"));
-
-                    playerJobs.computeIfAbsent(uuid, k -> new ArrayList<>()).add(pj);
+                    jobsList.add(pj);
                 }
+                playerJobs.put(uuid, jobsList);
             } catch (SQLException e) {
-                VonixCore.LOGGER.warn("Failed to load player jobs: {}", e.getMessage());
+                VonixCore.LOGGER.warn("Failed to load player jobs for {}: {}", uuid, e.getMessage());
             }
         });
+    }
+
+    public void unloadPlayerJobs(UUID uuid) {
+        playerJobs.remove(uuid);
     }
 
     public boolean joinJob(ServerPlayer player, String jobId) {
@@ -329,7 +335,7 @@ public class JobsManager {
             return false;
         }
 
-        List<PlayerJob> pJobs = playerJobs.computeIfAbsent(player.getUUID(), k -> new ArrayList<>());
+        List<PlayerJob> pJobs = playerJobs.computeIfAbsent(player.getUUID(), k -> new java.util.concurrent.CopyOnWriteArrayList<>());
         if (pJobs.stream().anyMatch(pj -> pj.getJobId().equalsIgnoreCase(jobId))) {
             player.sendSystemMessage(Component.literal("You already have this job!").withStyle(ChatFormatting.RED));
             return false;
@@ -507,7 +513,7 @@ public class JobsManager {
     }
 
     public List<PlayerJob> getPlayerJobs(UUID uuid) {
-        return playerJobs.getOrDefault(uuid, new ArrayList<>());
+        return playerJobs.getOrDefault(uuid, new java.util.concurrent.CopyOnWriteArrayList<>());
     }
 
     public Collection<Job> getAllJobs() {

@@ -139,22 +139,27 @@ public class SignShopManager {
 
         if (result.isBuySign) {
             double totalPrice = result.price * result.quantity;
-            double balance = eco.getBalance(player.getUUID());
-
-            if (balance < totalPrice) {
-                player.sendSystemMessage(
-                        Component.literal("§cInsufficient funds! Need " + symbol + String.format("%.2f", totalPrice)));
-                return;
-            }
-
-            if (eco.withdraw(player.getUUID(), totalPrice)) {
-                var leftover = ItemUtils.giveItems(player, result.itemId, result.quantity);
-                if (!leftover.isEmpty()) {
-                    player.drop(leftover, false);
+            
+            eco.getBalance(player.getUUID()).thenAccept(balance -> {
+                if (balance < totalPrice) {
+                    player.sendSystemMessage(
+                            Component.literal("§cInsufficient funds! Need " + symbol + String.format("%.2f", totalPrice)));
+                    return;
                 }
-                player.sendSystemMessage(Component.literal("§aPurchased " + result.quantity + "x " + result.itemId
-                        + " for " + symbol + String.format("%.2f", totalPrice)));
-            }
+
+                eco.withdraw(player.getUUID(), totalPrice).thenAccept(success -> {
+                    if (success) {
+                        player.getServer().execute(() -> {
+                            var leftover = ItemUtils.giveItems(player, result.itemId, result.quantity);
+                            if (!leftover.isEmpty()) {
+                                player.drop(leftover, false);
+                            }
+                            player.sendSystemMessage(Component.literal("§aPurchased " + result.quantity + "x " + result.itemId
+                                    + " for " + symbol + String.format("%.2f", totalPrice)));
+                        });
+                    }
+                });
+            });
 
         } else {
             int playerHas = ItemUtils.countItems(player, result.itemId);
@@ -168,9 +173,10 @@ public class SignShopManager {
             double totalPrice = result.price * result.quantity;
 
             if (ItemUtils.removeItems(player, result.itemId, result.quantity)) {
-                eco.deposit(player.getUUID(), totalPrice);
-                player.sendSystemMessage(Component.literal("§aSold " + result.quantity + "x " + result.itemId + " for "
-                        + symbol + String.format("%.2f", totalPrice)));
+                eco.deposit(player.getUUID(), totalPrice).thenAccept(v -> {
+                    player.sendSystemMessage(Component.literal("§aSold " + result.quantity + "x " + result.itemId + " for "
+                            + symbol + String.format("%.2f", totalPrice)));
+                });
             }
         }
     }

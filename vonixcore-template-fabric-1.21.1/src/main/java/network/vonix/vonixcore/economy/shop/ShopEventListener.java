@@ -256,25 +256,30 @@ public class ShopEventListener {
             }
 
             double price = shop.buyPrice();
-            double balance = eco.getBalance(player.getUUID());
-
-            if (balance < price) {
-                player.sendSystemMessage(
-                        Component.literal("§cInsufficient funds! Need " + symbol + String.format("%.2f", price)));
-                return;
-            }
-
-            // Process buy
-            if (eco.withdraw(player.getUUID(), price)) {
-                eco.deposit(shop.owner(), price);
-                var leftover = ItemUtils.giveItems(player, shop.itemId(), 1);
-                if (!leftover.isEmpty()) {
-                    player.drop(leftover, false);
+            
+            eco.getBalance(player.getUUID()).thenAccept(balance -> {
+                if (balance < price) {
+                    player.sendSystemMessage(
+                            Component.literal("§cInsufficient funds! Need " + symbol + String.format("%.2f", price)));
+                    return;
                 }
-                // TODO: Decrease stock in database
-                player.sendSystemMessage(Component
-                        .literal("§aPurchased 1x " + shop.itemId() + " for " + symbol + String.format("%.2f", price)));
-            }
+
+                // Process buy
+                eco.withdraw(player.getUUID(), price).thenAccept(success -> {
+                    if (success) {
+                        eco.deposit(shop.owner(), price);
+                        player.getServer().execute(() -> {
+                            var leftover = ItemUtils.giveItems(player, shop.itemId(), 1);
+                            if (!leftover.isEmpty()) {
+                                player.drop(leftover, false);
+                            }
+                            // TODO: Decrease stock in database
+                            player.sendSystemMessage(Component
+                                    .literal("§aPurchased 1x " + shop.itemId() + " for " + symbol + String.format("%.2f", price)));
+                        });
+                    }
+                });
+            });
 
         } else if (isSneaking && shop.sellPrice() != null && shop.sellPrice() > 0) {
             // Sell one item to the shop
@@ -288,20 +293,35 @@ public class ShopEventListener {
             double price = shop.sellPrice();
 
             // Check if shop owner can afford
-            double ownerBalance = eco.getBalance(shop.owner());
-            if (ownerBalance < price) {
-                player.sendSystemMessage(Component.literal("§cThe shop owner doesn't have enough money!"));
-                return;
-            }
+            eco.getBalance(shop.owner()).thenAccept(ownerBalance -> {
+                if (ownerBalance < price) {
+                    player.sendSystemMessage(Component.literal("§cThe shop owner doesn't have enough money!"));
+                    return;
+                }
 
-            // Process sell
-            if (ItemUtils.removeItems(player, shop.itemId(), 1)) {
-                eco.withdraw(shop.owner(), price);
-                eco.deposit(player.getUUID(), price);
-                // TODO: Increase stock in database
-                player.sendSystemMessage(Component
-                        .literal("§aSold 1x " + shop.itemId() + " for " + symbol + String.format("%.2f", price)));
-            }
+                // Process sell
+                // Need to remove items on main thread before giving money? Or optimistically?
+                // Better to remove items first on main thread, then process transaction.
+                // But handleCustomerClick is running on server thread (main).
+                // So we can remove items here.
+                
+                if (ItemUtils.removeItems(player, shop.itemId(), 1)) {
+                    eco.withdraw(shop.owner(), price).thenAccept(success -> {
+                        if (success) {
+                            eco.deposit(player.getUUID(), price);
+                            // TODO: Increase stock in database
+                            player.sendSystemMessage(Component
+                                    .literal("§aSold 1x " + shop.itemId() + " for " + symbol + String.format("%.2f", price)));
+                        } else {
+                            // Rollback items if withdraw failed (rare race condition)
+                            player.getServer().execute(() -> {
+                                ItemUtils.giveItems(player, shop.itemId(), 1);
+                                player.sendSystemMessage(Component.literal("§cTransaction failed (Owner out of funds). Items returned."));
+                            });
+                        }
+                    });
+                }
+            });
         } else {
             // Show shop info
             player.sendSystemMessage(Component.literal("§6=== Shop ==="));

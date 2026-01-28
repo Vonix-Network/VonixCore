@@ -124,8 +124,8 @@ public class ShopEventListener {
     private static void handleCustomerClick(ServerPlayer player, BlockPos pos, ShopManager.ChestShop shop) {
         String symbol = EssentialsConfig.CONFIG.currencySymbol.get();
         EconomyManager eco = EconomyManager.getInstance();
+        String world = player.level().dimension().location().toString();
 
-        // For now, left-click = buy, sneak-click = sell
         boolean isSneaking = player.isShiftKeyDown();
 
         if (!isSneaking && shop.buyPrice() != null && shop.buyPrice() > 0) {
@@ -136,84 +136,78 @@ public class ShopEventListener {
             }
 
             double price = shop.buyPrice();
-            String world = player.level().dimension().location().toString();
-
-            // Calculate tax
             double taxRate = network.vonix.vonixcore.config.ShopsConfig.CONFIG.chestShopsTaxRate.get();
             double taxAmount = price * taxRate;
             double totalPrice = price + taxAmount;
 
-            double balance = eco.getBalance(player.getUUID());
-            if (balance < totalPrice) {
-                player.sendSystemMessage(
-                        Component.literal("§cInsufficient funds! Need " + symbol + String.format("%.2f", totalPrice)));
-                return;
-            }
-
-            // Process buy with tax
-            if (eco.withdraw(player.getUUID(), totalPrice)) {
-                eco.deposit(shop.owner(), price); // Owner gets price without tax
-                var leftover = ItemUtils.giveItems(player, shop.itemId(), 1);
-                if (!leftover.isEmpty()) {
-                    player.drop(leftover, false);
-                }
-                ShopManager.getInstance().updateStock(world, pos, -1);
-
-                // Log transaction
-                if (network.vonix.vonixcore.config.ShopsConfig.CONFIG.transactionLogEnabled.get()) {
-                    network.vonix.vonixcore.economy.TransactionLog.getInstance().logShopBuy(
-                            player.getUUID(), shop.owner(), price, taxAmount,
-                            0, shop.itemId(), 1, world, pos.getX(), pos.getY(), pos.getZ());
+            eco.getBalance(player.getUUID()).thenAccept(balance -> {
+                if (balance < totalPrice) {
+                    VonixCore.execute(() -> player.sendSystemMessage(Component.literal("§cInsufficient funds! Need " + symbol + String.format("%.2f", totalPrice))));
+                    return;
                 }
 
-                String taxInfo = taxAmount > 0.001 ? String.format(" §7(+%s%.2f tax)", symbol, taxAmount) : "";
-                player.sendSystemMessage(Component
-                        .literal("§aPurchased 1x " + shop.itemId() + " for " + symbol + String.format("%.2f", price)
-                                + taxInfo));
-            }
+                eco.withdraw(player.getUUID(), totalPrice).thenAccept(withdrew -> {
+                    if (withdrew) {
+                        eco.deposit(shop.owner(), price).thenRun(() -> {
+                            ShopManager.getInstance().updateStock(world, pos, -1);
+                            VonixCore.execute(() -> {
+                                var leftover = ItemUtils.giveItems(player, shop.itemId(), 1);
+                                if (!leftover.isEmpty()) {
+                                    player.drop(leftover, false);
+                                }
+
+                                if (network.vonix.vonixcore.config.ShopsConfig.CONFIG.transactionLogEnabled.get()) {
+                                    network.vonix.vonixcore.economy.TransactionLog.getInstance().logShopBuy(
+                                            player.getUUID(), shop.owner(), price, taxAmount,
+                                            0, shop.itemId(), 1, world, pos.getX(), pos.getY(), pos.getZ());
+                                }
+
+                                String taxInfo = taxAmount > 0.001 ? String.format(" §7(+%s%.2f tax)", symbol, taxAmount) : "";
+                                player.sendSystemMessage(Component.literal("§aPurchased 1x " + shop.itemId() + " for " + symbol + String.format("%.2f", price) + taxInfo));
+                            });
+                        });
+                    }
+                });
+            });
 
         } else if (isSneaking && shop.sellPrice() != null && shop.sellPrice() > 0) {
-            // Sell one item to the shop
-            int playerHas = ItemUtils.countItems(player, shop.itemId());
-
-            if (playerHas < 1) {
+            // Sell one item
+            if (ItemUtils.countItems(player, shop.itemId()) < 1) {
                 player.sendSystemMessage(Component.literal("§cYou don't have any " + shop.itemId() + " to sell!"));
                 return;
             }
 
             double price = shop.sellPrice();
-            String world = player.level().dimension().location().toString();
-
-            // Calculate tax (deducted from seller's earnings)
             double taxRate = network.vonix.vonixcore.config.ShopsConfig.CONFIG.chestShopsTaxRate.get();
             double taxAmount = price * taxRate;
             double sellerReceives = price - taxAmount;
 
-            // Check if shop owner can afford
-            double ownerBalance = eco.getBalance(shop.owner());
-            if (ownerBalance < price) {
-                player.sendSystemMessage(Component.literal("§cThe shop owner doesn't have enough money!"));
-                return;
-            }
-
-            // Process sell with tax
-            if (ItemUtils.removeItems(player, shop.itemId(), 1)) {
-                eco.withdraw(shop.owner(), price);
-                eco.deposit(player.getUUID(), sellerReceives); // Seller gets amount minus tax
-                ShopManager.getInstance().updateStock(world, pos, 1);
-
-                // Log transaction
-                if (network.vonix.vonixcore.config.ShopsConfig.CONFIG.transactionLogEnabled.get()) {
-                    network.vonix.vonixcore.economy.TransactionLog.getInstance().logShopSell(
-                            player.getUUID(), shop.owner(), price, taxAmount,
-                            0, shop.itemId(), 1, world, pos.getX(), pos.getY(), pos.getZ());
+            eco.getBalance(shop.owner()).thenAccept(ownerBalance -> {
+                if (ownerBalance < price) {
+                    VonixCore.execute(() -> player.sendSystemMessage(Component.literal("§cThe shop owner doesn't have enough money!")));
+                    return;
                 }
 
-                String taxInfo = taxAmount > 0.001 ? String.format(" §7(-%s%.2f tax)", symbol, taxAmount) : "";
-                player.sendSystemMessage(Component
-                        .literal("§aSold 1x " + shop.itemId() + " for " + symbol + String.format("%.2f", sellerReceives)
-                                + taxInfo));
-            }
+                VonixCore.execute(() -> {
+                    if (ItemUtils.removeItems(player, shop.itemId(), 1)) {
+                        eco.withdraw(shop.owner(), price).thenAccept(withdrew -> {
+                            if (withdrew) {
+                                eco.deposit(player.getUUID(), sellerReceives).thenRun(() -> {
+                                    ShopManager.getInstance().updateStock(world, pos, 1);
+                                    if (network.vonix.vonixcore.config.ShopsConfig.CONFIG.transactionLogEnabled.get()) {
+                                        network.vonix.vonixcore.economy.TransactionLog.getInstance().logShopSell(
+                                                player.getUUID(), shop.owner(), price, taxAmount,
+                                                0, shop.itemId(), 1, world, pos.getX(), pos.getY(), pos.getZ());
+                                    }
+
+                                    String taxInfo = taxAmount > 0.001 ? String.format(" §7(-%s%.2f tax)", symbol, taxAmount) : "";
+                                    player.sendSystemMessage(Component.literal("§aSold 1x " + shop.itemId() + " for " + symbol + String.format("%.2f", sellerReceives) + taxInfo));
+                                });
+                            }
+                        });
+                    }
+                });
+            });
         } else {
             // Show shop info
             player.sendSystemMessage(Component.literal("§6=== Shop ==="));

@@ -25,6 +25,28 @@ import java.sql.SQLException;
 public class PlayerEventListener {
 
     /**
+     * Handle player join to load economy and jobs data.
+     */
+    @SubscribeEvent
+    public static void onPlayerJoin(PlayerEvent.PlayerLoggedInEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player) {
+            network.vonix.vonixcore.economy.EconomyManager.getInstance().loadBalanceAsync(player.getUUID());
+            network.vonix.vonixcore.jobs.JobsManager.getInstance().loadPlayerJobs(player.getUUID());
+        }
+    }
+
+    /**
+     * Handle player quit to unload economy and jobs data.
+     */
+    @SubscribeEvent
+    public static void onPlayerQuit(PlayerEvent.PlayerLoggedOutEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player) {
+            network.vonix.vonixcore.economy.EconomyManager.getInstance().unloadBalance(player.getUUID());
+            network.vonix.vonixcore.jobs.JobsManager.getInstance().unloadPlayerJobs(player.getUUID());
+        }
+    }
+
+    /**
      * Handle chat events.
      */
     @SubscribeEvent

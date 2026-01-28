@@ -146,6 +146,7 @@ public class VonixCore extends JavaPlugin {
         getCommand("pay").setExecutor(new network.vonix.vonixcore.economy.EconomyCommands());
 
         // Register listeners
+        getServer().getPluginManager().registerEvents(new network.vonix.vonixcore.economy.EconomyEventListener(network.vonix.vonixcore.economy.EconomyManager.getInstance()), this);
         getServer().getPluginManager().registerEvents(new network.vonix.vonixcore.essentials.EssentialsListener(),
                 this);
         getServer().getPluginManager().registerEvents(new network.vonix.vonixcore.protection.ProtectionListener(this),

@@ -1,12 +1,14 @@
 package network.vonix.vonixcore.chat;
 
-import net.minecraft.network.chat.TextComponent;
+import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.Style;
 import net.minecraft.network.chat.TextColor;
 import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.HoverEvent;
+import net.minecraft.network.chat.TextComponent;
 import net.minecraft.server.level.ServerPlayer;
+import network.vonix.vonixcore.permissions.PermissionManager;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -15,24 +17,29 @@ import java.util.regex.Pattern;
  * MiniMessage-style chat formatter with prefix/suffix support.
  * Supports: color codes (&a, &b), hex colors (&#RRGGBB), gradients, click/hover
  * events.
+ * Forge 1.18.2 compatible version.
  */
 public class ChatFormatter {
-
-    // Legacy color code pattern (&a, &l, etc.)
-    private static final Pattern LEGACY_COLOR = Pattern.compile("&([0-9a-fk-or])");
-    // Hex color pattern (&#RRGGBB or &x&R&R&G&G&B&B)
-    private static final Pattern HEX_COLOR = Pattern.compile("&#([0-9A-Fa-f]{6})");
-    // MiniMessage tags
-    private static final Pattern MINI_TAG = Pattern.compile("<([^>]+)>");
 
     /**
      * Format a chat message with prefix and suffix.
      */
-    public static TextComponent formatChatMessage(ServerPlayer player, String message) {
-        String playerName = player.getName().getString();
+    public static Component formatChatMessage(ServerPlayer player, String message) {
+        PermissionManager pm = PermissionManager.getInstance();
 
-        // Build the full message: name: message
+        String prefix = pm.getPrefix(player.getUUID());
+        String suffix = pm.getSuffix(player.getUUID());
+
+        String nickname = network.vonix.vonixcore.command.UtilityCommands.getNickname(player.getUUID());
+        String playerName = nickname != null ? nickname : player.getName().getString();
+
+        // Build the full message: [prefix] name [suffix]: message
         MutableComponent result = new TextComponent("");
+
+        // Add prefix
+        if (prefix != null && !prefix.isEmpty()) {
+            result.append(parseColors(prefix));
+        }
 
         // Add player name with hover
         MutableComponent nameComponent = new TextComponent(playerName)
@@ -43,21 +50,41 @@ public class ChatFormatter {
                                 "/msg " + playerName + " ")));
         result.append(nameComponent);
 
+        // Add suffix
+        if (suffix != null && !suffix.isEmpty()) {
+            result.append(parseColors(suffix));
+        }
+
         // Add separator and message
         result.append(new TextComponent("§7: §f"));
         result.append(parseColors(message));
 
-        return (TextComponent) result;
+        return result;
     }
 
     /**
      * Format display name for tab list / scoreboard.
      */
-    public static TextComponent formatDisplayName(ServerPlayer player) {
+    public static Component formatDisplayName(ServerPlayer player) {
+        PermissionManager pm = PermissionManager.getInstance();
+
+        String prefix = pm.getPrefix(player.getUUID());
+        String suffix = pm.getSuffix(player.getUUID());
         String playerName = player.getName().getString();
+
         MutableComponent result = new TextComponent("");
+
+        if (prefix != null && !prefix.isEmpty()) {
+            result.append(parseColors(prefix));
+        }
+
         result.append(new TextComponent(playerName));
-        return (TextComponent) result;
+
+        if (suffix != null && !suffix.isEmpty()) {
+            result.append(parseColors(suffix));
+        }
+
+        return result;
     }
 
     /**

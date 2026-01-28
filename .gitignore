@@ -6,6 +6,14 @@ BuildOutput/
 build/
 */build/
 */.gradle/
+gradle-cache/
+!gradle/wrapper/gradle-wrapper.jar
+
+# Java
+*.class
+*.jar
+*.war
+*.ear
 
 # IDE
 .idea/
@@ -14,24 +22,25 @@ build/
 *.iws
 .vscode/
 *.code-workspace
+nbproject/
+*.sublime-workspace
 
 # OS
 .DS_Store
 Thumbs.db
 desktop.ini
 
-# Java
-*.class
-*.jar
-!gradle/wrapper/*.jar
-
 # Logs
 *.log
 logs/
+build-log.txt
+compile-log.txt
 
 # Runtime
 run/
 */run/
+out/
+bin/
 
 # Generated
 src/generated/

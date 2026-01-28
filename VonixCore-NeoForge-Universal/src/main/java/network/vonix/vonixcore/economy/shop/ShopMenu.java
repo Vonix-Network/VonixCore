@@ -25,6 +25,7 @@ import java.util.function.Consumer;
 public class ShopMenu extends ChestMenu {
 
     private final ShopType shopType;
+    private final Player player;
     private int currentPage = 0;
     private Consumer<ShopClickEvent> clickHandler;
 
@@ -37,11 +38,13 @@ public class ShopMenu extends ChestMenu {
     public ShopMenu(int containerId, Inventory playerInventory, ShopType type) {
         super(MenuType.GENERIC_9x6, containerId, playerInventory, new SimpleContainer(54), 6);
         this.shopType = type;
+        this.player = playerInventory.player;
     }
 
     public ShopMenu(int containerId, Inventory playerInventory, Container container, ShopType type) {
         super(MenuType.GENERIC_9x6, containerId, playerInventory, container, 6);
         this.shopType = type;
+        this.player = playerInventory.player;
     }
 
     /**
@@ -102,51 +105,64 @@ public class ShopMenu extends ChestMenu {
     public void populateAdminShop(int page) {
         Container container = getContainer();
 
-        // Clear container
+        // Show loading screen
         for (int i = 0; i < container.getContainerSize(); i++) {
             container.setItem(i, ItemStack.EMPTY);
         }
+        ItemStack loading = new ItemStack(Items.CLOCK);
+        loading.set(net.minecraft.core.component.DataComponents.CUSTOM_NAME, Component.literal("§eLoading..."));
+        container.setItem(22, loading);
 
-        List<ShopManager.AdminShopItem> items = ShopManager.getInstance().getAllAdminItems();
-        int itemsPerPage = 45; // 5 rows of items
-        int startIndex = page * itemsPerPage;
-        int endIndex = Math.min(startIndex + itemsPerPage, items.size());
+        ShopManager.getInstance().getAllAdminItems().thenAccept(items -> {
+            if (!(this.player instanceof ServerPlayer serverPlayer)) return;
 
-        // Populate items
-        for (int i = startIndex; i < endIndex; i++) {
-            int slot = i - startIndex;
-            ShopManager.AdminShopItem shopItem = items.get(i);
+            serverPlayer.getServer().execute(() -> {
+                // Clear loading screen
+                for (int i = 0; i < container.getContainerSize(); i++) {
+                    container.setItem(i, ItemStack.EMPTY);
+                }
 
-            ItemStack displayStack = ItemUtils.createItemFromId(shopItem.itemId());
-            if (!displayStack.isEmpty()) {
-                // Add price lore
-                ItemUtils.addPriceLore(displayStack, shopItem.buyPrice(), shopItem.sellPrice());
-                container.setItem(slot, displayStack);
-            }
-        }
+                int itemsPerPage = 45; // 5 rows of items
+                int startIndex = page * itemsPerPage;
+                int endIndex = Math.min(startIndex + itemsPerPage, items.size());
 
-        // Navigation row (bottom row, slots 45-53)
-        if (page > 0) {
-            ItemStack prevPage = new ItemStack(Items.ARROW);
-            prevPage.set(net.minecraft.core.component.DataComponents.CUSTOM_NAME,
-                    Component.literal("§e« Previous Page"));
-            container.setItem(45, prevPage);
-        }
+                // Populate items
+                for (int i = startIndex; i < endIndex; i++) {
+                    int slot = i - startIndex;
+                    ShopManager.AdminShopItem shopItem = items.get(i);
 
-        // Info item
-        ItemStack info = new ItemStack(Items.BOOK);
-        info.set(net.minecraft.core.component.DataComponents.CUSTOM_NAME,
-                Component.literal("§6Admin Shop - Page " + (page + 1)));
-        container.setItem(49, info);
+                    ItemStack displayStack = ItemUtils.createItemFromId(shopItem.itemId());
+                    if (!displayStack.isEmpty()) {
+                        // Add price lore
+                        ItemUtils.addPriceLore(displayStack, shopItem.buyPrice(), shopItem.sellPrice());
+                        container.setItem(slot, displayStack);
+                    }
+                }
 
-        if (endIndex < items.size()) {
-            ItemStack nextPage = new ItemStack(Items.ARROW);
-            nextPage.set(net.minecraft.core.component.DataComponents.CUSTOM_NAME,
-                    Component.literal("§eNext Page »"));
-            container.setItem(53, nextPage);
-        }
+                // Navigation row (bottom row, slots 45-53)
+                if (page > 0) {
+                    ItemStack prevPage = new ItemStack(Items.ARROW);
+                    prevPage.set(net.minecraft.core.component.DataComponents.CUSTOM_NAME,
+                            Component.literal("§e« Previous Page"));
+                    container.setItem(45, prevPage);
+                }
 
-        this.currentPage = page;
+                // Info item
+                ItemStack info = new ItemStack(Items.BOOK);
+                info.set(net.minecraft.core.component.DataComponents.CUSTOM_NAME,
+                        Component.literal("§6Admin Shop - Page " + (page + 1)));
+                container.setItem(49, info);
+
+                if (endIndex < items.size()) {
+                    ItemStack nextPage = new ItemStack(Items.ARROW);
+                    nextPage.set(net.minecraft.core.component.DataComponents.CUSTOM_NAME,
+                            Component.literal("§eNext Page »"));
+                    container.setItem(53, nextPage);
+                }
+
+                this.currentPage = page;
+            });
+        });
     }
 
     /**
@@ -160,45 +176,50 @@ public class ShopMenu extends ChestMenu {
             container.setItem(i, ItemStack.EMPTY);
         }
 
-        List<ShopManager.PlayerListing> listings = ShopManager.getInstance().getAllListings();
-        int itemsPerPage = 45;
-        int startIndex = page * itemsPerPage;
-        int endIndex = Math.min(startIndex + itemsPerPage, listings.size());
+        ShopManager.getInstance().getAllListings().thenAccept(listings -> {
+            if (!(this.player instanceof ServerPlayer serverPlayer)) return;
+            
+            serverPlayer.getServer().execute(() -> {
+                int itemsPerPage = 45;
+                int startIndex = page * itemsPerPage;
+                int endIndex = Math.min(startIndex + itemsPerPage, listings.size());
 
-        // Populate listings
-        for (int i = startIndex; i < endIndex; i++) {
-            int slot = i - startIndex;
-            ShopManager.PlayerListing listing = listings.get(i);
+                // Populate listings
+                for (int i = startIndex; i < endIndex; i++) {
+                    int slot = i - startIndex;
+                    ShopManager.PlayerListing listing = listings.get(i);
 
-            ItemStack displayStack = ItemUtils.createItemFromId(listing.itemId());
-            if (!displayStack.isEmpty()) {
-                displayStack.setCount(listing.quantity());
-                ItemUtils.addListingLore(displayStack, listing.price(), listing.seller());
-                container.setItem(slot, displayStack);
-            }
-        }
+                    ItemStack displayStack = ItemUtils.createItemFromId(listing.itemId());
+                    if (!displayStack.isEmpty()) {
+                        displayStack.setCount(listing.quantity());
+                        ItemUtils.addListingLore(displayStack, listing.price(), listing.seller());
+                        container.setItem(slot, displayStack);
+                    }
+                }
 
-        // Navigation
-        if (page > 0) {
-            ItemStack prevPage = new ItemStack(Items.ARROW);
-            prevPage.set(net.minecraft.core.component.DataComponents.CUSTOM_NAME,
-                    Component.literal("§e« Previous Page"));
-            container.setItem(45, prevPage);
-        }
+                // Navigation
+                if (page > 0) {
+                    ItemStack prevPage = new ItemStack(Items.ARROW);
+                    prevPage.set(net.minecraft.core.component.DataComponents.CUSTOM_NAME,
+                            Component.literal("§e« Previous Page"));
+                    container.setItem(45, prevPage);
+                }
 
-        ItemStack info = new ItemStack(Items.EMERALD);
-        info.set(net.minecraft.core.component.DataComponents.CUSTOM_NAME,
-                Component.literal("§aPlayer Market - Page " + (page + 1)));
-        container.setItem(49, info);
+                ItemStack info = new ItemStack(Items.EMERALD);
+                info.set(net.minecraft.core.component.DataComponents.CUSTOM_NAME,
+                        Component.literal("§aPlayer Market - Page " + (page + 1)));
+                container.setItem(49, info);
 
-        if (endIndex < listings.size()) {
-            ItemStack nextPage = new ItemStack(Items.ARROW);
-            nextPage.set(net.minecraft.core.component.DataComponents.CUSTOM_NAME,
-                    Component.literal("§eNext Page »"));
-            container.setItem(53, nextPage);
-        }
+                if (endIndex < listings.size()) {
+                    ItemStack nextPage = new ItemStack(Items.ARROW);
+                    nextPage.set(net.minecraft.core.component.DataComponents.CUSTOM_NAME,
+                            Component.literal("§eNext Page »"));
+                    container.setItem(53, nextPage);
+                }
 
-        this.currentPage = page;
+                this.currentPage = page;
+            });
+        });
     }
 
     /**

@@ -114,94 +114,105 @@ public class ShopGUIManager {
         // Item interaction
         if (slot >= 0 && slot < 45 && !event.clickedItem().isEmpty()) {
             String itemId = ItemUtils.getItemId(event.clickedItem());
-            ShopManager.AdminShopItem shopItem = ShopManager.getInstance().getAdminPrice(itemId);
-
-            if (shopItem == null) {
-                player.sendSystemMessage(Component.literal("§cThis item is not available in the shop."));
-                return;
-            }
-
-            String symbol = EssentialsConfig.CONFIG.currencySymbol.get();
-
-            if (event.isLeftClick()) {
-                // Buy
-                if (shopItem.buyPrice() == null || shopItem.buyPrice() <= 0) {
-                    player.sendSystemMessage(Component.literal("§cThis item cannot be purchased."));
+            ShopManager.getInstance().getAdminPrice(itemId).thenAccept(optionalShopItem -> {
+                if (optionalShopItem.isEmpty()) {
+                    player.sendSystemMessage(Component.literal("§cThis item is not available in the shop."));
                     return;
                 }
 
-                double price = shopItem.buyPrice();
-                double balance = EconomyManager.getInstance().getBalance(player.getUUID());
+                ShopManager.AdminShopItem shopItem = optionalShopItem.get();
+                String symbol = EssentialsConfig.CONFIG.currencySymbol.get();
 
-                if (balance < price) {
-                    player.sendSystemMessage(
-                            Component.literal("§cInsufficient funds! Need " + symbol + String.format("%.2f", price)));
-                    return;
-                }
-
-                // Take money and give item
-                if (EconomyManager.getInstance().withdraw(player.getUUID(), price)) {
-                    var leftover = ItemUtils.giveItems(player, itemId, 1);
-                    if (!leftover.isEmpty()) {
-                        // Drop items that didn't fit
-                        player.drop(leftover, false);
+                if (event.isLeftClick()) {
+                    // Buy
+                    if (shopItem.buyPrice() == null || shopItem.buyPrice() <= 0) {
+                        player.sendSystemMessage(Component.literal("§cThis item cannot be purchased."));
+                        return;
                     }
-                    player.sendSystemMessage(Component
-                            .literal("§aPurchased 1x " + itemId + " for " + symbol + String.format("%.2f", price)));
-                }
 
-            } else if (event.isRightClick()) {
-                // Sell
-                if (shopItem.sellPrice() == null || shopItem.sellPrice() <= 0) {
-                    player.sendSystemMessage(Component.literal("§cThis item cannot be sold."));
-                    return;
-                }
+                    double price = shopItem.buyPrice();
+                    
+                    EconomyManager.getInstance().getBalance(player.getUUID()).thenAccept(balance -> {
+                        if (balance < price) {
+                            player.sendSystemMessage(
+                                    Component.literal("§cInsufficient funds! Need " + symbol + String.format("%.2f", price)));
+                            return;
+                        }
 
-                int playerHas = ItemUtils.countItems(player, itemId);
-                if (playerHas < 1) {
-                    player.sendSystemMessage(Component.literal("§cYou don't have any of this item to sell."));
-                    return;
-                }
+                        // Take money and give item
+                        EconomyManager.getInstance().withdraw(player.getUUID(), price).thenAccept(success -> {
+                            if (success) {
+                                player.getServer().execute(() -> {
+                                    var leftover = ItemUtils.giveItems(player, itemId, 1);
+                                    if (!leftover.isEmpty()) {
+                                        // Drop items that didn't fit
+                                        player.drop(leftover, false);
+                                    }
+                                    player.sendSystemMessage(Component
+                                            .literal("§aPurchased 1x " + itemId + " for " + symbol + String.format("%.2f", price)));
+                                });
+                            }
+                        });
+                    });
 
-                double price = shopItem.sellPrice();
-
-                // Take item and give money
-                if (ItemUtils.removeItems(player, itemId, 1)) {
-                    EconomyManager.getInstance().deposit(player.getUUID(), price);
-                    player.sendSystemMessage(
-                            Component.literal("§aSold 1x " + itemId + " for " + symbol + String.format("%.2f", price)));
-                }
-
-            } else if (event.isShiftClick() && event.isLeftClick()) {
-                // Bulk buy (stack)
-                if (shopItem.buyPrice() == null || shopItem.buyPrice() <= 0) {
-                    player.sendSystemMessage(Component.literal("§cThis item cannot be purchased."));
-                    return;
-                }
-
-                int amount = 64;
-                double totalPrice = shopItem.buyPrice() * amount;
-                double balance = EconomyManager.getInstance().getBalance(player.getUUID());
-
-                int affordable = (int) (balance / shopItem.buyPrice());
-                int toBuy = Math.min(amount, affordable);
-
-                if (toBuy <= 0) {
-                    player.sendSystemMessage(Component.literal("§cInsufficient funds!"));
-                    return;
-                }
-
-                totalPrice = shopItem.buyPrice() * toBuy;
-
-                if (EconomyManager.getInstance().withdraw(player.getUUID(), totalPrice)) {
-                    var leftover = ItemUtils.giveItems(player, itemId, toBuy);
-                    if (!leftover.isEmpty()) {
-                        player.drop(leftover, false);
+                } else if (event.isRightClick()) {
+                    // Sell
+                    if (shopItem.sellPrice() == null || shopItem.sellPrice() <= 0) {
+                        player.sendSystemMessage(Component.literal("§cThis item cannot be sold."));
+                        return;
                     }
-                    player.sendSystemMessage(Component.literal("§aPurchased " + toBuy + "x " + itemId + " for " + symbol
-                            + String.format("%.2f", totalPrice)));
+
+                    int playerHas = ItemUtils.countItems(player, itemId);
+                    if (playerHas < 1) {
+                        player.sendSystemMessage(Component.literal("§cYou don't have any of this item to sell."));
+                        return;
+                    }
+
+                    double price = shopItem.sellPrice();
+
+                    // Take item and give money
+                    if (ItemUtils.removeItems(player, itemId, 1)) {
+                        EconomyManager.getInstance().deposit(player.getUUID(), price).thenAccept(v -> {
+                            player.sendSystemMessage(
+                                    Component.literal("§aSold 1x " + itemId + " for " + symbol + String.format("%.2f", price)));
+                        });
+                    }
+
+                } else if (event.isShiftClick() && event.isLeftClick()) {
+                    // Bulk buy (stack)
+                    if (shopItem.buyPrice() == null || shopItem.buyPrice() <= 0) {
+                        player.sendSystemMessage(Component.literal("§cThis item cannot be purchased."));
+                        return;
+                    }
+
+                    int amount = 64;
+                    
+                    EconomyManager.getInstance().getBalance(player.getUUID()).thenAccept(balance -> {
+                        int affordable = (int) (balance / shopItem.buyPrice());
+                        int toBuy = Math.min(amount, affordable);
+
+                        if (toBuy <= 0) {
+                            player.sendSystemMessage(Component.literal("§cInsufficient funds!"));
+                            return;
+                        }
+
+                        double totalPrice = shopItem.buyPrice() * toBuy;
+
+                        EconomyManager.getInstance().withdraw(player.getUUID(), totalPrice).thenAccept(success -> {
+                            if (success) {
+                                player.getServer().execute(() -> {
+                                    var leftover = ItemUtils.giveItems(player, itemId, toBuy);
+                                    if (!leftover.isEmpty()) {
+                                        player.drop(leftover, false);
+                                    }
+                                    player.sendSystemMessage(Component.literal("§aPurchased " + toBuy + "x " + itemId + " for " + symbol
+                                            + String.format("%.2f", totalPrice)));
+                                });
+                            }
+                        });
+                    });
                 }
-            }
+            });
         }
     }
 
@@ -235,46 +246,52 @@ public class ShopGUIManager {
 
         // Purchase listing
         if (slot >= 0 && slot < 45 && !event.clickedItem().isEmpty()) {
-            List<ShopManager.PlayerListing> listings = ShopManager.getInstance().getAllListings();
-            int index = (event.currentPage() * 45) + slot;
-
-            if (index >= listings.size()) {
-                return;
-            }
-
-            ShopManager.PlayerListing listing = listings.get(index);
-            String symbol = EssentialsConfig.CONFIG.currencySymbol.get();
-
-            // Can't buy your own listing
-            if (listing.seller().equals(player.getUUID())) {
-                player.sendSystemMessage(Component.literal("§cYou can't buy your own listing!"));
-                return;
-            }
-
-            double balance = EconomyManager.getInstance().getBalance(player.getUUID());
-            if (balance < listing.price()) {
-                player.sendSystemMessage(Component
-                        .literal("§cInsufficient funds! Need " + symbol + String.format("%.2f", listing.price())));
-                return;
-            }
-
-            // Process purchase
-            if (ShopManager.getInstance().buyListing(listing.id(), player.getUUID())) {
-                var leftover = ItemUtils.giveItems(player, listing.itemId(), listing.quantity());
-                if (!leftover.isEmpty()) {
-                    player.drop(leftover, false);
+            ShopManager.getInstance().getAllListings().thenAccept(listings -> {
+                int index = (event.currentPage() * 45) + slot;
+    
+                if (index >= listings.size()) {
+                    return;
                 }
-                player.sendSystemMessage(Component.literal("§aPurchased " + listing.quantity() + "x " + listing.itemId()
-                        + " for " + symbol + String.format("%.2f", listing.price())));
-
-                // Refresh the GUI
-                ShopSession session = activeSessions.get(player.getUUID());
-                if (session != null && session.menu instanceof ShopMenu shopMenu) {
-                    shopMenu.populatePlayerMarket(event.currentPage());
+    
+                ShopManager.PlayerListing listing = listings.get(index);
+                String symbol = EssentialsConfig.CONFIG.currencySymbol.get();
+    
+                // Can't buy your own listing
+                if (listing.seller().equals(player.getUUID())) {
+                    player.sendSystemMessage(Component.literal("§cYou can't buy your own listing!"));
+                    return;
                 }
-            } else {
-                player.sendSystemMessage(Component.literal("§cFailed to purchase listing. It may have been sold."));
-            }
+    
+                EconomyManager.getInstance().getBalance(player.getUUID()).thenAccept(balance -> {
+                    if (balance < listing.price()) {
+                        player.sendSystemMessage(Component
+                                .literal("§cInsufficient funds! Need " + symbol + String.format("%.2f", listing.price())));
+                        return;
+                    }
+    
+                    // Process purchase
+                    ShopManager.getInstance().buyListing(listing.id(), player.getUUID()).thenAccept(success -> {
+                        if (success) {
+                            player.getServer().execute(() -> {
+                                var leftover = ItemUtils.giveItems(player, listing.itemId(), listing.quantity());
+                                if (!leftover.isEmpty()) {
+                                    player.drop(leftover, false);
+                                }
+                                player.sendSystemMessage(Component.literal("§aPurchased " + listing.quantity() + "x " + listing.itemId()
+                                        + " for " + symbol + String.format("%.2f", listing.price())));
+        
+                                // Refresh the GUI
+                                ShopSession session = activeSessions.get(player.getUUID());
+                                if (session != null && session.menu instanceof ShopMenu shopMenu) {
+                                    shopMenu.populatePlayerMarket(event.currentPage());
+                                }
+                            });
+                        } else {
+                            player.sendSystemMessage(Component.literal("§cFailed to purchase listing. It may have been sold."));
+                        }
+                    });
+                });
+            });
         }
     }
 

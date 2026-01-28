@@ -28,6 +28,18 @@ public class EssentialsConfig {
         public final ForgeConfigSpec.DoubleValue startingBalance;
         public final ForgeConfigSpec.DoubleValue taxRate;
 
+        public final ForgeConfigSpec.BooleanValue shopsEnabled;
+        public final ForgeConfigSpec.BooleanValue jobsEnabled;
+        public final ForgeConfigSpec.BooleanValue kitsEnabled;
+        
+        // RTP
+        public final ForgeConfigSpec.BooleanValue rtpEnabled;
+        public final ForgeConfigSpec.IntValue rtpCooldown;
+        public final ForgeConfigSpec.IntValue rtpMinRange;
+        public final ForgeConfigSpec.IntValue rtpMaxRange;
+        public final ForgeConfigSpec.IntValue rtpMaxAttempts;
+        public final ForgeConfigSpec.ConfigValue<java.util.List<? extends String>> rtpBlockedBiomes;
+
         static {
                 Pair<EssentialsConfig, ForgeConfigSpec> pair = new ForgeConfigSpec.Builder()
                         .configure(EssentialsConfig::new);
@@ -40,6 +52,15 @@ public class EssentialsConfig {
                 enabled = builder
                         .comment("Enable essentials features")
                         .define("enabled", true);
+                shopsEnabled = builder
+                        .comment("Enable shop features")
+                        .define("shops.enabled", true);
+                jobsEnabled = builder
+                        .comment("Enable jobs features")
+                        .define("jobs.enabled", true);
+                kitsEnabled = builder
+                        .comment("Enable kits features")
+                        .define("kits.enabled", true);
                 
                 // Economy
                 currencySymbol = builder
@@ -85,6 +106,26 @@ public class EssentialsConfig {
                         .comment("Minimum time to wait before using /back after death (seconds)")
                         .comment("Prevents immediate return to boss fights etc.")
                         .defineInRange("teleport.death_back_delay", 60, 0, 3600);
+
+                // RTP
+                rtpEnabled = builder
+                        .comment("Enable RTP command")
+                        .define("teleport.rtp_enabled", true);
+                rtpCooldown = builder
+                        .comment("RTP cooldown in seconds")
+                        .defineInRange("teleport.rtp_cooldown", 30, 0, 3600);
+                rtpMinRange = builder
+                        .comment("Minimum RTP radius")
+                        .defineInRange("teleport.rtp_min_range", 1000, 0, 1000000);
+                rtpMaxRange = builder
+                        .comment("Maximum RTP radius")
+                        .defineInRange("teleport.rtp_max_range", 10000, 0, 1000000);
+                rtpMaxAttempts = builder
+                        .comment("Maximum search attempts before giving up")
+                        .defineInRange("teleport.rtp_max_attempts", 50, 1, 1000);
+                rtpBlockedBiomes = builder
+                        .comment("List of biome IDs to avoid (e.g. minecraft:ocean)")
+                        .define("teleport.rtp_blocked_biomes", java.util.List.of("minecraft:ocean", "minecraft:deep_ocean"));
         }
 
         private static EssentialsConfig instance;
@@ -112,6 +153,18 @@ public class EssentialsConfig {
 
         public double getTaxRate() {
                 return CONFIG.taxRate.get();
+        }
+
+        public boolean isShopsEnabled() {
+                return CONFIG.shopsEnabled.get();
+        }
+
+        public boolean isJobsEnabled() {
+                return CONFIG.jobsEnabled.get();
+        }
+
+        public boolean isKitsEnabled() {
+                return CONFIG.kitsEnabled.get();
         }
 
         // Homes
@@ -159,5 +212,22 @@ public class EssentialsConfig {
         
         public boolean isEnabled() {
                 return CONFIG.enabled.get();
+        }
+
+        // RTP
+        public int getRtpMinRange() {
+                return CONFIG.rtpMinRange.get();
+        }
+
+        public int getRtpMaxRange() {
+                return CONFIG.rtpMaxRange.get();
+        }
+
+        public int getRtpMaxAttempts() {
+                return CONFIG.rtpMaxAttempts.get();
+        }
+
+        public java.util.List<? extends String> getRtpBlockedBiomes() {
+                return CONFIG.rtpBlockedBiomes.get();
         }
 }
