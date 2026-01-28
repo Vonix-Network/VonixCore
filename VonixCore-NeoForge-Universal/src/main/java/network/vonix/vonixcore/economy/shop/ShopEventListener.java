@@ -23,6 +23,7 @@ import net.neoforged.neoforge.event.level.ChunkEvent;
 import net.neoforged.neoforge.event.ServerChatEvent;
 import network.vonix.vonixcore.VonixCore;
 import network.vonix.vonixcore.config.EssentialsConfig;
+import network.vonix.vonixcore.config.ShopsConfig;
 import network.vonix.vonixcore.economy.EconomyManager;
 import network.vonix.vonixcore.economy.ShopManager;
 
@@ -51,7 +52,7 @@ public class ShopEventListener {
             return;
         if (!(event.getEntity() instanceof ServerPlayer player))
             return;
-        if (!EssentialsConfig.CONFIG.shopsEnabled.get())
+        if (!ShopsConfig.CONFIG.enabled.get())
             return;
 
         ServerLevel level = (ServerLevel) event.getLevel();
@@ -67,7 +68,17 @@ public class ShopEventListener {
 
         // Check for chest shop interaction
         if (state.getBlock() instanceof ChestBlock || state.is(Blocks.BARREL)) {
+            if (!ShopsConfig.CONFIG.chestShopsEnabled.get())
+                return;
+
             String world = level.dimension().location().toString();
+
+            // Optimization: Check cache first. If not in cache, assume it's not a shop.
+            // This prevents "Loading..." spam on every chest.
+            if (!ShopManager.getInstance().isShopCached(world, pos)) {
+                return;
+            }
+
             var future = ShopManager.getInstance().getShopAt(world, pos);
             
             if (future.isDone()) {
@@ -392,7 +403,7 @@ public class ShopEventListener {
             return;
         if (!(event.getPlayer() instanceof ServerPlayer player))
             return;
-        if (!EssentialsConfig.CONFIG.shopsEnabled.get())
+        if (!ShopsConfig.CONFIG.enabled.get())
             return;
 
         BlockState state = event.getState();
@@ -402,6 +413,12 @@ public class ShopEventListener {
 
         String world = player.level().dimension().location().toString();
         BlockPos pos = event.getPos();
+
+        // Optimization: Check cache first. If not in cache, assume it's not a shop.
+        if (!ShopManager.getInstance().isShopCached(world, pos)) {
+            return;
+        }
+
         var future = ShopManager.getInstance().getShopAt(world, pos);
 
         if (future.isDone()) {
@@ -438,7 +455,7 @@ public class ShopEventListener {
      */
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onPlayerChat(ServerChatEvent event) {
-        if (!EssentialsConfig.CONFIG.shopsEnabled.get())
+        if (!ShopsConfig.CONFIG.enabled.get())
             return;
 
         ServerPlayer player = event.getPlayer();
@@ -680,7 +697,7 @@ public class ShopEventListener {
     public static void onChunkLoad(ChunkEvent.Load event) {
         if (event.getLevel().isClientSide())
             return;
-        if (!EssentialsConfig.CONFIG.shopsEnabled.get())
+        if (!ShopsConfig.CONFIG.enabled.get())
             return;
         // Skip if mod or database not yet initialized (happens during world generation)
         if (VonixCore.getInstance() == null || VonixCore.getInstance().getDatabase() == null)

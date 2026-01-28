@@ -167,6 +167,13 @@ public class ShopManager {
     }
 
     /**
+     * Check if a shop is in the cache.
+     */
+    public boolean isShopCached(String world, BlockPos pos) {
+        return shopCache.containsKey(shopKey(world, pos));
+    }
+
+    /**
      * Get shop at a location.
      */
     public CompletableFuture<Optional<ChestShop>> getShopAt(String world, BlockPos pos) {
